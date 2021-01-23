@@ -117,11 +117,11 @@ def geometric_mean(unsorted_x: uint256[N_COINS]) -> uint256:
         tmp: uint256 = 10**18
         for _x in x:
             tmp = tmp * _x / D
-            D = D * ((N_COINS - 1) * 10**18 + tmp) / (N_COINS * 10**18)
-            if D > D_prev:
-                diff = D - D_prev
-            else:
-                diff = D_prev - D
-            if diff <= 1 or diff * 10**18 < D:
-                return D
+        D = D * ((N_COINS - 1) * 10**18 + tmp) / (N_COINS * 10**18)
+        if D > D_prev:
+            diff = D - D_prev
+        else:
+            diff = D_prev - D
+        if diff <= 1 or diff * 10**18 < D:
+            return D
     raise "Did not converge"
