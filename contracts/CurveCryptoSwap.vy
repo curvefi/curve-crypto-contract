@@ -64,5 +64,64 @@ def __init__(
     self.fee_gamma = fee_gamma
     self.adjustment_step = adjustment_step
     self.admin_fee = admin_fee
-    self.price_scale = initial_prices
-    self.price_oracle = initial_prices
+    new_initial_prices: uint256[N_COINS] = initial_prices
+    precisions: uint256[N_COINS] = PRECISION_MUL
+    new_initial_prices[0] = precisions[0] * PRECISION  # First price is always 1e18
+    self.price_scale = new_initial_prices
+    self.price_oracle = new_initial_prices
+
+
+@internal
+@view
+def xp() -> uint256[N_COINS]:
+    result: uint256[N_COINS] = self.balances
+    # PRECISION_MUL is already contained in self.price_scale
+    for i in range(N_COINS):
+        result[i] = result[i] * self.price_scale[i] / PRECISION
+    return result
+
+
+@internal
+@pure
+def sort(A0: uint256[N_COINS]) -> uint256[N_COINS]:
+    """
+    Insertion sort from high to low
+    """
+    A: uint256[N_COINS] = A0
+    for i in range(1, N_COINS):
+        x: uint256 = A[i]
+        cur: uint256 = i
+        for j in range(N_COINS):
+            y: uint256 = A[cur-1]
+            if y > x:
+                break
+            A[cur] = y
+            cur -= 1
+            if cur == 0:
+                break
+        A[cur] = x
+    return A
+
+
+@internal
+@view
+def geometric_mean(unsorted_x: uint256[N_COINS]) -> uint256:
+    """
+    (x[0] * x[1] * ...) ** (1/N)
+    """
+    x: uint256[N_COINS] = self.sort(unsorted_x)
+    D: uint256 = x[0]
+    diff: uint256 = 0
+    for i in range(255):
+        D_prev: uint256 = D
+        tmp: uint256 = 10**18
+        for _x in x:
+            tmp = tmp * _x / D
+            D = D * ((N_COINS - 1) * 10**18 + tmp) / (N_COINS * 10**18)
+            if D > D_prev:
+                diff = D - D_prev
+            else:
+                diff = D_prev - D
+            if diff <= 1 or diff * 10**18 < D:
+                return D
+    raise "Did not converge"
