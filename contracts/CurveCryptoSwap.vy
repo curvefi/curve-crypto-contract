@@ -105,11 +105,13 @@ def sort(A0: uint256[N_COINS]) -> uint256[N_COINS]:
 
 @internal
 @view
-def geometric_mean(unsorted_x: uint256[N_COINS]) -> uint256:
+def geometric_mean(unsorted_x: uint256[N_COINS], sort: bool = True) -> uint256:
     """
     (x[0] * x[1] * ...) ** (1/N)
     """
-    x: uint256[N_COINS] = self.sort(unsorted_x)
+    x: uint256[N_COINS] = unsorted_x
+    if sort:
+        x = self.sort(x)
     D: uint256 = x[0]
     diff: uint256 = 0
     for i in range(255):
@@ -147,3 +149,65 @@ def reduction_coefficient(x: uint256[N_COINS], gamma: uint256) -> uint256:
     if gamma > 0:
         K = gamma * 10**18 / (gamma + 10**18 - K)
     return K
+
+
+@internal
+@view
+def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint256:
+    """
+    Finding the invariant using Newton method.
+    ANN is higher by the factor A_MULTIPLIER
+    ANN is already A * N**N
+
+    Currently uses 60k gas
+    """
+    # Initial value of invariant D is that for constant-product invariant
+    x: uint256[N_COINS] = self.sort(x_unsorted)
+    D: uint256 = N_COINS * self.geometric_mean(x, False)
+    S: uint256 = 0
+    for x_i in x:
+        S += x_i
+
+    for i in range(255):
+        D_prev: uint256 = D
+
+        K0: uint256 = 10**18
+        for _x in x:
+            K0 = K0 * _x * N_COINS / D
+
+        _g1k0: uint256 = gamma + 10**18
+        if _g1k0 > K0:
+            _g1k0 -= K0
+        else:
+            _g1k0 = K0 - _g1k0
+
+        # D / (A * N**N) * _g1k0**2 / gamma**2
+        mul1: uint256 = 10**18 * D / gamma * _g1k0 / gamma * _g1k0 * A_MULTIPLIER / ANN
+
+        # 2*N*K0 / _g1k0
+        mul2: uint256 = (2 * 10**18) * N_COINS * K0 / _g1k0
+
+        neg_fprime: uint256 = (S + S * mul2 / 10**18) + mul1 * N_COINS / K0 - mul2 * D / 10**18
+
+        # D -= f / fprime
+        D_plus: uint256 = D * (neg_fprime + S) / neg_fprime
+        D_minus: uint256 = D*D / neg_fprime
+        if 10**18 > K0:
+            D_minus += D * (mul1 / neg_fprime) / 10**18 * (10**18 - K0) / K0
+        else:
+            D_minus -= D * (mul1 / neg_fprime) / 10**18 * (K0 - 10**18) / K0
+
+        if D_plus > D_minus:
+            D = D_plus - D_minus
+        else:
+            D = (D_minus - D_plus) / 2
+
+        diff: uint256 = 0
+        if D > D_prev:
+            diff = D - D_prev
+        else:
+            diff = D_prev - D
+        if diff * 10**14 < max(10**16, D):  # Could reduce precision for gas efficiency here
+            return D
+
+    raise "Did not converge"

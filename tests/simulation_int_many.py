@@ -201,11 +201,11 @@ def newton_D(A, gamma, x, D0):
         assert neg_fprime > 0  # Python only: -f' > 0
 
         # D -= f / fprime
-        D = (D * neg_fprime + D * S - D**2) // neg_fprime - D * (mul1 // neg_fprime) // 10**18 * (10**18 - K0) // K0
+        D = (D * neg_fprime + D * S) // neg_fprime - D**2 // neg_fprime - D * (mul1 // neg_fprime) // 10**18 * (10**18 - K0) // K0
 
         if D < 0:
             D = -D // 2
-        if abs(D - D_prev) <= max(100, D // 10**14):
+        if abs(D - D_prev) * 10**14 < max(10**16, D):
             return D
 
     raise ValueError("Did not converge")
