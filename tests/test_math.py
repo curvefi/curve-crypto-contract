@@ -1,4 +1,5 @@
 import pytest
+from . import simulation_int_many as sim
 from brownie.test import given, strategy
 from itertools import permutations
 
@@ -39,3 +40,15 @@ def test_reduction_coefficient(test_math):
     assert result > 0
     assert result < 10**18
     assert result > 9 * 10**17
+
+
+@given(
+    x0=strategy('uint256', min_value=10**9, max_value=10**9 * 10**18),
+    x1=strategy('uint256', min_value=10**9, max_value=10**9 * 10**18),
+    x2=strategy('uint256', min_value=10**9, max_value=10**9 * 10**18),
+    gamma=strategy('uint256', min_value=0, max_value=10**17)
+)
+def test_reduction_coefficient_sim(test_math, x0, x1, x2, gamma):
+    result_contract = test_math.pub_reduction_coefficient([x0, x1, x2], gamma)
+    result_sim = sim.reduction_coefficient([x0, x1, x2], gamma)
+    assert result_contract == result_sim
