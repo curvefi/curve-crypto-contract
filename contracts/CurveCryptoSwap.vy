@@ -125,3 +125,25 @@ def geometric_mean(unsorted_x: uint256[N_COINS]) -> uint256:
         if diff <= 1 or diff * 10**18 < D:
             return D
     raise "Did not converge"
+
+
+@internal
+@pure
+def reduction_coefficient(x: uint256[N_COINS], gamma: uint256) -> uint256:
+    """
+    gamma / (gamma + (1 - K))
+    where
+    K = prod(x) / (sum(x) / N)**N
+    (all normalized to 1e18)
+    """
+    K: uint256 = 10**18
+    S: uint256 = 0
+    for x_i in x:
+        S += x_i
+    # Could be good to pre-sort x, but it is used only for dynamic fee,
+    # so that is not so important
+    for x_i in x:
+        K = K * N_COINS * x_i / S
+    if gamma > 0:
+        K = gamma * 10**18 / (gamma + 10**18 - K)
+    return K
