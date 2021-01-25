@@ -67,3 +67,23 @@ def test_newton_D(test_math, A, x, yx, zx, gamma):
     # test_math.public_newton_D_w(A, gamma, X)
     result_contract = test_math.public_newton_D(A, gamma, X)
     assert abs(result_sim - result_contract) <= max(2, result_sim/1e15)
+
+
+@given(
+       A=strategy('uint256', min_value=1, max_value=10000),
+       x=strategy('uint256', min_value=10**17, max_value=10**9 * 10**18),  # 1e-9 USD to 1e9 USD
+       yx=strategy('uint256', min_value=5 * 10**15, max_value=2 * 10**20),  # <- ratio 1e18 * y/x, typically 1e18 * 1
+       zx=strategy('uint256', min_value=5 * 10**15, max_value=2 * 10**20),  # <- ratio 1e18 * z/x, typically 1e18 * 1
+       gamma=strategy('uint256', min_value=10**10, max_value=10**16),  # gamma from 1e-8 up to 0.01
+       i=strategy('uint256', min_value=0, max_value=2),
+       j=strategy('uint256', min_value=0, max_value=2),
+       inx=strategy('uint256', min_value=5 * 10**15, max_value=2 * 10**20)
+)
+def test_newton_y(test_math, A, x, yx, zx, gamma, i, j, inx):
+    X = [x, x * yx // 10**18, x * zx // 10**18]
+    in_amount = x * inx // 10**18
+    D = sim.solve_D(A, gamma, X)
+    X[i] = in_amount
+    result_sim = sim.solve_x(A, gamma, X, D, j)
+    result_contract = test_math.public_newton_y(A, gamma, X, D, j)
+    assert abs(result_sim - result_contract) <= max(30, result_sim/1e15)

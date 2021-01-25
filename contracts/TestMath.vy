@@ -224,7 +224,13 @@ def newton_y(ANN: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: u
             diff = y - y_prev
         else:
             diff = y_prev - y
-        if diff <= max(convergence_limit, y / 10**14):
+        if diff < max(convergence_limit, y / 10**14):
             return y
 
     raise "Did not converge"
+
+
+@external
+@view
+def public_newton_y(A: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: uint256) -> uint256:
+    return self.newton_y(A * N_COINS**N_COINS * A_MULTIPLIER, gamma, x, D, i)
