@@ -234,3 +234,45 @@ def newton_y(ANN: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: u
 @view
 def public_newton_y(A: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: uint256) -> uint256:
     return self.newton_y(A * N_COINS**N_COINS * A_MULTIPLIER, gamma, x, D, i)
+
+
+@internal
+@pure
+def halfpow(power: uint256, precision: uint256) -> uint256:
+    """
+    1e18 * 0.5 ** (power/1e18)
+    """
+    intpow: uint256 = power / 10**18
+    otherpow: uint256 = power - intpow * 10**18
+    if intpow > 59:
+        return 0
+    result: uint256 = 10**18 / (2**intpow)
+
+    term: uint256 = 10**18
+    x: uint256 = 5 * 10**17
+    S: uint256 = 10**18
+    neg: bool = False
+
+    for i in range(1, 256):
+        K: uint256 = i * 10**18
+        c: uint256 = K - 10**18
+        if otherpow > c:
+            c = otherpow - c
+            neg = not neg
+        else:
+            c -= otherpow
+        term = term * (c * x / 10**18) / K
+        if neg:
+            S -= term
+        else:
+            S += term
+        if term < precision:
+            return result * S / 10**18
+
+    raise "Did not converge"
+
+
+@external
+@view
+def public_halfpow(power: uint256, precision: uint256) -> uint256:
+    return self.halfpow(power, precision)

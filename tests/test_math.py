@@ -87,3 +87,13 @@ def test_newton_y(test_math, A, x, yx, zx, gamma, i, j, inx):
     result_sim = sim.solve_x(A, gamma, X, D, j)
     result_contract = test_math.public_newton_y(A, gamma, X, D, j)
     assert abs(result_sim - result_contract) <= max(30, result_sim/1e15)
+
+
+@given(
+    strategy('uint256', min_value=0, max_value=10**22),
+    strategy('uint256', min_value=10, max_value=10**15)
+)
+def test_exp(test_math, power, precision):
+    pow_int = test_math.public_halfpow(power, precision) / 1e18
+    pow_ideal = 0.5 ** (power / 1e18)
+    assert abs(pow_int - pow_ideal) < max(5 * precision / 1e18, 5e-16)
