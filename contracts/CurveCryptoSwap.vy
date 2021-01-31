@@ -15,8 +15,11 @@ FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
 A_MULTIPLIER: constant(uint256) = 100
 
-price_scale: public(uint256[N_COINS])
-price_oracle: public(uint256[N_COINS])  # Given by MA
+price_scale: public(uint256[N_COINS-1])   # Internal price scale
+price_oracle: public(uint256[N_COINS-1])  # Price target given by MA
+
+last_prices: public(uint256[N_COINS-1])
+last_prices_timestamp: public(uint256)
 
 A_precise: public(uint256)
 gamma: public(uint256)
@@ -25,17 +28,21 @@ out_fee: public(uint256)
 price_threshold: public(uint256)
 fee_gamma: public(uint256)
 adjustment_step: public(uint256)
-# MA parameters are needed, too
+ma_half_time: public(uint256)
 
 balances: public(uint256[N_COINS])
 coins: public(address[N_COINS])
-# XXX should we store the invariant?
+D: public(uint256)
 
 token: public(address)
 owner: public(address)
 
 admin_fee: public(uint256)
 # XXX admin fee charging requires work
+
+virtual_price: public(uint256)  # xcp_profit_real in simulation
+xcp_profit: uint256
+xcp: uint256
 
 
 @external
@@ -51,7 +58,8 @@ def __init__(
     fee_gamma: uint256,
     adjustment_step: uint256,
     admin_fee: uint256,
-    initial_prices: uint256[N_COINS]
+    ma_half_time: uint256,
+    initial_prices: uint256[N_COINS-1]
 ):
     self.owner = owner
     self.coins = coins
@@ -64,23 +72,30 @@ def __init__(
     self.fee_gamma = fee_gamma
     self.adjustment_step = adjustment_step
     self.admin_fee = admin_fee
-    new_initial_prices: uint256[N_COINS] = initial_prices
+    new_initial_prices: uint256[N_COINS-1] = initial_prices
     precisions: uint256[N_COINS] = PRECISION_MUL
     new_initial_prices[0] = precisions[0] * PRECISION  # First price is always 1e18
     self.price_scale = new_initial_prices
     self.price_oracle = new_initial_prices
+    self.last_prices = new_initial_prices
+    self.last_prices_timestamp = block.timestamp
+    self.ma_half_time = ma_half_time
 
 
+# XXX do we end up calling it?
 @internal
 @view
 def xp() -> uint256[N_COINS]:
     result: uint256[N_COINS] = self.balances
     # PRECISION_MUL is already contained in self.price_scale
-    for i in range(N_COINS):
-        result[i] = result[i] * self.price_scale[i] / PRECISION
+    for i in range(N_COINS-1):
+        result[i+1] = result[i+1] * self.price_scale[i] / PRECISION
     return result
 
 
+####################################
+# Necessary mathematical functions #
+####################################
 @internal
 @pure
 def sort(A0: uint256[N_COINS]) -> uint256[N_COINS]:
@@ -319,3 +334,135 @@ def halfpow(power: uint256, precision: uint256) -> uint256:
             return result * S / 10**18
 
     raise "Did not converge"
+
+
+@internal
+@pure
+def sqrt_int(x: uint256) -> uint256:
+    if x == 0:
+        return 0
+
+    z: uint256 = (x + 10**18) / 2
+    y: uint256 = x
+
+    for i in range(256):
+        if z == y:
+            return y
+        y = z
+        z = (x * 10**18 / z + z) / 2
+
+    raise "Did not converge"
+
+###################################
+#           Actual logic          #
+###################################
+@internal
+@view
+def _fee(xp: uint256[N_COINS]) -> uint256:
+    f: uint256 = self.reduction_coefficient(xp, self.fee_gamma)
+    return (self.mid_fee * f + self.out_fee * (10**18 - f)) / 10**18
+
+
+@external
+@view
+def fee() -> uint256:
+    return self._fee(self.xp())
+
+
+@internal
+@view
+def get_xcp() -> uint256:
+    D: uint256 = self.D
+    x: uint256[N_COINS] = empty(uint256[N_COINS])
+    x[0] = D / N_COINS
+    for i in range(N_COINS-1):
+        x[i+1] = D * 10**18 / (N_COINS * self.price_oracle[i])
+    return self.geometric_mean(x)
+
+
+@internal
+def update_xcp(only_vprice: bool = False):
+    xcp: uint256 = self.get_xcp()
+    old_xcp: uint256 = self.xcp
+    self.virtual_price = self.virtual_price * xcp / old_xcp
+    if not only_vprice:
+        self.xcp_profit = self.xcp_profit * xcp / old_xcp
+    self.xcp = xcp
+
+
+@internal
+def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256):
+    """
+    dx of coin i -> dy of coin j
+
+    TODO: this can be compressed by having each number being 128 bits
+    """
+    # Update MA if needed
+    price_oracle: uint256[N_COINS-1] = self.price_oracle
+    last_prices_timestamp: uint256 = self.last_prices_timestamp
+    last_prices: uint256[N_COINS-1] = self.last_prices
+    if self.last_prices_timestamp < block.timestamp:
+        # MA update required
+        ma_half_time: uint256 = self.ma_half_time
+        alpha: uint256 = self.halfpow((block.timestamp - last_prices_timestamp) * 10**18 / ma_half_time, 10**10)
+        for k in range(N_COINS-1):
+            price_oracle[k] = (last_prices[k] * (10**18 - alpha) + price_oracle[k] * alpha) / 10**18
+        self.price_oracle = price_oracle
+        self.last_prices_timestamp = block.timestamp
+
+    # Save the last price
+    p: uint256 = 0
+    ix: uint256 = j
+    if i != 0 and j != 0:
+        p = last_prices[i] * dx / dy
+    elif i == 0:
+        p = dx * 10**18 / dy
+    else:  # j == 0
+        p = dy * 10**18 / dx
+        ix = i
+    self.last_prices[ix] = p
+
+    # The actual algo
+    norm: uint256 = 0
+    price_scale: uint256[N_COINS-1] = self.price_scale
+    for k in range(N_COINS-1):
+        ratio: uint256 = price_oracle[k] * 10**18 / price_scale[k]
+        if ratio > 10**18:
+            ratio -= 10**18
+        else:
+            ratio = 10**18 - ratio
+        norm += ratio**2
+
+    # self.price_threshold must be > self.adjustment_step
+    # should we pause for a bit if profit wasn't enough to not spend this gas every time?
+    if norm > self.price_threshold ** 2:
+        norm = self.sqrt_int(norm)  # XXX implement
+        adjustment_step: uint256 = self.adjustment_step
+
+        p_new: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+        for k in range(N_COINS-1):
+            p_new[k] = (price_scale[k] * (norm - adjustment_step) + adjustment_step * price_oracle[k]) / norm
+
+        # Calculate balances*prices
+        xp: uint256[N_COINS] = self.balances
+        for k in range(N_COINS-1):
+            xp[k+1] = xp[k+1] * p_new[k] / PRECISION
+
+        # Calculate "extended constant product" invariant xCP
+        D: uint256 = self.newton_D(self.A_precise, self.gamma, xp)
+        xp[0] = D / N_COINS
+        for k in range(N_COINS-1):
+            xp[k+1] = D * 10**18 / (N_COINS * p_new[k])
+        xcp: uint256 = self.geometric_mean(xp)
+        old_xcp: uint256 = self.xcp
+        xcp_profit: uint256 = self.xcp_profit
+        vprice: uint256 = self.virtual_price * xcp / old_xcp
+
+        # Proceed if we've got enough profit
+        if 2 * (vprice - 10**18) > xcp_profit - 10**18:
+            self.price_scale = p_new
+            self.D = D
+            self.xcp_profit = xcp_profit * xcp / old_xcp
+            self.virtual_price = vprice
+
+        # else - make a delay?
