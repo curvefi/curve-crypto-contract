@@ -97,3 +97,10 @@ def test_exp(test_math, power, precision):
     pow_int = test_math.public_halfpow(power, precision) / 1e18
     pow_ideal = 0.5 ** (power / 1e18)
     assert abs(pow_int - pow_ideal) < max(5 * precision / 1e18, 5e-16)
+
+
+@given(strategy('uint256', max_value=2**255 // 10**18))
+def test_sqrt(test_math, x):
+    sqrt_int = test_math.public_sqrt_int(x)
+    sqrt_ideal = int((x / 1e18)**0.5 * 1e18)
+    assert abs(sqrt_int - sqrt_ideal) <= max(1, sqrt_ideal/1e15)

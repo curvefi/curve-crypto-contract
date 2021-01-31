@@ -276,3 +276,27 @@ def halfpow(power: uint256, precision: uint256) -> uint256:
 @view
 def public_halfpow(power: uint256, precision: uint256) -> uint256:
     return self.halfpow(power, precision)
+
+
+@internal
+@pure
+def sqrt_int(x: uint256) -> uint256:
+    if x == 0:
+        return 0
+
+    z: uint256 = (x + 10**18) / 2
+    y: uint256 = x
+
+    for i in range(256):
+        if z == y:
+            return y
+        y = z
+        z = (x * 10**18 / z + z) / 2
+
+    raise "Did not converge"
+
+
+@external
+@view
+def public_sqrt_int(x: uint256) -> uint256:
+    return self.sqrt_int(x)
