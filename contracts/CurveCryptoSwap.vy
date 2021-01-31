@@ -436,7 +436,7 @@ def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256):
     # self.price_threshold must be > self.adjustment_step
     # should we pause for a bit if profit wasn't enough to not spend this gas every time?
     if norm > self.price_threshold ** 2:
-        norm = self.sqrt_int(norm)  # XXX implement
+        norm = self.sqrt_int(norm)
         adjustment_step: uint256 = self.adjustment_step
 
         p_new: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
@@ -466,3 +466,27 @@ def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256):
             self.virtual_price = vprice
 
         # else - make a delay?
+
+
+@external
+@nonreentrant('lock')
+def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
+    pass
+
+
+@external
+@view
+def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
+    return 0
+
+
+@external
+@nonreentrant('lock')
+def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
+    pass
+
+
+@external
+@nonreentrant('lock')
+def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
+    pass
