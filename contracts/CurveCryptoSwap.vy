@@ -8,6 +8,14 @@ interface CurveToken:
     def mint(_to: address, _value: uint256) -> bool: nonpayable
     def burnFrom(_to: address, _value: uint256) -> bool: nonpayable
 
+# Events
+event TokenExchange:
+    buyer: indexed(address)
+    sold_id: uint256
+    tokens_sold: uint256
+    bought_id: uint256
+    tokens_bought: uint256
+
 
 N_COINS: constant(int128) = 3  # <- change
 PRECISION_MUL: constant(uint256[N_COINS]) = [1, 1, 1]  # 3usd, renpool, eth
@@ -82,7 +90,6 @@ def __init__(
     self.ma_half_time = ma_half_time
 
 
-# XXX do we end up calling it?
 @internal
 @view
 def xp() -> uint256[N_COINS]:
@@ -124,6 +131,7 @@ def geometric_mean(unsorted_x: uint256[N_COINS], sort: bool = True) -> uint256:
     """
     (x[0] * x[1] * ...) ** (1/N)
     """
+    # XXX check limits of applicability
     x: uint256[N_COINS] = unsorted_x
     if sort:
         x = self.sort(x)
@@ -153,6 +161,7 @@ def reduction_coefficient(x: uint256[N_COINS], gamma: uint256) -> uint256:
     K = prod(x) / (sum(x) / N)**N
     (all normalized to 1e18)
     """
+    # XXX check limits of applicability
     K: uint256 = 10**18
     S: uint256 = 0
     for x_i in x:
@@ -176,6 +185,7 @@ def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint
 
     Currently uses 60k gas
     """
+    # XXX check limits of applicability
     # Initial value of invariant D is that for constant-product invariant
     x: uint256[N_COINS] = self.sort(x_unsorted)
     D: uint256 = N_COINS * self.geometric_mean(x, False)
@@ -235,6 +245,7 @@ def newton_y(ANN: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: u
     Calculating x[i] given other balances x[0..N_COINS-1] and invariant D
     ANN = A * N**N
     """
+    # XXX check limits of applicability
     y: uint256 = D / N_COINS
     K0_i: uint256 = 10**18
     S_i: uint256 = 0
@@ -391,7 +402,7 @@ def update_xcp(only_vprice: bool = False):
 
 
 @internal
-def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256):
+def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256) -> bool:
     """
     dx of coin i -> dy of coin j
 
@@ -464,14 +475,53 @@ def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256):
             self.D = D
             self.xcp_profit = xcp_profit * xcp / old_xcp
             self.virtual_price = vprice
+            return True
 
         # else - make a delay?
+
+    return False
 
 
 @external
 @nonreentrant('lock')
-def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
-    pass
+def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
+    # XXX is killed?
+    assert i != j and i < N_COINS and j < N_COINS
+
+    input_coin: address = self.coins[i]
+    assert ERC20(input_coin).transferFrom(msg.sender, self, dx)
+
+    price_scale: uint256[N_COINS-1] = self.price_scale
+    xp: uint256[N_COINS] = self.balances
+    y0: uint256 = xp[j]
+    xp[i] += dx
+    for k in range(N_COINS-1):
+        xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
+
+    A: uint256 = self.A_precise
+    gamma: uint256 = self.gamma
+
+    y: uint256 = self.newton_y(self.A_precise, self.gamma, xp, self.D, j)
+    dy: uint256 = xp[j] - y - 1
+    xp[j] = y
+    if j > 0:
+        dy = dy * PRECISION / price_scale[j-1]
+    dy -= self._fee(xp) * dy / 10**10
+    assert dy >= min_dy, "Exchange resulted in fewer coins than expected"
+
+    self.balances[j] = y0 - dy
+    output_coin: address = self.coins[j]
+    assert ERC20(output_coin).transfer(msg.sender, dy)
+
+    if not self.tweak_price(i, dx, j, dy):
+        if j == 0:
+            xp[0] = y0 - dy
+        else:
+            xp[j] = (y0 - dy) * price_scale[j-1] / PRECISION
+        self.D = self.newton_D(A, gamma, xp)
+
+    # XXX admin fee is not as easy - requires work!
+    log TokenExchange(msg.sender, i, dx, j, dy)
 
 
 @external
