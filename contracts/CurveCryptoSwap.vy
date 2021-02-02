@@ -393,6 +393,14 @@ def get_xcp() -> uint256:
     return self.geometric_mean(x)
 
 
+@external
+@view
+def get_virtual_price() -> uint256:
+    # XXX save virtual price at the very first liquidity deposit
+    # and divide by it here to have virtual_price starting from 1.0
+    return self.get_xcp() * 10**18 / CurveToken(self.token).totalSupply()
+
+
 @internal
 def update_xcp(only_real: bool = False):
     xcp: uint256 = self.get_xcp()
