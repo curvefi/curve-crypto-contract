@@ -48,9 +48,11 @@ owner: public(address)
 admin_fee: public(uint256)
 # XXX admin fee charging requires work
 
-virtual_price: public(uint256)  # xcp_profit_real in simulation
+xcp_profit_real: public(uint256)  # xcp_profit_real in simulation
 xcp_profit: uint256
 xcp: uint256
+
+is_killed: public(uint256)
 
 
 @external
@@ -392,11 +394,11 @@ def get_xcp() -> uint256:
 
 
 @internal
-def update_xcp(only_vprice: bool = False):
+def update_xcp(only_real: bool = False):
     xcp: uint256 = self.get_xcp()
     old_xcp: uint256 = self.xcp
-    self.virtual_price = self.virtual_price * xcp / old_xcp
-    if not only_vprice:
+    self.xcp_profit_real = self.xcp_profit_real * xcp / old_xcp
+    if not only_real:
         self.xcp_profit = self.xcp_profit * xcp / old_xcp
     self.xcp = xcp
 
@@ -467,14 +469,14 @@ def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256) -> bool:
         xcp: uint256 = self.geometric_mean(xp)
         old_xcp: uint256 = self.xcp
         xcp_profit: uint256 = self.xcp_profit
-        vprice: uint256 = self.virtual_price * xcp / old_xcp
+        xcp_profit_real: uint256 = self.xcp_profit_real * xcp / old_xcp
 
         # Proceed if we've got enough profit
-        if 2 * (vprice - 10**18) > xcp_profit - 10**18:
+        if 2 * (xcp_profit_real - 10**18) > xcp_profit - 10**18:
             self.price_scale = p_new
             self.D = D
             self.xcp_profit = xcp_profit * xcp / old_xcp
-            self.virtual_price = vprice
+            self.xcp_profit_real = xcp_profit_real
             return True
 
         # else - make a delay?
@@ -485,7 +487,7 @@ def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256) -> bool:
 @external
 @nonreentrant('lock')
 def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
-    # XXX is killed?
+    assert not self.is_killed
     assert i != j and i < N_COINS and j < N_COINS
 
     input_coin: address = self.coins[i]
