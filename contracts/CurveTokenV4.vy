@@ -164,6 +164,23 @@ def mint(_to: address, _value: uint256) -> bool:
 
 
 @external
+def mint_relative(_to: address, frac: uint256) -> bool:
+    """
+    @dev Increases supply by factor of (1 + frac/1e18) and mints it for _to
+    """
+    assert msg.sender == self.minter
+
+    supply: uint256 = self.totalSupply
+    d_supply: uint256 = supply * frac / 10**18
+    if d_supply > 0:
+        self.totalSupply = supply + d_supply
+        self.balanceOf[_to] += d_supply
+        log Transfer(ZERO_ADDRESS, _to, d_supply)
+
+    return True
+
+
+@external
 def burnFrom(_to: address, _value: uint256) -> bool:
     """
     @dev Burn an amount of the token from a given account.

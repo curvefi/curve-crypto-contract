@@ -6,6 +6,7 @@ from vyper.interfaces import ERC20
 interface CurveToken:
     def totalSupply() -> uint256: view
     def mint(_to: address, _value: uint256) -> bool: nonpayable
+    def mint_relative(_to: address, frac: uint256) -> bool: nonpayable
     def burnFrom(_to: address, _value: uint256) -> bool: nonpayable
 
 # Events
@@ -469,6 +470,11 @@ def tweak_price(_xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: 
     xcp_profit_real: uint256 = old_xcp_profit_real * xcp / old_xcp
     xcp_profit: uint256 = old_xcp_profit * xcp / old_xcp
     self.xcp_profit = xcp_profit
+
+    # Mint admin fees
+    frac: uint256 = (10**18 * xcp / old_xcp - 10**18) * self.admin_fee / (2 * 10**10)
+    if frac > 0:
+        assert CurveToken(self.token).mint_relative(self.owner, frac)
 
     # self.price_threshold must be > self.adjustment_step
     # should we pause for a bit if profit wasn't enough to not spend this gas every time?
