@@ -412,7 +412,7 @@ def update_xcp(only_real: bool = False):
 
 
 @internal
-def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256) -> bool:
+def tweak_price(_xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: uint256) -> bool:
     """
     dx of coin i -> dy of coin j
 
@@ -443,8 +443,11 @@ def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256) -> bool:
         ix = i
     self.last_prices[ix] = p
 
-    # The actual algo
     norm: uint256 = 0
+    A: uint256 = self.A_precise
+    gamma: uint256 = self.gamma
+    old_xcp_profit: uint256 = self.xcp_profit
+    old_xcp_profit_real: uint256 = self.xcp_profit_real
     price_scale: uint256[N_COINS-1] = self.price_scale
     for k in range(N_COINS-1):
         ratio: uint256 = price_oracle[k] * 10**18 / price_scale[k]
@@ -453,6 +456,19 @@ def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256) -> bool:
         else:
             ratio = 10**18 - ratio
         norm += ratio**2
+
+
+    # Update profit numbers without price adjustment first
+    D_unadjusted: uint256 = self.newton_D(A, gamma, _xp)
+    xp: uint256[N_COINS] = empty(uint256[N_COINS])
+    xp[0] = D_unadjusted / N_COINS
+    for k in range(N_COINS-1):
+        xp[k+1] = D_unadjusted * 10**18 / (N_COINS * price_scale[k])
+    old_xcp: uint256 = self.xcp
+    xcp: uint256 = self.geometric_mean(xp)
+    xcp_profit_real: uint256 = old_xcp_profit_real * xcp / old_xcp
+    xcp_profit: uint256 = old_xcp_profit * xcp / old_xcp
+    self.xcp_profit = xcp_profit
 
     # self.price_threshold must be > self.adjustment_step
     # should we pause for a bit if profit wasn't enough to not spend this gas every time?
@@ -465,29 +481,31 @@ def tweak_price(i: uint256, dx: uint256, j: uint256, dy: uint256) -> bool:
             p_new[k] = (price_scale[k] * (norm - adjustment_step) + adjustment_step * price_oracle[k]) / norm
 
         # Calculate balances*prices
-        xp: uint256[N_COINS] = self.balances
+        xp = _xp
         for k in range(N_COINS-1):
-            xp[k+1] = xp[k+1] * p_new[k] / PRECISION
+            xp[k+1] = _xp[k+1] * p_new[k] / price_scale[k]
 
         # Calculate "extended constant product" invariant xCP
-        D: uint256 = self.newton_D(self.A_precise, self.gamma, xp)
+        D: uint256 = self.newton_D(A, gamma, xp)
         xp[0] = D / N_COINS
         for k in range(N_COINS-1):
             xp[k+1] = D * 10**18 / (N_COINS * p_new[k])
-        xcp: uint256 = self.geometric_mean(xp)
-        old_xcp: uint256 = self.xcp
-        xcp_profit: uint256 = self.xcp_profit
-        xcp_profit_real: uint256 = self.xcp_profit_real * xcp / old_xcp
+        xcp = self.geometric_mean(xp)
+        old_xcp_profit_real = old_xcp_profit_real * xcp / old_xcp  # Just reusing a variable here: it's not old anymore
 
         # Proceed if we've got enough profit
-        if 2 * (xcp_profit_real - 10**18) > xcp_profit - 10**18:
+        if 2 * (old_xcp_profit_real - 10**18) > xcp_profit - 10**18:
             self.price_scale = p_new
             self.D = D
-            self.xcp_profit = xcp_profit * xcp / old_xcp
-            self.xcp_profit_real = xcp_profit_real
+            self.xcp_profit_real = old_xcp_profit_real
             return True
 
         # else - make a delay?
+
+    # If we are here, the price_scale adjustment did not happen
+    # Still need to update the profit counter and D
+    self.D = D_unadjusted
+    self.xcp_profit_real = xcp_profit_real
 
     return False
 
@@ -523,11 +541,11 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     output_coin: address = self.coins[j]
     assert ERC20(output_coin).transfer(msg.sender, dy)
 
-    if not self.tweak_price(i, dx, j, dy):
-        if j == 0:
-            xp[0] = y0 - dy
-        else:
-            xp[j] = (y0 - dy) * price_scale[j-1] / PRECISION
+    if j == 0:
+        xp[0] = y0 - dy
+    else:
+        xp[j] = (y0 - dy) * price_scale[j-1] / PRECISION
+    if not self.tweak_price(xp, i, dx, j, dy):
         self.D = self.newton_D(A, gamma, xp)
 
     # XXX admin fee is not as easy - requires work!
