@@ -473,6 +473,7 @@ def tweak_price(_xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: 
 
     # Mint admin fees
     frac: uint256 = (10**18 * xcp / old_xcp - 10**18) * self.admin_fee / (2 * 10**10)
+    # /2 here is because half of the fee usually goes for retargeting the price
     if frac > 0:
         assert CurveToken(self.token).mint_relative(self.owner, frac)
 
