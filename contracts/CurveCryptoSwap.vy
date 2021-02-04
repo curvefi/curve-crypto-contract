@@ -47,7 +47,6 @@ token: public(address)
 owner: public(address)
 
 admin_fee: public(uint256)
-# XXX admin fee charging requires work
 
 xcp_profit_real: public(uint256)  # xcp_profit_real in simulation
 xcp_profit: uint256
@@ -134,7 +133,6 @@ def geometric_mean(unsorted_x: uint256[N_COINS], sort: bool = True) -> uint256:
     """
     (x[0] * x[1] * ...) ** (1/N)
     """
-    # XXX check limits of applicability
     x: uint256[N_COINS] = unsorted_x
     if sort:
         x = self.sort(x)

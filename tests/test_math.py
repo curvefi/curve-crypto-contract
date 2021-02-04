@@ -56,9 +56,9 @@ def test_reduction_coefficient_sim(test_math, x0, x1, x2, gamma):
 
 @given(
        A=strategy('uint256', min_value=1, max_value=10000),
-       x=strategy('uint256', min_value=10**9, max_value=10**9 * 10**18),  # 1e-9 USD to 1e9 USD
-       yx=strategy('uint256', min_value=10**13, max_value=10**23),  # <- ratio 1e18 * y/x, typically 1e18 * 1
-       zx=strategy('uint256', min_value=10**13, max_value=10**23),  # <- ratio 1e18 * z/x, typically 1e18 * 1
+       x=strategy('uint256', min_value=10**9, max_value=10**15 * 10**18),  # 1e-9 USD to 1e9 USD
+       yx=strategy('uint256', min_value=int(1.0001e13), max_value=int(0.9999e23)),  # <- ratio 1e18 * y/x, typically 1e18 * 1
+       zx=strategy('uint256', min_value=int(1.0001e13), max_value=int(0.9999e23)),  # <- ratio 1e18 * z/x, typically 1e18 * 1
        gamma=strategy('uint256', min_value=10**10, max_value=10**16)  # gamma from 1e-8 up to 0.01
 )
 def test_newton_D(test_math, A, x, yx, zx, gamma):
@@ -71,19 +71,15 @@ def test_newton_D(test_math, A, x, yx, zx, gamma):
 
 @given(
        A=strategy('uint256', min_value=1, max_value=10000),
-       x=strategy('uint256', min_value=10**17, max_value=10**9 * 10**18),  # 1e-9 USD to 1e9 USD
-       yx=strategy('uint256', min_value=5 * 10**15, max_value=2 * 10**20),  # <- ratio 1e18 * y/x, typically 1e18 * 1
-       zx=strategy('uint256', min_value=5 * 10**15, max_value=2 * 10**20),  # <- ratio 1e18 * z/x, typically 1e18 * 1
+       D=strategy('uint256', min_value=10**17, max_value=10**15 * 10**18),  # 1e-9 USD to 1e9 USD
+       xD=strategy('uint256', min_value=int(5.001e15), max_value=int(1.999e20)),  # <- ratio 1e18 * x/D, typically 1e18 * 1
+       yD=strategy('uint256', min_value=int(5.001e15), max_value=int(1.999e20)),  # <- ratio 1e18 * y/D, typically 1e18 * 1
+       zD=strategy('uint256', min_value=int(5.001e15), max_value=int(1.999e20)),  # <- ratio 1e18 * z/D, typically 1e18 * 1
        gamma=strategy('uint256', min_value=10**10, max_value=10**16),  # gamma from 1e-8 up to 0.01
-       i=strategy('uint256', min_value=0, max_value=2),
        j=strategy('uint256', min_value=0, max_value=2),
-       inx=strategy('uint256', min_value=5 * 10**15, max_value=2 * 10**20)
 )
-def test_newton_y(test_math, A, x, yx, zx, gamma, i, j, inx):
-    X = [x, x * yx // 10**18, x * zx // 10**18]
-    in_amount = x * inx // 10**18
-    D = sim.solve_D(A, gamma, X)
-    X[i] = in_amount
+def test_newton_y(test_math, A, D, xD, yD, zD, gamma, j):
+    X = [D * xD // 10**18, D * yD // 10**18, D * zD // 10**18]
     result_sim = sim.solve_x(A, gamma, X, D, j)
     result_contract = test_math.public_newton_y(A, gamma, X, D, j)
     assert abs(result_sim - result_contract) <= max(30, result_sim/1e15)

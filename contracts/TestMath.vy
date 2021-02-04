@@ -100,8 +100,17 @@ def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint
 
     Currently uses 60k gas
     """
+    # Safety checks
+    assert ANN > N_COINS**N_COINS * A_MULTIPLIER - 1 and ANN < 10000 * N_COINS**N_COINS * A_MULTIPLIER + 1  # dev: unsafe values A
+    assert gamma > 10**10-1 and gamma < 10**16+1  # dev: unsafe values gamma
+    assert x_unsorted[0] > 10**9 - 1 and x_unsorted[0] < 10**15 * 10**18 + 1  # dev: unsafe values x[0]
+    for i in range(1, N_COINS):
+        frac: uint256 = x_unsorted[i] * 10**18 / x_unsorted[0]
+        assert (frac > 10**13-1) and (frac < 10**23+1)  # dev: unsafe values x[i]
+
     # Initial value of invariant D is that for constant-product invariant
     x: uint256[N_COINS] = self.sort(x_unsorted)
+
     D: uint256 = N_COINS * self.geometric_mean(x, False)
     S: uint256 = 0
     for x_i in x:
@@ -165,6 +174,14 @@ def newton_y(ANN: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: u
     Calculating x[i] given other balances x[0..N_COINS-1] and invariant D
     ANN = A * N**N
     """
+    # Safety checks
+    assert ANN > N_COINS**N_COINS * A_MULTIPLIER - 1 and ANN < 10000 * N_COINS**N_COINS * A_MULTIPLIER + 1  # dev: unsafe values A
+    assert gamma > 10**10-1 and gamma < 10**16+1  # dev: unsafe values gamma
+    assert D > 10**17 - 1 and D < 10**15 * 10**18 + 1 # dev: unsafe values D
+    for _x in x:
+        frac: uint256 = _x * 10**18 / D
+        assert (frac > 5 * 10**15 - 1) and (frac < 2 * 10**20 + 1)  # dev: unsafe values x[i]
+
     y: uint256 = D / N_COINS
     K0_i: uint256 = 10**18
     S_i: uint256 = 0
