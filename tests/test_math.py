@@ -86,7 +86,7 @@ def test_newton_y(test_math, A, D, xD, yD, zD, gamma, j):
 
 
 @given(
-    strategy('uint256', min_value=0, max_value=10**22),
+    strategy('uint256'),
     strategy('uint256', min_value=10, max_value=10**15)
 )
 def test_exp(test_math, power, precision):
