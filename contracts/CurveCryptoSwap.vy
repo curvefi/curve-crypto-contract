@@ -426,7 +426,7 @@ def update_xcp(only_real: bool = False):
 
 
 @internal
-def tweak_price(_xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: uint256):
+def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: uint256):
     """
     dx of coin i -> dy of coin j
 
@@ -458,8 +458,6 @@ def tweak_price(_xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: 
     self.last_prices[ix] = p
 
     norm: uint256 = 0
-    A: uint256 = self.A_precise
-    gamma: uint256 = self.gamma
     old_xcp_profit: uint256 = self.xcp_profit
     old_xcp_profit_real: uint256 = self.xcp_profit_real
     price_scale: uint256[N_COINS-1] = self.price_scale
@@ -547,7 +545,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     A: uint256 = self.A_precise
     gamma: uint256 = self.gamma
 
-    y: uint256 = self.newton_y(self.A_precise, self.gamma, xp, self.D, j)
+    y: uint256 = self.newton_y(A, gamma, xp, self.D, j)
     dy: uint256 = xp[j] - y - 1
     xp[j] = y
     if j > 0:
@@ -563,7 +561,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
         xp[0] = y0 - dy
     else:
         xp[j] = (y0 - dy) * price_scale[j-1] / PRECISION
-    self.tweak_price(xp, i, dx, j, dy)
+    self.tweak_price(A, gamma, xp, i, dx, j, dy)
 
     log TokenExchange(msg.sender, i, dx, j, dy)
 
