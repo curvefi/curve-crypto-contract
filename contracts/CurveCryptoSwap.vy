@@ -639,3 +639,21 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
 @nonreentrant('lock')
 def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
     pass
+
+
+@view
+@external
+def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
+    return 0
+
+
+@view
+@external
+def calc_withdraw_one_coin(_token_amount: uint256, i: int128) -> uint256:
+    return 0
+
+
+@external
+@nonreentrant('lock')
+def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_amount: uint256):
+    pass
