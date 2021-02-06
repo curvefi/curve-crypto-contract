@@ -426,7 +426,7 @@ def update_xcp(only_real: bool = False):
 
 
 @internal
-def tweak_price(_xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: uint256) -> bool:
+def tweak_price(_xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: uint256):
     """
     dx of coin i -> dy of coin j
 
@@ -518,7 +518,7 @@ def tweak_price(_xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: 
             self.price_scale = p_new
             self.D = D
             self.xcp_profit_real = old_xcp_profit_real
-            return True
+            return
 
         # else - make a delay?
 
@@ -526,8 +526,6 @@ def tweak_price(_xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: 
     # Still need to update the profit counter and D
     self.D = D_unadjusted
     self.xcp_profit_real = xcp_profit_real
-
-    return False
 
 
 @external
@@ -565,10 +563,8 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
         xp[0] = y0 - dy
     else:
         xp[j] = (y0 - dy) * price_scale[j-1] / PRECISION
-    if not self.tweak_price(xp, i, dx, j, dy):
-        self.D = self.newton_D(A, gamma, xp)
+    self.tweak_price(xp, i, dx, j, dy)
 
-    # XXX admin fee is not as easy - requires work!
     log TokenExchange(msg.sender, i, dx, j, dy)
 
 
