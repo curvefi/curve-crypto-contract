@@ -568,8 +568,27 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
 
 @external
 @view
-def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
-    return 0
+def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
+    assert i != j and i < N_COINS and j < N_COINS
+
+    price_scale: uint256[N_COINS-1] = self.price_scale
+    xp: uint256[N_COINS] = self.balances
+    y0: uint256 = xp[j]
+    xp[i] += dx
+    for k in range(N_COINS-1):
+        xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
+
+    A: uint256 = self.A_precise
+    gamma: uint256 = self.gamma
+
+    y: uint256 = self.newton_y(A, gamma, xp, self.D, j)
+    dy: uint256 = xp[j] - y - 1
+    xp[j] = y
+    if j > 0:
+        dy = dy * PRECISION / price_scale[j-1]
+    dy -= self._fee(xp) * dy / 10**10
+
+    return dy
 
 
 @external
