@@ -17,6 +17,12 @@ event TokenExchange:
     bought_id: uint256
     tokens_bought: uint256
 
+event AddLiquidity:
+    provider: indexed(address)
+    token_amounts: uint256[N_COINS]
+    fee: uint256
+    token_supply: uint256
+
 
 N_COINS: constant(int128) = 3  # <- change
 PRECISION_MUL: constant(uint256[N_COINS]) = [1, 1, 1]  # 3usd, renpool, eth
@@ -398,8 +404,10 @@ def fee() -> uint256:
 
 @internal
 @view
-def get_xcp() -> uint256:
-    D: uint256 = self.D
+def get_xcp(_D: uint256 = 0) -> uint256:
+    D: uint256 = _D
+    if D == 0:
+        D = self.D
     x: uint256[N_COINS] = empty(uint256[N_COINS])
     x[0] = D / N_COINS
     for i in range(N_COINS-1):
@@ -446,16 +454,17 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
         self.last_prices_timestamp = block.timestamp
 
     # Save the last price
-    p: uint256 = 0
-    ix: uint256 = j
-    if i != 0 and j != 0:
-        p = last_prices[i] * dx / dy
-    elif i == 0:
-        p = dx * 10**18 / dy
-    else:  # j == 0
-        p = dy * 10**18 / dx
-        ix = i
-    self.last_prices[ix] = p
+    if i > 0 or j > 0:
+        p: uint256 = 0
+        ix: uint256 = j
+        if i != 0 and j != 0:
+            p = last_prices[i-1] * dx / dy
+        elif i == 0:
+            p = dx * 10**18 / dy
+        else:  # j == 0
+            p = dy * 10**18 / dx
+            ix = i
+        self.last_prices[ix-1] = p
 
     norm: uint256 = 0
     old_xcp_profit: uint256 = self.xcp_profit
@@ -471,6 +480,7 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
 
 
     # Update profit numbers without price adjustment first
+    # XXX should we leave it like this or call get_xcp?
     D_unadjusted: uint256 = self.newton_D(A, gamma, _xp)
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     xp[0] = D_unadjusted / N_COINS
@@ -594,8 +604,36 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
 @external
 @nonreentrant('lock')
 def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
-    pass
+    for i in range(N_COINS):
+        assert ERC20(self.coins[i]).transferFrom(msg.sender, self, amounts[i])
 
+    price_scale: uint256[N_COINS-1] = self.price_scale
+    xp: uint256[N_COINS] = self.balances
+    xp[0] += amounts[0]
+    for i in range(N_COINS-1):
+        xp[i+1] = (xp[i+1] + amounts[i+1]) * price_scale[i] / PRECISION
+    A: uint256 = self.A_precise
+    gamma: uint256 = self.gamma
+    token: address = self.token
+
+    xcp_0: uint256 = self.get_xcp()
+    D: uint256 = self.newton_D(A, gamma, xp)
+    xcp: uint256 = self.get_xcp(D)
+
+    token_supply: uint256 = CurveToken(token).totalSupply()
+    d_token: uint256 = token_supply * xcp / xcp_0
+    assert d_token > 0  # dev: nothing minted
+    d_token_fee: uint256 = self._fee(xp) * d_token / (2 * 10**10) + 1  # /2 because it's half a trade
+
+    assert CurveToken(token).mint(msg.sender, d_token - d_token_fee)
+    assert CurveToken(token).mint(self.owner, d_token_fee * self.admin_fee / (2 * 10**10))  # /2 b/c price retarget
+
+    # tweak price without touching price oracle because there's no trade
+    # Should we really calculate all prices here instead and tweak the oracle? XXX
+    # Considering deposit == trade?
+    self.tweak_price(A, gamma, xp, 0, 0, 0, 0)
+
+    log AddLiquidity(msg.sender, amounts, d_token_fee, token_supply)
 
 @external
 @nonreentrant('lock')
