@@ -633,8 +633,10 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     d_token: uint256 = token_supply * xcp / xcp_0
     assert d_token > 0  # dev: nothing minted
     d_token_fee: uint256 = self._fee(xp) * d_token / (2 * 10**10) + 1  # /2 because it's half a trade
+    d_token -= d_token_fee
+    assert d_token >= min_mint_amount, "Slippage screwed you"
 
-    assert CurveToken(token).mint(msg.sender, d_token - d_token_fee)
+    assert CurveToken(token).mint(msg.sender, d_token)
     assert CurveToken(token).mint(self.owner, d_token_fee * self.admin_fee / (2 * 10**10))  # /2 b/c price retarget
 
     self.tweak_price(A, gamma, xp, 0, 0, 0, 0)
