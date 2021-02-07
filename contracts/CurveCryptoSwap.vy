@@ -634,12 +634,10 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     gamma: uint256 = self.gamma
     token: address = self.token
 
-    xcp_0: uint256 = self.get_xcp()
     D: uint256 = self.newton_D(A, gamma, xp)
-    xcp: uint256 = self.get_xcp(D)
 
     token_supply: uint256 = CurveToken(token).totalSupply()
-    d_token: uint256 = token_supply * xcp / xcp_0
+    d_token: uint256 = token_supply * D / self.D
     assert d_token > 0  # dev: nothing minted
     d_token_fee: uint256 = self._fee(xp) * d_token / (2 * 10**10) + 1  # /2 because it's half a trade
     d_token -= d_token_fee
@@ -673,7 +671,25 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
 @view
 @external
 def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
-    return 0
+    token_supply: uint256 = CurveToken(self.token).totalSupply()
+    xp: uint256[N_COINS] = self.balances
+    if deposit:
+        for k in range(N_COINS):
+            xp[k] += amounts[k]
+    else:
+        for k in range(N_COINS):
+            xp[k] -= amounts[k]
+    for k in range(N_COINS-1):
+        xp[k+1] = xp[k+1] * self.price_scale[k] / PRECISION
+    D: uint256 = self.newton_D(self.A_precise, self.gamma, xp)
+    fee: uint256 = self._fee(xp)
+    d_token: uint256 = token_supply * D / self.D
+    if deposit:
+        d_token -= token_supply
+    else:
+        d_token = token_supply - d_token
+    d_token -= fee * d_token / (2 * 10**10) + 1
+    return d_token
 
 
 @view
