@@ -548,7 +548,7 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
 @external
 @nonreentrant('lock')
 def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
-    assert not self.is_killed
+    assert not self.is_killed  # dev: the pool is killed
     assert i != j and i < N_COINS and j < N_COINS
 
     input_coin: address = self.coins[i]
@@ -613,6 +613,8 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
 @external
 @nonreentrant('lock')
 def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
+    assert not self.is_killed  # dev: the pool is killed
+
     for i in range(N_COINS):
         assert ERC20(self.coins[i]).transferFrom(msg.sender, self, amounts[i])
 
