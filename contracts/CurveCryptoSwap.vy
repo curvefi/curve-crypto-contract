@@ -23,6 +23,11 @@ event AddLiquidity:
     fee: uint256
     token_supply: uint256
 
+event RemoveLiquidity:
+    provider: indexed(address)
+    token_amounts: uint256[N_COINS]
+    token_supply: uint256
+
 
 N_COINS: constant(int128) = 3  # <- change
 PRECISION_MUL: constant(uint256[N_COINS]) = [1, 1, 1]  # 3usd, renpool, eth
@@ -620,6 +625,8 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
 
     price_scale: uint256[N_COINS-1] = self.price_scale
     xp: uint256[N_COINS] = self.balances
+    for i in range(N_COINS):
+        self.balances[i] = xp[i] + amounts[i]
     xp[0] += amounts[0]
     for i in range(N_COINS-1):
         xp[i+1] = (xp[i+1] + amounts[i+1]) * price_scale[i] / PRECISION
@@ -648,7 +655,19 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
 @external
 @nonreentrant('lock')
 def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
-    pass
+    token: address = self.token
+    total_supply: uint256 = CurveToken(token).totalSupply()
+    assert CurveToken(token).burnFrom(msg.sender, _amount)
+    balances: uint256[N_COINS] = self.balances
+
+    for i in range(N_COINS):
+        d_balance: uint256 = balances[i] * _amount / total_supply
+        assert d_balance >= min_amounts[i]
+        self.balances[i] = balances[i] - d_balance
+        balances[i] = d_balance  # now it's the amounts going out
+        assert ERC20(self.coins[i]).transfer(msg.sender, d_balance)
+
+    log RemoveLiquidity(msg.sender, balances, total_supply - _amount)
 
 
 @view
