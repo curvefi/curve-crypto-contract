@@ -444,7 +444,7 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
     price_oracle: uint256[N_COINS-1] = self.price_oracle
     last_prices_timestamp: uint256 = self.last_prices_timestamp
     last_prices: uint256[N_COINS-1] = self.last_prices
-    if self.last_prices_timestamp < block.timestamp:
+    if last_prices_timestamp < block.timestamp:
         # MA update required
         ma_half_time: uint256 = self.ma_half_time
         alpha: uint256 = self.halfpow((block.timestamp - last_prices_timestamp) * 10**18 / ma_half_time, 10**10)
@@ -453,8 +453,12 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
         self.price_oracle = price_oracle
         self.last_prices_timestamp = block.timestamp
 
-    # Save the last price
+    # We will need this a few times (35k gas)
+    D_unadjusted: uint256 = self.newton_D(A, gamma, _xp)
+    price_scale: uint256[N_COINS-1] = self.price_scale
+
     if i > 0 or j > 0:
+        # Save the last price
         p: uint256 = 0
         ix: uint256 = j
         if i != 0 and j != 0:
@@ -465,11 +469,17 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
             p = dy * 10**18 / dx
             ix = i
         self.last_prices[ix-1] = p
+    else:
+        # calculate real prices
+        # it would cost 70k gas for a 3-token pool. Sad. How do we do better?
+        __xp: uint256[N_COINS] = _xp
+        __xp[0] += 10**18
+        for k in range(N_COINS-1):
+            self.last_prices[k] = price_scale[k] * 10**18 / (_xp[k+1] - self.newton_y(A, gamma, __xp, D_unadjusted, k+1))
 
     norm: uint256 = 0
     old_xcp_profit: uint256 = self.xcp_profit
     old_xcp_profit_real: uint256 = self.xcp_profit_real
-    price_scale: uint256[N_COINS-1] = self.price_scale
     for k in range(N_COINS-1):
         ratio: uint256 = price_oracle[k] * 10**18 / price_scale[k]
         if ratio > 10**18:
@@ -481,7 +491,6 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
 
     # Update profit numbers without price adjustment first
     # XXX should we leave it like this or call get_xcp?
-    D_unadjusted: uint256 = self.newton_D(A, gamma, _xp)
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     xp[0] = D_unadjusted / N_COINS
     for k in range(N_COINS-1):
@@ -628,9 +637,6 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     assert CurveToken(token).mint(msg.sender, d_token - d_token_fee)
     assert CurveToken(token).mint(self.owner, d_token_fee * self.admin_fee / (2 * 10**10))  # /2 b/c price retarget
 
-    # tweak price without touching price oracle because there's no trade
-    # Should we really calculate all prices here instead and tweak the oracle? XXX
-    # Considering deposit == trade?
     self.tweak_price(A, gamma, xp, 0, 0, 0, 0)
 
     log AddLiquidity(msg.sender, amounts, d_token_fee, token_supply)
