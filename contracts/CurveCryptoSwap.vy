@@ -28,6 +28,11 @@ event RemoveLiquidity:
     token_amounts: uint256[N_COINS]
     token_supply: uint256
 
+event RemoveLiquidityOne:
+    provider: indexed(address)
+    token_amount: uint256
+    coin_amount: uint256
+
 
 N_COINS: constant(int128) = 3  # <- change
 PRECISION_MUL: constant(uint256[N_COINS]) = [1, 1, 1]  # 3usd, renpool, eth
@@ -576,7 +581,6 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
         dy = dy * PRECISION / price_scale[j-1]
     dy -= self._fee(xp) * dy / 10**10
     assert dy >= min_dy, "Exchange resulted in fewer coins than expected"
-    # XXX admin fee
 
     self.balances[j] = y0 - dy
     output_coin: address = self.coins[j]
@@ -645,7 +649,6 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     assert d_token >= min_mint_amount, "Slippage screwed you"
 
     assert CurveToken(token).mint(msg.sender, d_token)
-    assert CurveToken(token).mint(self.owner, d_token_fee * self.admin_fee / (2 * 10**10))  # /2 b/c price retarget
 
     self.tweak_price(A, gamma, xp, 0, 0, 0, 0)
 
@@ -695,7 +698,7 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
 
 @internal
 @view
-def _calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256[2]:
+def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i: uint256) -> (uint256, uint256[N_COINS]):
     D: uint256 = self.D
     token_supply: uint256 = CurveToken(self.token).totalSupply()
 
@@ -706,23 +709,42 @@ def _calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256[2]:
         xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
 
     D = D * (token_supply - token_amount) / token_supply
-    dy: uint256 = self.newton_y(self.A_precise, self.gamma, xp, D, i)
+    dy: uint256 = self.newton_y(A, gamma, xp, D, i)
     if i > 0:
         dy = dy * PRECISION / price_scale[i-1]
     dy = y0 - dy
     fee: uint256 = self._fee(xp) * dy / (2 * 10**10) + 1
     dy -= fee
 
-    return [dy, fee]
+    return dy, xp
 
 
 @view
 @external
 def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
-    return self._calc_withdraw_one_coin(token_amount, i)[0]
+    return self._calc_withdraw_one_coin(self.A_precise, self.gamma, token_amount, i)[0]
 
 
 @external
 @nonreentrant('lock')
-def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_amount: uint256):
-    pass
+def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256):
+    assert not self.is_killed  # dev: the pool is killed
+
+    token: address = self.token
+    assert CurveToken(self.token).burnFrom(msg.sender, token_amount)
+    A: uint256 = self.A_precise
+    gamma: uint256 = self.gamma
+
+    dy: uint256 = 0
+    xp: uint256[N_COINS] = empty(uint256[N_COINS])
+    dy, xp = self._calc_withdraw_one_coin(A, gamma, token_amount, i)
+    assert dy >= min_amount, "Slippage screwed you"
+
+    self.balances[i] -= dy
+    assert ERC20(self.coins[i]).transfer(msg.sender, dy)
+
+    self.tweak_price(A, gamma, xp, 0, 0, 0, 0)
+
+    log RemoveLiquidityOne(msg.sender, token_amount, dy)
+
+# XXX not sure if remove_liquidity_imbalance is used by anyone - can remove
