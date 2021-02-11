@@ -576,6 +576,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
         dy = dy * PRECISION / price_scale[j-1]
     dy -= self._fee(xp) * dy / 10**10
     assert dy >= min_dy, "Exchange resulted in fewer coins than expected"
+    # XXX admin fee
 
     self.balances[j] = y0 - dy
     output_coin: address = self.coins[j]
@@ -692,10 +693,33 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
     return d_token
 
 
+@internal
+@view
+def _calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256[2]:
+    D: uint256 = self.D
+    token_supply: uint256 = CurveToken(self.token).totalSupply()
+
+    xp: uint256[N_COINS] = self.balances
+    y0: uint256 = xp[i]
+    price_scale: uint256[N_COINS-1] = self.price_scale
+    for k in range(N_COINS-1):
+        xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
+
+    D = D * (token_supply - token_amount) / token_supply
+    dy: uint256 = self.newton_y(self.A_precise, self.gamma, xp, D, i)
+    if i > 0:
+        dy = dy * PRECISION / price_scale[i-1]
+    dy = y0 - dy
+    fee: uint256 = self._fee(xp) * dy / (2 * 10**10) + 1
+    dy -= fee
+
+    return [dy, fee]
+
+
 @view
 @external
-def calc_withdraw_one_coin(_token_amount: uint256, i: int128) -> uint256:
-    return 0
+def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
+    return self._calc_withdraw_one_coin(token_amount, i)[0]
 
 
 @external
