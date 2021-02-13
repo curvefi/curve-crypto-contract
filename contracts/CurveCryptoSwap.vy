@@ -47,6 +47,7 @@ last_prices: public(uint256[N_COINS-1])
 last_prices_timestamp: public(uint256)
 
 A_precise: public(uint256)
+
 gamma: public(uint256)
 mid_fee: public(uint256)
 out_fee: public(uint256)
@@ -69,6 +70,8 @@ xcp_profit: uint256
 xcp: uint256
 
 is_killed: public(bool)
+kill_deadline: uint256
+KILL_DEADLINE_DT: constant(uint256) = 2 * 30 * 86400
 
 
 @external
@@ -106,6 +109,8 @@ def __init__(
     self.last_prices = new_initial_prices
     self.last_prices_timestamp = block.timestamp
     self.ma_half_time = ma_half_time
+
+    self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
 
 
 @internal
@@ -748,3 +753,63 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     log RemoveLiquidityOne(msg.sender, token_amount, dy)
 
 # XXX not sure if remove_liquidity_imbalance is used by anyone - can remove
+
+
+# Admin parameters
+@external
+def ramp_A(_future_A: uint256, _future_time: uint256):
+    pass
+
+
+@external
+def stop_ramp_A():
+    pass
+
+
+@external
+def commit_new_fees(new_mid_fee: uint256, new_out_fee: uint256, new_admin_fee: uint256):
+    pass
+
+
+@external
+def apply_new_fees():
+    pass
+
+
+@external
+def revert_new_parameters():
+    pass
+
+
+@external
+def commit_transfer_ownership(_owner: address):
+    pass
+
+
+@external
+def apply_transfer_ownership():
+    pass
+
+
+@external
+def revert_transfer_ownership():
+    pass
+
+
+@external
+def withdraw_admin_fees():
+    # Wrap as pool token and withdraw
+    pass
+
+
+@external
+def kill_me():
+    assert msg.sender == self.owner  # dev: only owner
+    assert self.kill_deadline > block.timestamp  # dev: deadline has passed
+    self.is_killed = True
+
+
+@external
+def unkill_me():
+    assert msg.sender == self.owner  # dev: only owner
+    self.is_killed = False
