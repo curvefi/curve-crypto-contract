@@ -46,7 +46,10 @@ price_oracle: public(uint256[N_COINS-1])  # Price target given by MA
 last_prices: public(uint256[N_COINS-1])
 last_prices_timestamp: public(uint256)
 
-A_precise: public(uint256)
+initial_A: public(uint256)
+future_A: public(uint256)
+initial_A_time: public(uint256)
+future_A_time: public(uint256)
 
 gamma: public(uint256)
 mid_fee: public(uint256)
@@ -93,7 +96,8 @@ def __init__(
     self.owner = owner
     self.coins = coins
     self.token = pool_token
-    self.A_precise = A * A_MULTIPLIER
+    self.initial_A = A * A_MULTIPLIER
+    self.future_A = A * A_MULTIPLIER
     self.gamma = gamma
     self.mid_fee = mid_fee
     self.out_fee = out_fee
@@ -121,6 +125,38 @@ def xp() -> uint256[N_COINS]:
     for i in range(N_COINS-1):
         result[i+1] = result[i+1] * self.price_scale[i] / PRECISION
     return result
+
+
+@view
+@internal
+def _A() -> uint256:
+    t1: uint256 = self.future_A_time
+    A1: uint256 = self.future_A
+
+    if block.timestamp < t1:
+        # handle ramping up and down of A
+        A0: uint256 = self.initial_A
+        t0: uint256 = self.initial_A_time
+        # Expressions in uint256 cannot have negative numbers, thus "if"
+        if A1 > A0:
+            return A0 + (A1 - A0) * (block.timestamp - t0) / (t1 - t0)
+        else:
+            return A0 - (A0 - A1) * (block.timestamp - t0) / (t1 - t0)
+
+    else:  # when t1 == 0 or block.timestamp >= t1
+        return A1
+
+
+@view
+@external
+def A() -> uint256:
+    return self._A() / A_MULTIPLIER
+
+
+@view
+@external
+def A_precise() -> uint256:
+    return self._A()
 
 
 ####################################
@@ -576,7 +612,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     for k in range(N_COINS-1):
         xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
 
-    A: uint256 = self.A_precise
+    A: uint256 = self._A()
     gamma: uint256 = self.gamma
 
     y: uint256 = self.newton_y(A, gamma, xp, self.D, j)
@@ -612,7 +648,7 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
     for k in range(N_COINS-1):
         xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
 
-    A: uint256 = self.A_precise
+    A: uint256 = self._A()
     gamma: uint256 = self.gamma
 
     y: uint256 = self.newton_y(A, gamma, xp, self.D, j)
@@ -640,7 +676,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     xp[0] += amounts[0]
     for i in range(N_COINS-1):
         xp[i+1] = (xp[i+1] + amounts[i+1]) * price_scale[i] / PRECISION
-    A: uint256 = self.A_precise
+    A: uint256 = self._A()
     gamma: uint256 = self.gamma
     token: address = self.token
 
@@ -690,7 +726,7 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
             xp[k] -= amounts[k]
     for k in range(N_COINS-1):
         xp[k+1] = xp[k+1] * self.price_scale[k] / PRECISION
-    D: uint256 = self.newton_D(self.A_precise, self.gamma, xp)
+    D: uint256 = self.newton_D(self._A(), self.gamma, xp)
     fee: uint256 = self._fee(xp)
     d_token: uint256 = token_supply * D / self.D
     if deposit:
@@ -727,7 +763,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
 @view
 @external
 def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
-    return self._calc_withdraw_one_coin(self.A_precise, self.gamma, token_amount, i)[0]
+    return self._calc_withdraw_one_coin(self._A(), self.gamma, token_amount, i)[0]
 
 
 @external
@@ -737,7 +773,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
     token: address = self.token
     assert CurveToken(self.token).burnFrom(msg.sender, token_amount)
-    A: uint256 = self.A_precise
+    A: uint256 = self._A()
     gamma: uint256 = self.gamma
 
     dy: uint256 = 0
