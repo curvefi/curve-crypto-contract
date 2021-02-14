@@ -43,6 +43,24 @@ event RemoveLiquidityOne:
     token_amount: uint256
     coin_amount: uint256
 
+event CommitNewAdmin:
+    deadline: indexed(uint256)
+    admin: indexed(address)
+
+event NewAdmin:
+    admin: indexed(address)
+
+event CommitNewFee:
+    deadline: indexed(uint256)
+    mid_fee: uint256
+    out_fee: uint256
+    admin_fee: uint256
+
+event NewFee:
+    mid_fee: uint256
+    out_fee: uint256
+    admin_fee: uint256
+
 
 N_COINS: constant(int128) = 3  # <- change
 PRECISION_MUL: constant(uint256[N_COINS]) = [1, 1, 1]  # 3usd, renpool, eth
@@ -50,7 +68,7 @@ FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
 A_MULTIPLIER: constant(uint256) = 100
 
-math: constant(address) = 0x0000000000000000000000000000000000000000
+math: constant(address) = 0x0000000000000000000000000000000000000000  # <- to replace
 
 price_scale: public(uint256[N_COINS-1])   # Internal price scale
 price_oracle: public(uint256[N_COINS-1])  # Price target given by MA
@@ -64,12 +82,17 @@ initial_A_time: public(uint256)
 future_A_time: public(uint256)
 
 gamma: public(uint256)
-mid_fee: public(uint256)
-out_fee: public(uint256)
 price_threshold: public(uint256)
 fee_gamma: public(uint256)
 adjustment_step: public(uint256)
 ma_half_time: public(uint256)
+
+mid_fee: public(uint256)
+out_fee: public(uint256)
+admin_fee: public(uint256)
+future_mid_fee: public(uint256)
+future_out_fee: public(uint256)
+future_admin_fee: public(uint256)
 
 balances: public(uint256[N_COINS])
 coins: public(address[N_COINS])
@@ -77,16 +100,22 @@ D: public(uint256)
 
 token: public(address)
 owner: public(address)
-
-admin_fee: public(uint256)
+future_owner: public(address)
 
 xcp_profit_real: public(uint256)  # xcp_profit_real in simulation
 xcp_profit: uint256
 xcp: uint256
 
 is_killed: public(bool)
-kill_deadline: uint256
+kill_deadline: public(uint256)
+transfer_ownership_deadline: public(uint256)
+admin_actions_deadline: public(uint256)
+
 KILL_DEADLINE_DT: constant(uint256) = 2 * 30 * 86400
+ADMIN_ACTIONS_DELAY: constant(uint256) = 3 * 86400
+MIN_RAMP_TIME: constant(uint256) = 86400
+MAX_ADMIN_FEE: constant(uint256) = 10 * 10 ** 9
+MAX_FEE: constant(uint256) = 5 * 10 ** 9
 
 
 @external
@@ -171,9 +200,6 @@ def A_precise() -> uint256:
     return self._A()
 
 
-###################################
-#           Actual logic          #
-###################################
 @internal
 @view
 def _fee(xp: uint256[N_COINS]) -> uint256:
@@ -538,32 +564,74 @@ def stop_ramp_A():
 
 @external
 def commit_new_fees(new_mid_fee: uint256, new_out_fee: uint256, new_admin_fee: uint256):
-    pass
+    assert msg.sender == self.owner  # dev: only owner
+    assert self.admin_actions_deadline == 0  # dev: active action
+    assert new_out_fee <= MAX_FEE  # dev: fee exceeds maximum
+    assert new_mid_fee <= new_out_fee  # dev: mid fee exceeds out fee
+    assert new_admin_fee <= MAX_ADMIN_FEE  # dev: admin fee exceeds maximum
+
+    _deadline: uint256 = block.timestamp + ADMIN_ACTIONS_DELAY
+    self.admin_actions_deadline = _deadline
+    self.future_mid_fee = new_mid_fee
+    self.future_out_fee = new_out_fee
+    self.future_admin_fee = new_admin_fee
+
+    log CommitNewFee(_deadline, new_mid_fee, new_out_fee, new_admin_fee)
 
 
 @external
 def apply_new_fees():
-    pass
+    assert msg.sender == self.owner  # dev: only owner
+    assert block.timestamp >= self.admin_actions_deadline  # dev: insufficient time
+    assert self.admin_actions_deadline != 0  # dev: no active action
+
+    self.admin_actions_deadline = 0
+    mid_fee: uint256 = self.future_mid_fee
+    out_fee: uint256 = self.future_out_fee
+    admin_fee: uint256 = self.future_admin_fee
+    self.mid_fee = mid_fee
+    self.out_fee = out_fee
+    self.admin_fee = admin_fee
+
+    log NewFee(mid_fee, out_fee, admin_fee)
 
 
 @external
 def revert_new_parameters():
-    pass
+    assert msg.sender == self.owner  # dev: only owner
+    self.admin_actions_deadline = 0
 
 
 @external
 def commit_transfer_ownership(_owner: address):
-    pass
+    assert msg.sender == self.owner  # dev: only owner
+    assert self.transfer_ownership_deadline == 0  # dev: active transfer
+
+    _deadline: uint256 = block.timestamp + ADMIN_ACTIONS_DELAY
+    self.transfer_ownership_deadline = _deadline
+    self.future_owner = _owner
+
+    log CommitNewAdmin(_deadline, _owner)
 
 
 @external
 def apply_transfer_ownership():
-    pass
+    assert msg.sender == self.owner  # dev: only owner
+    assert block.timestamp >= self.transfer_ownership_deadline  # dev: insufficient time
+    assert self.transfer_ownership_deadline != 0  # dev: no active transfer
+
+    self.transfer_ownership_deadline = 0
+    _owner: address = self.future_owner
+    self.owner = _owner
+
+    log NewAdmin(_owner)
 
 
 @external
 def revert_transfer_ownership():
-    pass
+    assert msg.sender == self.owner  # dev: only owner
+
+    self.transfer_ownership_deadline = 0
 
 
 @external
