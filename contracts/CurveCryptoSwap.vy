@@ -249,8 +249,6 @@ def get_xcp(_D: uint256 = 0) -> uint256:
 @external
 @view
 def get_virtual_price() -> uint256:
-    # XXX save virtual price at the very first liquidity deposit
-    # and divide by it here to have virtual_price starting from 1.0
     return self.get_xcp() * 10**18 / CurveToken(self.token).totalSupply()
 
 
@@ -321,7 +319,6 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
 
 
     # Update profit numbers without price adjustment first
-    # XXX should we leave it like this or call get_xcp?
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     xp[0] = D_unadjusted / N_COINS
     for k in range(N_COINS-1):
@@ -441,13 +438,14 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
     return dy
 
 
-@external
-@nonreentrant('lock')
-def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
+@internal
+def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
+                   from_address: address, for_address: address):
     assert not self.is_killed  # dev: the pool is killed
 
-    for i in range(N_COINS):
-        assert ERC20(self.coins[i]).transferFrom(msg.sender, self, amounts[i])
+    if from_address != self:
+        for i in range(N_COINS):
+            assert ERC20(self.coins[i]).transferFrom(from_address, self, amounts[i])
 
     price_scale: uint256[N_COINS-1] = self.price_scale
     xp: uint256[N_COINS] = self.balances
@@ -463,17 +461,30 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     D: uint256 = Math(math).newton_D(A, gamma, xp)
 
     token_supply: uint256 = CurveToken(token).totalSupply()
-    d_token: uint256 = token_supply * D / self.D
+    old_D: uint256 = self.D
+    d_token: uint256 = 0
+    if old_D > 0:
+        d_token = token_supply * D / old_D
+    else:
+        d_token = self.get_xcp(D)  # making initial virtual price equal to 1
     assert d_token > 0  # dev: nothing minted
+    # XXX fee is taken at symmetric deposit here which is wrong: needs fixing?
     d_token_fee: uint256 = self._fee(xp) * d_token / (2 * 10**10) + 1  # /2 because it's half a trade
     d_token -= d_token_fee
     assert d_token >= min_mint_amount, "Slippage screwed you"
 
-    assert CurveToken(token).mint(msg.sender, d_token)
+    assert CurveToken(token).mint(for_address, d_token)
 
     self.tweak_price(A, gamma, xp, 0, 0, 0, 0)
 
-    log AddLiquidity(msg.sender, amounts, d_token_fee, token_supply)
+    log AddLiquidity(for_address, amounts, d_token_fee, token_supply)
+
+
+@external
+@nonreentrant('lock')
+def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
+    self._add_liquidity(amounts, min_mint_amount, msg.sender, msg.sender)
+
 
 @external
 @nonreentrant('lock')
@@ -730,9 +741,13 @@ def revert_transfer_ownership():
 
 
 @external
+@nonreentrant('lock')
 def withdraw_admin_fees():
     # Wrap as pool token and withdraw
-    pass
+    admin_balances: uint256[N_COINS] = empty(uint256[N_COINS])
+    for i in range(N_COINS):
+        admin_balances[i] = ERC20(self.coins[i]).balanceOf(self) - self.balances[i]
+    self._add_liquidity(admin_balances, 0, self, self.owner)
 
 
 @external
