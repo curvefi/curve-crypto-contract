@@ -50,16 +50,26 @@ event CommitNewAdmin:
 event NewAdmin:
     admin: indexed(address)
 
-event CommitNewFee:
+event CommitNewParameters:
     deadline: indexed(uint256)
+    admin_fee: uint256
     mid_fee: uint256
     out_fee: uint256
-    admin_fee: uint256
+    gamma: uint256
+    fee_gamma: uint256
+    price_threshold: uint256
+    adjustment_step: uint256
+    ma_half_time: uint256
 
-event NewFee:
+event NewParameters:
+    admin_fee: uint256
     mid_fee: uint256
     out_fee: uint256
-    admin_fee: uint256
+    gamma: uint256
+    fee_gamma: uint256
+    price_threshold: uint256
+    adjustment_step: uint256
+    ma_half_time: uint256
 
 
 N_COINS: constant(int128) = 3  # <- change
@@ -82,10 +92,19 @@ initial_A_time: public(uint256)
 future_A_time: public(uint256)
 
 gamma: public(uint256)
+future_gamma: public(uint256)
+
 price_threshold: public(uint256)
+future_price_threshoold: public(uint256)
+
 fee_gamma: public(uint256)
+future_fee_gamma: public(uint256)
+
 adjustment_step: public(uint256)
+future_adjustment_step: public(uint256)
+
 ma_half_time: public(uint256)
+future_ma_half_time: public(uint256)
 
 mid_fee: public(uint256)
 out_fee: public(uint256)
@@ -114,6 +133,7 @@ admin_actions_deadline: public(uint256)
 KILL_DEADLINE_DT: constant(uint256) = 2 * 30 * 86400
 ADMIN_ACTIONS_DELAY: constant(uint256) = 3 * 86400
 MIN_RAMP_TIME: constant(uint256) = 86400
+
 MAX_ADMIN_FEE: constant(uint256) = 10 * 10 ** 9
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 
@@ -563,42 +583,117 @@ def stop_ramp_A():
 
 
 @external
-def commit_new_fees(new_mid_fee: uint256, new_out_fee: uint256, new_admin_fee: uint256):
+def commit_new_parameters(
+    _new_mid_fee: uint256,
+    _new_out_fee: uint256,
+    _new_admin_fee: uint256,
+    _new_gamma: uint256,
+    _new_fee_gamma: uint256,
+    _new_price_threshold: uint256,
+    _new_adjustment_step: uint256,
+    _new_ma_half_time: uint256,
+    ):
     assert msg.sender == self.owner  # dev: only owner
     assert self.admin_actions_deadline == 0  # dev: active action
-    assert new_out_fee <= MAX_FEE  # dev: fee exceeds maximum
-    assert new_mid_fee <= new_out_fee  # dev: mid fee exceeds out fee
-    assert new_admin_fee <= MAX_ADMIN_FEE  # dev: admin fee exceeds maximum
+
+    new_mid_fee: uint256 = _new_mid_fee
+    new_out_fee: uint256 = _new_out_fee
+    new_admin_fee: uint256 = _new_admin_fee
+    new_gamma: uint256 = _new_gamma
+    new_fee_gamma: uint256 = _new_fee_gamma
+    new_price_threshold: uint256 = _new_price_threshold
+    new_adjustment_step: uint256 = _new_adjustment_step
+    new_ma_half_time: uint256 = _new_ma_half_time
+
+    # Fees
+    if new_out_fee != MAX_UINT256:
+        assert new_out_fee <= MAX_FEE  # dev: fee is too high
+    else:
+        new_out_fee = self.out_fee
+    if new_mid_fee == MAX_UINT256:
+        new_mid_fee = self.mid_fee
+    assert new_mid_fee <= new_out_fee  # dev: mid-fee is too high
+    if new_admin_fee != MAX_UINT256:
+        assert new_admin_fee <= MAX_ADMIN_FEE  # dev: admin fee exceeds maximum
+    else:
+        new_admin_fee = self.admin_fee
+
+    # AMM parameters
+    if new_gamma != MAX_UINT256:
+        assert new_gamma >= 10**10 and new_gamma <= 10**16  # dev: gamma should be in [1e-8 .. 1e-2]
+    else:
+        new_gamma = self.gamma
+    if new_fee_gamma != MAX_UINT256:
+        assert new_fee_gamma > 0 and new_fee_gamma < 2**100  # dev: fee_gamma out of range [1 .. 2**100]
+    else:
+        new_fee_gamma = self.fee_gamma
+    if new_price_threshold != MAX_UINT256:
+        assert new_price_threshold > new_mid_fee  # dev: price threshold should be higher than the fee
+    else:
+        new_price_threshold = self.price_threshold
+    if new_adjustment_step == MAX_UINT256:
+        new_adjustment_step = self.adjustment_step
+    assert new_adjustment_step <= new_price_threshold  # dev: adjustment step should be smaller than price threshold
+
+    # MA
+    if new_ma_half_time != MAX_UINT256:
+        assert new_ma_half_time > 0 and new_ma_half_time < 7*86400  # dev: MA time should be shorter than 1 week
+    else:
+        new_ma_half_time = self.ma_half_time
 
     _deadline: uint256 = block.timestamp + ADMIN_ACTIONS_DELAY
     self.admin_actions_deadline = _deadline
+
+    self.future_admin_fee = new_admin_fee
     self.future_mid_fee = new_mid_fee
     self.future_out_fee = new_out_fee
-    self.future_admin_fee = new_admin_fee
+    self.future_gamma = new_gamma
+    self.future_fee_gamma = new_fee_gamma
+    self.future_price_threshoold = new_price_threshold
+    self.future_adjustment_step = new_adjustment_step
+    self.future_ma_half_time = new_ma_half_time
 
-    log CommitNewFee(_deadline, new_mid_fee, new_out_fee, new_admin_fee)
+    log CommitNewParameters(_deadline, new_admin_fee, new_mid_fee, new_out_fee,
+                            new_gamma, new_fee_gamma,
+                            new_price_threshold, new_adjustment_step,
+                            new_ma_half_time)
 
 
 @external
-def apply_new_fees():
+def apply_new_parameters():
     assert msg.sender == self.owner  # dev: only owner
     assert block.timestamp >= self.admin_actions_deadline  # dev: insufficient time
     assert self.admin_actions_deadline != 0  # dev: no active action
 
     self.admin_actions_deadline = 0
-    mid_fee: uint256 = self.future_mid_fee
-    out_fee: uint256 = self.future_out_fee
-    admin_fee: uint256 = self.future_admin_fee
-    self.mid_fee = mid_fee
-    self.out_fee = out_fee
-    self.admin_fee = admin_fee
 
-    log NewFee(mid_fee, out_fee, admin_fee)
+    admin_fee: uint256 = self.future_admin_fee
+    self.admin_fee = admin_fee
+    mid_fee: uint256 = self.future_mid_fee
+    self.mid_fee = mid_fee
+    out_fee: uint256 = self.future_out_fee
+    self.out_fee = out_fee
+    gamma: uint256 = self.future_gamma
+    self.gamma = gamma
+    fee_gamma: uint256 = self.future_fee_gamma
+    self.fee_gamma = fee_gamma
+    price_threshold: uint256 = self.future_price_threshoold
+    self.price_threshold = price_threshold
+    adjustment_step: uint256 = self.future_adjustment_step
+    self.adjustment_step = adjustment_step
+    ma_half_time: uint256 = self.future_ma_half_time
+    self.ma_half_time = ma_half_time
+
+    log NewParameters(admin_fee, mid_fee, out_fee,
+                      gamma, fee_gamma,
+                      price_threshold, adjustment_step,
+                      ma_half_time)
 
 
 @external
 def revert_new_parameters():
     assert msg.sender == self.owner  # dev: only owner
+
     self.admin_actions_deadline = 0
 
 
