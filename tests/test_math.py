@@ -46,6 +46,17 @@ def test_reduction_coefficient(test_math):
     x0=strategy('uint256', min_value=10**9, max_value=10**9 * 10**18),
     x1=strategy('uint256', min_value=10**9, max_value=10**9 * 10**18),
     x2=strategy('uint256', min_value=10**9, max_value=10**9 * 10**18),
+    gamma=strategy('uint256', min_value=1, max_value=2**100)
+)
+def test_reduction_coefficient_property(test_math, x0, x1, x2, gamma):
+    coeff = test_math.pub_reduction_coefficient([x0, x1, x2], gamma)
+    assert coeff <= 10**18
+
+
+@given(
+    x0=strategy('uint256', min_value=10**9, max_value=10**9 * 10**18),
+    x1=strategy('uint256', min_value=10**9, max_value=10**9 * 10**18),
+    x2=strategy('uint256', min_value=10**9, max_value=10**9 * 10**18),
     gamma=strategy('uint256', min_value=0, max_value=10**17)
 )
 def test_reduction_coefficient_sim(test_math, x0, x1, x2, gamma):
