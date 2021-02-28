@@ -55,7 +55,6 @@ event CommitNewParameters:
     admin_fee: uint256
     mid_fee: uint256
     out_fee: uint256
-    gamma: uint256
     fee_gamma: uint256
     price_threshold: uint256
     adjustment_step: uint256
@@ -65,7 +64,6 @@ event NewParameters:
     admin_fee: uint256
     mid_fee: uint256
     out_fee: uint256
-    gamma: uint256
     fee_gamma: uint256
     price_threshold: uint256
     adjustment_step: uint256
@@ -86,13 +84,10 @@ price_oracle: public(uint256[N_COINS-1])  # Price target given by MA
 last_prices: public(uint256[N_COINS-1])
 last_prices_timestamp: public(uint256)
 
-initial_A: public(uint256)
-future_A: public(uint256)
-initial_A_time: public(uint256)
-future_A_time: public(uint256)
-
-gamma: public(uint256)
-future_gamma: public(uint256)
+initial_A_gamma: public(uint256)
+future_A_gamma: public(uint256)
+initial_A_gamma_time: public(uint256)
+future_A_gamma_time: public(uint256)
 
 price_threshold: public(uint256)
 future_price_threshoold: public(uint256)
@@ -157,9 +152,14 @@ def __init__(
     self.owner = owner
     self.coins = coins
     self.token = pool_token
-    self.initial_A = A * A_MULTIPLIER
-    self.future_A = A * A_MULTIPLIER
-    self.gamma = gamma
+
+    # Pack A and gamma:
+    # shifted A + gamma
+    A_gamma: uint256 = shift(A * A_MULTIPLIER, 128)
+    A_gamma = bitwise_or(A_gamma, gamma)
+    self.initial_A_gamma = A_gamma
+    self.future_A_gamma = A_gamma
+
     self.mid_fee = mid_fee
     self.out_fee = out_fee
     self.price_threshold = price_threshold
@@ -190,34 +190,50 @@ def xp() -> uint256[N_COINS]:
 
 @view
 @internal
-def _A() -> uint256:
-    t1: uint256 = self.future_A_time
-    A1: uint256 = self.future_A
+def _A_gamma() -> (uint256, uint256):
+    t1: uint256 = self.future_A_gamma_time
+
+    A_gamma_1: uint256 = self.future_A_gamma
+    gamma1: uint256 = bitwise_and(A_gamma_1, 2**128-1)
+    A1: uint256 = shift(A_gamma_1, -128)
 
     if block.timestamp < t1:
         # handle ramping up and down of A
-        A0: uint256 = self.initial_A
-        t0: uint256 = self.initial_A_time
+        A_gamma_0: uint256 = self.initial_A_gamma
+        gamma0: uint256 = bitwise_and(A_gamma_0, 2**128-1)
+        A0: uint256 = shift(A_gamma_0, -128)
+
+        t0: uint256 = self.initial_A_gamma_time
         # Expressions in uint256 cannot have negative numbers, thus "if"
         if A1 > A0:
-            return A0 + (A1 - A0) * (block.timestamp - t0) / (t1 - t0)
+            A1 = A0 + (A1 - A0) * (block.timestamp - t0) / (t1 - t0)
         else:
-            return A0 - (A0 - A1) * (block.timestamp - t0) / (t1 - t0)
+            A1 = A0 - (A0 - A1) * (block.timestamp - t0) / (t1 - t0)
+        # Expressions in uint256 cannot have negative numbers, thus "if"
+        if gamma1 > gamma0:
+            gamma1 = gamma0 + (gamma1 - gamma0) * (block.timestamp - t0) / (t1 - t0)
+        else:
+            gamma1 = gamma0 - (gamma0 - gamma1) * (block.timestamp - t0) / (t1 - t0)
 
-    else:  # when t1 == 0 or block.timestamp >= t1
-        return A1
+    return A1, gamma1
 
 
 @view
 @external
 def A() -> uint256:
-    return self._A() / A_MULTIPLIER
+    return self._A_gamma()[0] / A_MULTIPLIER
+
+
+@view
+@external
+def gamma() -> uint256:
+    return self._A_gamma()[1]
 
 
 @view
 @external
 def A_precise() -> uint256:
-    return self._A()
+    return self._A_gamma()[0]
 
 
 @internal
@@ -389,8 +405,9 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     for k in range(N_COINS-1):
         xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
 
-    A: uint256 = self._A()
-    gamma: uint256 = self.gamma
+    A: uint256 = 0
+    gamma: uint256 = 0
+    A, gamma = self._A_gamma()
 
     y: uint256 = Math(math).newton_y(A, gamma, xp, self.D, j)
     dy: uint256 = xp[j] - y - 1
@@ -425,8 +442,9 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
     for k in range(N_COINS-1):
         xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
 
-    A: uint256 = self._A()
-    gamma: uint256 = self.gamma
+    A: uint256 = 0
+    gamma: uint256 = 0
+    A, gamma = self._A_gamma()
 
     y: uint256 = Math(math).newton_y(A, gamma, xp, self.D, j)
     dy: uint256 = xp[j] - y - 1
@@ -454,8 +472,9 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
     xp[0] += amounts[0]
     for i in range(N_COINS-1):
         xp[i+1] = (xp[i+1] + amounts[i+1]) * price_scale[i] / PRECISION
-    A: uint256 = self._A()
-    gamma: uint256 = self.gamma
+    A: uint256 = 0
+    gamma: uint256 = 0
+    A, gamma = self._A_gamma()
     token: address = self.token
 
     D: uint256 = Math(math).newton_D(A, gamma, xp)
@@ -517,7 +536,10 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
             xp[k] -= amounts[k]
     for k in range(N_COINS-1):
         xp[k+1] = xp[k+1] * self.price_scale[k] / PRECISION
-    D: uint256 = Math(math).newton_D(self._A(), self.gamma, xp)
+    A: uint256 = 0
+    gamma: uint256 = 0
+    A, gamma = self._A_gamma()
+    D: uint256 = Math(math).newton_D(A, gamma, xp)
     fee: uint256 = self._fee(xp)
     d_token: uint256 = token_supply * D / self.D
     if deposit:
@@ -554,7 +576,10 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
 @view
 @external
 def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
-    return self._calc_withdraw_one_coin(self._A(), self.gamma, token_amount, i)[0]
+    A: uint256 = 0
+    gamma: uint256 = 0
+    A, gamma = self._A_gamma()
+    return self._calc_withdraw_one_coin(A, gamma, token_amount, i)[0]
 
 
 @external
@@ -564,8 +589,9 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
     token: address = self.token
     assert CurveToken(self.token).burnFrom(msg.sender, token_amount)
-    A: uint256 = self._A()
-    gamma: uint256 = self.gamma
+    A: uint256 = 0
+    gamma: uint256 = 0
+    A, gamma = self._A_gamma()
 
     dy: uint256 = 0
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
@@ -598,7 +624,6 @@ def commit_new_parameters(
     _new_mid_fee: uint256,
     _new_out_fee: uint256,
     _new_admin_fee: uint256,
-    _new_gamma: uint256,
     _new_fee_gamma: uint256,
     _new_price_threshold: uint256,
     _new_adjustment_step: uint256,
@@ -610,7 +635,6 @@ def commit_new_parameters(
     new_mid_fee: uint256 = _new_mid_fee
     new_out_fee: uint256 = _new_out_fee
     new_admin_fee: uint256 = _new_admin_fee
-    new_gamma: uint256 = _new_gamma
     new_fee_gamma: uint256 = _new_fee_gamma
     new_price_threshold: uint256 = _new_price_threshold
     new_adjustment_step: uint256 = _new_adjustment_step
@@ -630,10 +654,6 @@ def commit_new_parameters(
         new_admin_fee = self.admin_fee
 
     # AMM parameters
-    if new_gamma != MAX_UINT256:
-        assert new_gamma >= 10**10 and new_gamma <= 10**16  # dev: gamma should be in [1e-8 .. 1e-2]
-    else:
-        new_gamma = self.gamma
     if new_fee_gamma != MAX_UINT256:
         assert new_fee_gamma > 0 and new_fee_gamma < 2**100  # dev: fee_gamma out of range [1 .. 2**100]
     else:
@@ -658,14 +678,13 @@ def commit_new_parameters(
     self.future_admin_fee = new_admin_fee
     self.future_mid_fee = new_mid_fee
     self.future_out_fee = new_out_fee
-    self.future_gamma = new_gamma
     self.future_fee_gamma = new_fee_gamma
     self.future_price_threshoold = new_price_threshold
     self.future_adjustment_step = new_adjustment_step
     self.future_ma_half_time = new_ma_half_time
 
     log CommitNewParameters(_deadline, new_admin_fee, new_mid_fee, new_out_fee,
-                            new_gamma, new_fee_gamma,
+                            new_fee_gamma,
                             new_price_threshold, new_adjustment_step,
                             new_ma_half_time)
 
@@ -684,8 +703,6 @@ def apply_new_parameters():
     self.mid_fee = mid_fee
     out_fee: uint256 = self.future_out_fee
     self.out_fee = out_fee
-    gamma: uint256 = self.future_gamma
-    self.gamma = gamma
     fee_gamma: uint256 = self.future_fee_gamma
     self.fee_gamma = fee_gamma
     price_threshold: uint256 = self.future_price_threshoold
@@ -696,7 +713,7 @@ def apply_new_parameters():
     self.ma_half_time = ma_half_time
 
     log NewParameters(admin_fee, mid_fee, out_fee,
-                      gamma, fee_gamma,
+                      fee_gamma,
                       price_threshold, adjustment_step,
                       ma_half_time)
 
