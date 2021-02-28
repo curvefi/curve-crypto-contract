@@ -1,4 +1,4 @@
-# @version 0.2.8
+# @version 0.2.11
 # (c) Curve.Fi, 2020
 # Pool for 3Crv(USD)/BTC/ETH or similar
 from vyper.interfaces import ERC20
@@ -69,6 +69,17 @@ event NewParameters:
     adjustment_step: uint256
     ma_half_time: uint256
 
+event RampAgamma:
+    initial_A: uint256
+    future_A: uint256
+    initial_time: uint256
+    future_time: uint256
+
+event StopRampA:
+    current_A: uint256
+    current_gamma: uint256
+    time: uint256
+
 
 N_COINS: constant(int128) = 3  # <- change
 PRECISION_MUL: constant(uint256[N_COINS]) = [1, 1, 1]  # 3usd, renpool, eth
@@ -131,6 +142,8 @@ MIN_RAMP_TIME: constant(uint256) = 86400
 
 MAX_ADMIN_FEE: constant(uint256) = 10 * 10 ** 9
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
+MAX_A: constant(uint256) = 10000 * A_MULTIPLIER
+MAX_A_CHANGE: constant(uint256) = 10
 
 
 @external
@@ -610,13 +623,52 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
 # Admin parameters
 @external
-def ramp_A(_future_A: uint256, _future_time: uint256):
-    pass
+def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256):
+    assert msg.sender == self.owner  # dev: only owner
+    assert block.timestamp >= self.initial_A_gamma_time + MIN_RAMP_TIME
+    assert future_time >= block.timestamp + MIN_RAMP_TIME  # dev: insufficient time
+
+    initial_A: uint256 = 0
+    initial_gamma: uint256 = 0
+    initial_A, initial_gamma = self._A_gamma()
+    initial_A_gamma: uint256 = shift(initial_A, 128)
+    initial_A_gamma = bitwise_or(initial_A_gamma, initial_gamma)
+
+    future_A_p: uint256 = future_A * A_MULTIPLIER
+
+    assert future_A > 0 and future_A < MAX_A
+    if future_A_p < initial_A:
+        assert future_A_p * MAX_A_CHANGE >= initial_A
+    else:
+        assert future_A_p <= initial_A * MAX_A_CHANGE
+
+    self.initial_A_gamma = initial_A_gamma
+    self.initial_A_gamma_time = block.timestamp
+
+    future_A_gamma: uint256 = shift(future_A_p, 128)
+    future_A_gamma = bitwise_or(future_A_gamma, future_gamma)
+    self.future_A_gamma_time = future_time
+    self.future_A_gamma = future_A_gamma
+
+    log RampAgamma(initial_A, future_A_p, block.timestamp, future_time)
 
 
 @external
-def stop_ramp_A():
-    pass
+def stop_ramp_A_gamma():
+    assert msg.sender == self.owner  # dev: only owner
+
+    current_A: uint256 = 0
+    current_gamma: uint256 = 0
+    current_A, current_gamma = self._A_gamma()
+    current_A_gamma: uint256 = shift(current_A, 128)
+    current_A_gamma = bitwise_or(current_A_gamma, current_gamma)
+    self.initial_A_gamma = current_A_gamma
+    self.future_A_gamma = current_A_gamma
+    self.initial_A_gamma_time = block.timestamp
+    self.future_A_gamma_time = block.timestamp
+    # now (block.timestamp < t1) is always False, so we return saved A
+
+    log StopRampA(current_A, current_gamma, block.timestamp)
 
 
 @external
