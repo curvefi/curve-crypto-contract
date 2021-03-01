@@ -5,7 +5,7 @@ from itertools import permutations
 from hypothesis import settings
 
 N_COINS = 3
-MAX_SAMPLES = 2500
+MAX_SAMPLES = 500
 
 
 @pytest.fixture(scope="module")
@@ -100,7 +100,7 @@ def test_newton_y(test_math, A, D, xD, yD, zD, gamma, j):
     X = [D * xD // 10**18, D * yD // 10**18, D * zD // 10**18]
     result_sim = sim.solve_x(A, gamma, X, D, j)
     result_contract = test_math.public_newton_y(A, gamma, X, D, j)
-    assert abs(result_sim - result_contract) <= max(100, result_sim/1e15)
+    assert abs(result_sim - result_contract) <= max(200, result_sim/1e15)
 
 
 @given(
