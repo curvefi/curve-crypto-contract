@@ -1,4 +1,4 @@
-# @version 0.2.8
+# @version 0.2.11
 N_COINS: constant(uint256) = 3
 A_MULTIPLIER: constant(uint256) = 100
 
