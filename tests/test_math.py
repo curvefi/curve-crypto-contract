@@ -83,7 +83,7 @@ def test_newton_D(test_math, A, x, yx, zx, gamma):
     result_sim = sim.solve_D(A, gamma, X)
     # test_math.public_newton_D_w(A, gamma, X)
     result_contract = test_math.public_newton_D(A, gamma, X)
-    assert abs(result_sim - result_contract) <= max(10, result_sim/1e15)
+    assert abs(result_sim - result_contract) <= max(1000, result_sim/1e15)  # 1000 is $1e-15
 
 
 @given(
@@ -100,7 +100,7 @@ def test_newton_y(test_math, A, D, xD, yD, zD, gamma, j):
     X = [D * xD // 10**18, D * yD // 10**18, D * zD // 10**18]
     result_sim = sim.solve_x(A, gamma, X, D, j)
     result_contract = test_math.public_newton_y(A, gamma, X, D, j)
-    assert abs(result_sim - result_contract) <= max(200, result_sim/1e15)
+    assert abs(result_sim - result_contract) <= max(10000, result_sim/1e15)  # 10000 is $1e-14
 
 
 @given(
