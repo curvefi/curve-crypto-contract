@@ -1,7 +1,8 @@
+from brownie.test import given, strategy
 from .conftest import INITIAL_PRICES
 
 
-def test_1st_deposit_and_last_withdraw(crypto_swap, coins, token, accounts, crypto_math):
+def test_1st_deposit_and_last_withdraw(crypto_swap, coins, token, accounts):
     user = accounts[1]
     quantities = [10**36 // p for p in [10**18] + INITIAL_PRICES]  # $3 worth
     for coin, q in zip(coins, quantities):
@@ -19,3 +20,9 @@ def test_1st_deposit_and_last_withdraw(crypto_swap, coins, token, accounts, cryp
     crypto_swap.remove_liquidity(token_balance, [0] * 3, {'from': user})
 
     assert token.balanceOf(user) == token.totalSupply() == 0
+
+
+@given(values=strategy('uint256[3]', min_value=0, max_value=10**6 * 10**18))
+def test_second_deposit(crypto_swap_with_deposit, coins, accounts, values):
+    if all(v == 0 for v in values):
+        return
