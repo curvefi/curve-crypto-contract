@@ -33,7 +33,7 @@ def crypto_swap(crypto_math, token, coins, accounts):
             accounts[0],
             coins,
             token,
-            135,  # A
+            135 * 3**3,  # A
             int(7e-5 * 1e18),  # gamma
             int(4e-4 * 1e10),  # mid_fee
             int(4e-3 * 1e10),  # out_fee

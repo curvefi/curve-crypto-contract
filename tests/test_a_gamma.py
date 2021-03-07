@@ -1,12 +1,12 @@
 def test_A_gamma(crypto_swap):
-    assert crypto_swap.A() == 135
-    assert crypto_swap.A_precise() == 13500
+    assert crypto_swap.A() == 135 * 3**3
+    assert crypto_swap.A_precise() == 135 * 3**3 * 100
     assert crypto_swap.gamma() == int(7e-5 * 1e18)
 
 
 def test_ramp_A_gamma(chain, crypto_swap, accounts):
-    initial_A = 135
-    future_A = 300
+    initial_A = 135 * 3**3
+    future_A = 300 * 3**3
     initial_gamma = int(7e-5 * 1e18)
     future_gamma = int(2e-4 * 1e18)
     t0 = chain.time()
