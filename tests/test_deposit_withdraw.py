@@ -51,6 +51,8 @@ def test_immediate_withdraw(crypto_swap_with_deposit, token, coins, accounts, to
     if f <= 1:
         expected = [int(f * crypto_swap_with_deposit.balances(i)) for i in range(3)]
         measured = [c.balanceOf(user) for c in coins]
+        token_amount_calc = crypto_swap_with_deposit.calc_token_amount(expected, False)
+        assert abs(token_amount_calc - token_amount) / token_amount < 1e-3
         crypto_swap_with_deposit.remove_liquidity(
                 token_amount,
                 [int(0.999 * e) for e in expected],
