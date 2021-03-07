@@ -59,3 +59,5 @@ def crypto_swap_with_deposit(crypto_swap, coins, accounts):
 
     # Very first deposit
     crypto_swap.add_liquidity(quantities, 0, {'from': user})
+
+    return crypto_swap
