@@ -82,7 +82,6 @@ event StopRampA:
 
 
 N_COINS: constant(int128) = 3  # <- change
-PRECISION_MUL: constant(uint256[N_COINS]) = [1, 1, 1]  # 3usd, renpool, eth
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
 A_MULTIPLIER: constant(uint256) = 100
@@ -180,8 +179,6 @@ def __init__(
     self.adjustment_step = adjustment_step
     self.admin_fee = admin_fee
     new_initial_prices: uint256[N_COINS-1] = initial_prices
-    precisions: uint256[N_COINS] = PRECISION_MUL
-    new_initial_prices[0] = precisions[0] * PRECISION  # First price is always 1e18
     self.price_scale = new_initial_prices
     self.price_oracle = new_initial_prices
     self.last_prices = new_initial_prices
@@ -298,6 +295,8 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
 
     TODO: this can be compressed by having each number being 128 bits
     """
+    # XXX pass D in case we know it?
+    #
     # Update MA if needed
     price_oracle: uint256[N_COINS-1] = self.price_oracle
     last_prices_timestamp: uint256 = self.last_prices_timestamp
@@ -331,9 +330,9 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
         # calculate real prices
         # it would cost 70k gas for a 3-token pool. Sad. How do we do better?
         __xp: uint256[N_COINS] = _xp
-        __xp[0] += 10**18
+        __xp[0] += 10**12
         for k in range(N_COINS-1):
-            self.last_prices[k] = price_scale[k] * 10**18 / (_xp[k+1] - Math(math).newton_y(A, gamma, __xp, D_unadjusted, k+1))
+            self.last_prices[k] = price_scale[k] * 10**12 / (_xp[k+1] - Math(math).newton_y(A, gamma, __xp, D_unadjusted, k+1))
 
     norm: uint256 = 0
     old_xcp_profit: uint256 = self.xcp_profit
@@ -353,20 +352,26 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
     for k in range(N_COINS-1):
         xp[k+1] = D_unadjusted * 10**18 / (N_COINS * price_scale[k])
     old_xcp: uint256 = self.xcp
-    xcp: uint256 = Math(math).geometric_mean(xp)
-    xcp_profit_real: uint256 = old_xcp_profit_real * xcp / old_xcp
-    xcp_profit: uint256 = old_xcp_profit * xcp / old_xcp
-    self.xcp_profit = xcp_profit
+    xcp: uint256 = 0
+    xcp_profit: uint256 = 10**18
+    xcp_profit_real: uint256 = 10**18
 
-    # Mint admin fees
-    frac: uint256 = (10**18 * xcp / old_xcp - 10**18) * self.admin_fee / (2 * 10**10)
-    # /2 here is because half of the fee usually goes for retargeting the price
-    if frac > 0:
-        assert CurveToken(self.token).mint_relative(self.owner, frac)
+    if old_xcp > 0:
+        xcp = Math(math).geometric_mean(xp)
+        xcp_profit_real = old_xcp_profit_real * xcp / old_xcp
+        xcp_profit = old_xcp_profit * xcp / old_xcp
+
+        # Mint admin fees
+        frac: uint256 = (10**18 * xcp / old_xcp - 10**18) * self.admin_fee / (2 * 10**10)
+        # /2 here is because half of the fee usually goes for retargeting the price
+        if frac > 0:
+            assert CurveToken(self.token).mint_relative(self.owner, frac)
+
+    self.xcp_profit = xcp_profit
 
     # self.price_threshold must be > self.adjustment_step
     # should we pause for a bit if profit wasn't enough to not spend this gas every time?
-    if norm > self.price_threshold ** 2:
+    if norm > self.price_threshold ** 2 and old_xcp > 0:
         norm = Math(math).sqrt_int(norm)
         adjustment_step: uint256 = self.adjustment_step
 

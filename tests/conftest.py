@@ -1,6 +1,8 @@
 import pytest
 from brownie import compile_source
 
+INITIAL_PRICES = [47500 * 10**18, 1500 * 10**18]
+
 
 @pytest.fixture(scope="module")
 def crypto_math(CurveCryptoMath3, accounts):
@@ -27,7 +29,7 @@ def crypto_swap(crypto_math, token, coins, accounts):
         source = source.replace("0x0000000000000000000000000000000000000000", crypto_math.address)
     contract = compile_source(source, vyper_version='0.2.11').Vyper  # XXX remove version once brownie supports new Vyper
 
-    return contract.deploy(
+    swap = contract.deploy(
             accounts[0],
             coins,
             token,
@@ -40,5 +42,8 @@ def crypto_swap(crypto_math, token, coins, accounts):
             int(0.0015 * 1e18),  # adjustment_step
             0,  # admin_fee
             600,  # ma_half_time
-            [47500 * 10**18, 1500 * 10**18],  # initial_prices
+            INITIAL_PRICES,
             {'from': accounts[0]})
+    token.set_minter(swap, {"from": accounts[0]})
+
+    return swap
