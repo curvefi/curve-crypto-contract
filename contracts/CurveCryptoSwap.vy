@@ -502,7 +502,7 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
     old_D: uint256 = self.D
     d_token: uint256 = 0
     if old_D > 0:
-        d_token = token_supply * D / old_D
+        d_token = token_supply * D / old_D - token_supply
     else:
         d_token = self.get_xcp(D)  # making initial virtual price equal to 1
     assert d_token > 0  # dev: nothing minted

@@ -1,5 +1,8 @@
 from brownie.test import given, strategy
+from hypothesis import settings  # noqa
 from .conftest import INITIAL_PRICES
+
+MAX_SAMPLES = 50
 
 
 def test_1st_deposit_and_last_withdraw(crypto_swap, coins, token, accounts):
@@ -22,8 +25,9 @@ def test_1st_deposit_and_last_withdraw(crypto_swap, coins, token, accounts):
     assert token.balanceOf(user) == token.totalSupply() == 0
 
 
-@given(values=strategy('uint256[3]', min_value=0, max_value=10**6 * 10**18))
-def test_second_deposit(crypto_swap_with_deposit, coins, accounts, values):
+@given(values=strategy('uint256[3]', min_value=10**16, max_value=10**6 * 10**18))
+@settings(max_examples=MAX_SAMPLES)
+def test_second_deposit(crypto_swap_with_deposit, token, coins, accounts, values, crypto_math):
     user = accounts[1]
     if all(v == 0 for v in values):
         return
@@ -31,4 +35,9 @@ def test_second_deposit(crypto_swap_with_deposit, coins, accounts, values):
     for c, v in zip(coins, amounts):
         c._mint_for_testing(user, v)
 
+    calculated = crypto_swap_with_deposit.calc_token_amount(amounts, True)
+    measured = token.balanceOf(user)
     crypto_swap_with_deposit.add_liquidity(amounts, 0, {'from': user})
+    measured = token.balanceOf(user) - measured
+
+    assert calculated == measured
