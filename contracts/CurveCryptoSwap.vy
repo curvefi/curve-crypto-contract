@@ -330,9 +330,10 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
         # calculate real prices
         # it would cost 70k gas for a 3-token pool. Sad. How do we do better?
         __xp: uint256[N_COINS] = _xp
-        __xp[0] += 10**12
+        dx_price: uint256 = __xp[0] / 10**6
+        __xp[0] += dx_price
         for k in range(N_COINS-1):
-            self.last_prices[k] = price_scale[k] * 10**12 / (_xp[k+1] - Math(math).newton_y(A, gamma, __xp, D_unadjusted, k+1))
+            self.last_prices[k] = price_scale[k] * dx_price / (_xp[k+1] - Math(math).newton_y(A, gamma, __xp, D_unadjusted, k+1))
 
     norm: uint256 = 0
     old_xcp_profit: uint256 = self.xcp_profit

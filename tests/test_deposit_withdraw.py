@@ -10,3 +10,6 @@ def test_deposit_and_withdraw(crypto_swap, coins, token, accounts, crypto_math):
 
     # Very first deposit
     crypto_swap.add_liquidity(quantities, 0, {'from': user})
+
+    assert token.balanceOf(user) == token.totalSupply() > 0
+    assert abs(crypto_swap.get_virtual_price() / 1e18 - 1) < 1e-3
