@@ -4,23 +4,23 @@ from brownie import compile_source
 INITIAL_PRICES = [47500 * 10**18, 1500 * 10**18]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="module", autouse=True)
 def crypto_math(CurveCryptoMath3, accounts):
     yield CurveCryptoMath3.deploy({'from': accounts[0]})
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module", autouse=True)
 def token(CurveTokenV4, accounts):
     yield CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", {"from": accounts[0]})
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module", autouse=True)
 def coins(ERC20Mock, accounts):
     yield [ERC20Mock.deploy(name, name, 18, {"from": accounts[0]})
            for name in ['USD', 'BTC', 'ETH']]
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module", autouse=True)
 def crypto_swap(crypto_math, token, coins, accounts):
     from brownie import CurveCryptoSwap
     path = CurveCryptoSwap._sources.get_source_path('CurveCryptoSwap')
@@ -47,6 +47,11 @@ def crypto_swap(crypto_math, token, coins, accounts):
     token.set_minter(swap, {"from": accounts[0]})
 
     return swap
+
+
+@pytest.fixture(autouse=True)
+def isolation(fn_isolation):
+    pass
 
 
 @pytest.fixture(scope="function")
