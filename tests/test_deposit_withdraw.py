@@ -82,4 +82,4 @@ def test_immediate_withdraw_one(crypto_swap_with_deposit, token, coins, accounts
         crypto_swap_with_deposit.remove_liquidity_one_coin(token_amount, i, int(0.999 * calculated), {'from': user})
         measured = coins[i].balanceOf(user) - measured
 
-        assert abs(calculated - measured) / calculated < 1e-4
+        assert calculated == measured

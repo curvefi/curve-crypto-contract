@@ -607,7 +607,6 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     assert not self.is_killed  # dev: the pool is killed
 
     token: address = self.token
-    assert CurveToken(self.token).burnFrom(msg.sender, token_amount)
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
@@ -618,6 +617,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     assert dy >= min_amount, "Slippage screwed you"
 
     self.balances[i] -= dy
+    assert CurveToken(self.token).burnFrom(msg.sender, token_amount)
     assert ERC20(self.coins[i]).transfer(msg.sender, dy)
 
     self.tweak_price(A, gamma, xp, 0, 0, 0, 0)

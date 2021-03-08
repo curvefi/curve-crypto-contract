@@ -5,7 +5,7 @@ from itertools import permutations
 from hypothesis import settings
 
 N_COINS = 3
-MAX_SAMPLES = 500
+MAX_SAMPLES = 50  # Increase for fuzzing
 
 
 @pytest.fixture(scope="module")
