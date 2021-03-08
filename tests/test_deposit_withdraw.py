@@ -63,3 +63,23 @@ def test_immediate_withdraw(crypto_swap_with_deposit, token, coins, accounts, to
     else:
         with brownie.reverts():
             crypto_swap_with_deposit.remove_liquidity(token_amount, [0] * 3, {'from': user})
+
+
+@given(
+    token_amount=strategy('uint256', min_value=10**12, max_value=4 * 10**6 * 10**18),  # Can be more than we have
+    i=strategy('uint8', min_value=0, max_value=2))
+@settings(max_examples=MAX_SAMPLES)
+def test_immediate_withdraw_one(crypto_swap_with_deposit, token, coins, accounts, token_amount, i):
+    user = accounts[1]
+
+    if token_amount >= token.totalSupply():
+        with brownie.reverts():
+            crypto_swap_with_deposit.calc_withdraw_one_coin(token_amount, i)
+
+    else:
+        calculated = crypto_swap_with_deposit.calc_withdraw_one_coin(token_amount, i)
+        measured = coins[i].balanceOf(user)
+        crypto_swap_with_deposit.remove_liquidity_one_coin(token_amount, i, int(0.999 * calculated), {'from': user})
+        measured = coins[i].balanceOf(user) - measured
+
+        assert abs(calculated - measured) / calculated < 1e-4
