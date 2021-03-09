@@ -314,7 +314,7 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
     D_unadjusted: uint256 = Math(math).newton_D(A, gamma, _xp)
     price_scale: uint256[N_COINS-1] = self.price_scale
 
-    if i > 0 or j > 0:
+    if (i > 0 or j > 0) and (dx > 10**5) and (dy > 10**5):
         # Save the last price
         p: uint256 = 0
         ix: uint256 = j
@@ -412,7 +412,7 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
 @nonreentrant('lock')
 def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     assert not self.is_killed  # dev: the pool is killed
-    assert i != j and i < N_COINS and j < N_COINS
+    assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
 
     input_coin: address = self.coins[i]
     assert ERC20(input_coin).transferFrom(msg.sender, self, dx)
@@ -452,7 +452,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
 @external
 @view
 def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
-    assert i != j and i < N_COINS and j < N_COINS
+    assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
 
     price_scale: uint256[N_COINS-1] = self.price_scale
     xp: uint256[N_COINS] = self.balances
