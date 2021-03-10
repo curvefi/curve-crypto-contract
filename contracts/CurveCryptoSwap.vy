@@ -421,6 +421,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     xp: uint256[N_COINS] = self.balances
     y0: uint256 = xp[j]
     xp[i] += dx
+    self.balances[i] = xp[i]
     for k in range(N_COINS-1):
         xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
 

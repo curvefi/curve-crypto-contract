@@ -3,7 +3,7 @@ from brownie.test import given, strategy
 from hypothesis import settings  # noqa
 from .conftest import INITIAL_PRICES
 
-MAX_SAMPLES = 500
+MAX_SAMPLES = 50
 
 
 @given(
@@ -28,11 +28,18 @@ def test_exchange(crypto_swap_with_deposit, token, coins, accounts, amount, i, j
         calculated = crypto_swap_with_deposit.get_dy(i, j, amount)
         measured_i = coins[i].balanceOf(user)
         measured_j = coins[j].balanceOf(user)
+        d_balance_i = crypto_swap_with_deposit.balances(i)
+        d_balance_j = crypto_swap_with_deposit.balances(j)
 
         crypto_swap_with_deposit.exchange(i, j, amount, int(0.999 * calculated), {'from': user})
 
         measured_i -= coins[i].balanceOf(user)
         measured_j = coins[j].balanceOf(user) - measured_j
+        d_balance_i = crypto_swap_with_deposit.balances(i) - d_balance_i
+        d_balance_j = crypto_swap_with_deposit.balances(j) - d_balance_j
 
         assert amount == measured_i
         assert calculated == measured_j
+
+        assert d_balance_i == amount
+        assert -d_balance_j == measured_j
