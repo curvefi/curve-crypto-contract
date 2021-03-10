@@ -46,3 +46,22 @@ def test_last_price_exchange(crypto_swap_with_deposit, token, coins, accounts, a
     else:  # j == 0
         price_i = out * 10**18 // amount
         assert price_i == crypto_swap_with_deposit.last_prices(i-1)
+
+
+@given(
+    token_frac=strategy('uint256', min_value=10**6, max_value=10**17),
+    i=strategy('uint8', min_value=0, max_value=2))
+@settings(max_examples=MAX_SAMPLES)
+def test_last_price_remove_liq(crypto_swap_with_deposit, token, coins, accounts, token_frac, i):
+    user = accounts[1]
+
+    prices = [10**18] + INITIAL_PRICES
+    token_amount = token_frac * token.totalSupply() // 10**18
+
+    out = coins[i].balanceOf(user)
+    crypto_swap_with_deposit.remove_liquidity_one_coin(token_amount, i, 0, {'from': user})
+    out = coins[i].balanceOf(user) - out
+
+    for k in [1, 2]:
+        oracle_price = crypto_swap_with_deposit.last_prices(k-1)
+        assert abs(log2(oracle_price / prices[k])) < 0.1
