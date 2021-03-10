@@ -1,3 +1,4 @@
+from math import log2
 from brownie.test import strategy, given
 from hypothesis import settings
 from .conftest import INITIAL_PRICES
@@ -30,7 +31,10 @@ def test_last_price_exchange(crypto_swap_with_deposit, token, coins, accounts, a
     out = coins[j].balanceOf(user) - out
 
     if amount <= 10**5 or out <= 10**5:
-        # XXX needs to be price calc from bonding curve instead
+        # A very rough sanity check
+        for k in [1, 2]:
+            oracle_price = crypto_swap_with_deposit.last_prices(k-1)
+            assert abs(log2(oracle_price / prices[k])) < 1
         return
 
     if i > 0 and j > 0:
