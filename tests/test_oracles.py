@@ -70,9 +70,10 @@ def test_last_price_remove_liq(crypto_swap_with_deposit, token, coins, accounts,
 @given(
     amount=strategy('uint256', min_value=10**6, max_value=2 * 10**6 * 10**18),  # Can be more than we have
     i=strategy('uint8', min_value=0, max_value=2),
-    j=strategy('uint8', min_value=0, max_value=2))
+    j=strategy('uint8', min_value=0, max_value=2),
+    t=strategy('uint256', max_value=10 * 86400))
 @settings(max_examples=MAX_SAMPLES)
-def test_ma(chain, crypto_swap_with_deposit, token, coins, accounts, amount, i, j):
+def test_ma(chain, crypto_swap_with_deposit, token, coins, accounts, amount, i, j, t):
     user = accounts[1]
     if i == j:
         return
@@ -81,16 +82,20 @@ def test_ma(chain, crypto_swap_with_deposit, token, coins, accounts, amount, i, 
     amount = amount * 10**18 // prices1[i]
     coins[i]._mint_for_testing(user, amount)
 
+    half_time = crypto_swap_with_deposit.ma_half_time()
+
     out = coins[j].balanceOf(user)
     crypto_swap_with_deposit.exchange(i, j, amount, 0, {'from': user})
     out = coins[j].balanceOf(user) - out
 
     prices2 = [crypto_swap_with_deposit.last_prices(k) for k in [0, 1]]
 
-    chain.sleep(86400)
+    chain.sleep(t)
     crypto_swap_with_deposit.remove_liquidity_one_coin(10**15, 0, 0, {'from': user})
 
     prices3 = [crypto_swap_with_deposit.price_oracle(k) for k in [0, 1]]
 
-    for p2, p3 in zip(prices2, prices3):
-        assert abs(log2(p2 / p3)) < 1e-4
+    for p1, p2, p3 in zip(INITIAL_PRICES, prices2, prices3):
+        alpha = 0.5 ** (t / half_time)
+        theory = p1 * alpha + p2 * (1 - alpha)
+        assert abs(log2(theory / p3)) < 1e-4
