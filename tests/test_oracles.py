@@ -71,7 +71,7 @@ def test_last_price_remove_liq(crypto_swap_with_deposit, token, coins, accounts,
     amount=strategy('uint256', min_value=10**6, max_value=2 * 10**6 * 10**18),  # Can be more than we have
     i=strategy('uint8', min_value=0, max_value=2),
     j=strategy('uint8', min_value=0, max_value=2),
-    t=strategy('uint256', max_value=10 * 86400))
+    t=strategy('uint256', min_value=10, max_value=10 * 86400))
 @settings(max_examples=MAX_SAMPLES)
 def test_ma(chain, crypto_swap_with_deposit, token, coins, accounts, amount, i, j, t):
     user = accounts[1]
