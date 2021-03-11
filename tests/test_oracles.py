@@ -99,3 +99,37 @@ def test_ma(chain, crypto_swap_with_deposit, token, coins, accounts, amount, i, 
         alpha = 0.5 ** (t / half_time)
         theory = p1 * alpha + p2 * (1 - alpha)
         assert abs(log2(theory / p3)) < 1e-4
+
+
+# Sanity check for price scale
+@given(
+    amount=strategy('uint256', min_value=10**6, max_value=2 * 10**6 * 10**18),  # Can be more than we have
+    i=strategy('uint8', min_value=0, max_value=2),
+    j=strategy('uint8', min_value=0, max_value=2),
+    t=strategy('uint256', max_value=10 * 86400))
+@settings(max_examples=MAX_SAMPLES)
+def test_price_scale(chain, crypto_swap_with_deposit, token, coins, accounts, amount, i, j, t):
+    user = accounts[1]
+    if i == j:
+        return
+
+    prices1 = [10**18] + INITIAL_PRICES
+    amount = amount * 10**18 // prices1[i]
+    coins[i]._mint_for_testing(user, amount)
+
+    out = coins[j].balanceOf(user)
+    crypto_swap_with_deposit.exchange(i, j, amount, 0, {'from': user})
+    out = coins[j].balanceOf(user) - out
+
+    prices2 = [crypto_swap_with_deposit.last_prices(k) for k in [0, 1]]
+
+    chain.sleep(t)
+    crypto_swap_with_deposit.remove_liquidity_one_coin(10**15, 0, 0, {'from': user})
+
+    prices3 = [crypto_swap_with_deposit.price_scale(k) for k in [0, 1]]
+
+    for p1, p2, p3 in zip(INITIAL_PRICES, prices2, prices3):
+        if p1 > p2:
+            assert p3 <= p1 and p3 >= p2
+        else:
+            assert p3 >= p1 and p3 <= p2
