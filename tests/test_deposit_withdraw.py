@@ -36,10 +36,13 @@ def test_second_deposit(crypto_swap_with_deposit, token, coins, accounts, values
 
     calculated = crypto_swap_with_deposit.calc_token_amount(amounts, True)
     measured = token.balanceOf(user)
+    d_balances = [crypto_swap_with_deposit.balances(i) for i in range(3)]
     crypto_swap_with_deposit.add_liquidity(amounts, int(calculated * 0.999), {'from': user})
+    d_balances = [crypto_swap_with_deposit.balances(i) - d_balances[i] for i in range(3)]
     measured = token.balanceOf(user) - measured
 
     assert calculated == measured
+    assert tuple(amounts) == tuple(d_balances)
 
 
 @given(token_amount=strategy('uint256', min_value=10**12, max_value=4000 * 10**18))  # supply is 2400 * 1e18
@@ -53,13 +56,19 @@ def test_immediate_withdraw(crypto_swap_with_deposit, token, coins, accounts, to
         measured = [c.balanceOf(user) for c in coins]
         token_amount_calc = crypto_swap_with_deposit.calc_token_amount(expected, False)
         assert abs(token_amount_calc - token_amount) / token_amount < 1e-3
+        d_balances = [crypto_swap_with_deposit.balances(i) for i in range(3)]
         crypto_swap_with_deposit.remove_liquidity(
                 token_amount,
                 [int(0.999 * e) for e in expected],
                 {'from': user})
+        d_balances = [d_balances[i] - crypto_swap_with_deposit.balances(i) for i in range(3)]
         measured = [c.balanceOf(user) - m for c, m in zip(coins, measured)]
+
         for e, m in zip(expected, measured):
             assert abs(e - m) / e < 1e-3
+
+        assert tuple(d_balances) == tuple(measured)
+
     else:
         with brownie.reverts():
             crypto_swap_with_deposit.remove_liquidity(token_amount, [0] * 3, {'from': user})
@@ -79,7 +88,15 @@ def test_immediate_withdraw_one(crypto_swap_with_deposit, token, coins, accounts
     else:
         calculated = crypto_swap_with_deposit.calc_withdraw_one_coin(token_amount, i)
         measured = coins[i].balanceOf(user)
+        d_balances = [crypto_swap_with_deposit.balances(k) for k in range(3)]
         crypto_swap_with_deposit.remove_liquidity_one_coin(token_amount, i, int(0.999 * calculated), {'from': user})
+        d_balances = [d_balances[k] - crypto_swap_with_deposit.balances(k) for k in range(3)]
         measured = coins[i].balanceOf(user) - measured
 
         assert calculated == measured
+
+        for k in range(3):
+            if k == i:
+                assert d_balances[k] == measured
+            else:
+                assert d_balances[k] == 0
