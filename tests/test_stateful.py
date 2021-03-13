@@ -1,5 +1,9 @@
+import brownie
 from brownie.test import strategy
 from .conftest import INITIAL_PRICES
+
+
+MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
 
 
 class NumbaGoUp:
@@ -10,14 +14,16 @@ class NumbaGoUp:
     exchange_amount_in = strategy('uint256', max_value=10**9 * 10**18)  # in USD
     exchange_i = strategy('uint8', max_value=3)  # 3 is deliberately wrong one
     deposit_amounts = strategy('uint256[3]', min_value=0, max_value=10**9 * 10**18)
+    token_amount = strategy('uint256', max_value=10**12 * 10**18)
     sleep_time = strategy('uint256', max_value=86400 * 7)
     user = strategy('address')
 
-    def __init__(self, chain, accounts, coins, crypto_swap):
+    def __init__(self, chain, accounts, coins, crypto_swap, token):
         self.accounts = accounts
         self.swap = crypto_swap
         self.coins = coins
         self.chain = chain
+        self.token = token
 
     def setup(self):
         self.user_balances = {u: [0] * 3 for u in self.accounts}
@@ -70,6 +76,9 @@ class NumbaGoUp:
         return True
 
     def rule_deposit(self, deposit_amounts, user):
+        if self.swap.D() > MAX_D:
+            return
+
         amounts = self.convert_amounts(deposit_amounts)
         new_balances = [x + y for x, y in zip(self.balances, amounts)]
 
@@ -83,9 +92,26 @@ class NumbaGoUp:
             if self.check_limits(amounts):
                 raise
 
+    def rule_remove_liquidity(self, token_amount, user):
+        if self.token.balanceOf(user) < token_amount:
+            with brownie.reverts():
+                self.swap.remove_liquidity(token_amount, [0] * 3, {'from': user})
+        else:
+            amounts = [c.balanceOf(user) for c in self.coins]
+            self.swap.remove_liquidity(token_amount, [0] * 3, {'from': user})
+            amounts = [(c.balanceOf(user) - a) for c, a in zip(self.coins, amounts)]
+            self.balances = [b-a for a, b in zip(amounts, self.balances)]
+
     def rule_sleep(self, sleep_time):
         self.chain.sleep(sleep_time)
 
+    def invariant_balances(self):
+        balances = [self.swap.balances(i) for i in range(3)]
+        balances_of = [c.balanceOf(self.swap) for c in self.coins]
+        for i in range(3):
+            assert self.balances[i] == balances[i]
+            assert self.balances[i] == balances_of[i]
 
-def test_numba_go_up(crypto_swap, chain, accounts, coins, state_machine):
-    state_machine(NumbaGoUp, chain, accounts, coins, crypto_swap)
+
+def test_numba_go_up(crypto_swap, token, chain, accounts, coins, state_machine):
+    state_machine(NumbaGoUp, chain, accounts, coins, crypto_swap, token)
