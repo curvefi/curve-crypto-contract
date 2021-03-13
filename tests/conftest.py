@@ -14,7 +14,7 @@ def token(CurveTokenV4, accounts):
     yield CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", {"from": accounts[0]})
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def coins(ERC20Mock, accounts):
     yield [ERC20Mock.deploy(name, name, 18, {"from": accounts[0]})
            for name in ['USD', 'BTC', 'ETH']]
