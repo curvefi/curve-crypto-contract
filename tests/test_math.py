@@ -1,7 +1,7 @@
 import pytest
+from itertools import permutations
 from . import simulation_int_many as sim
 from brownie.test import given, strategy
-from itertools import permutations
 from hypothesis import settings
 
 N_COINS = 3
@@ -73,13 +73,16 @@ def test_reduction_coefficient_sim(crypto_math, x0, x1, x2, gamma):
 @given(
        A=strategy('uint256', min_value=1, max_value=10000),
        x=strategy('uint256', min_value=10**9, max_value=10**14 * 10**18),  # 1e-9 USD to 100T USD
-       yx=strategy('uint256', min_value=int(5.0001e15), max_value=int(1.999e20)),  # <- ratio 1e18 * y/x, typically 1e18 * 1
-       zx=strategy('uint256', min_value=int(5.0001e15), max_value=int(1.999e20)),  # <- ratio 1e18 * z/x, typically 1e18 * 1
+       yx=strategy('uint256', min_value=int(1.1e11), max_value=10**18),  # <- ratio 1e18 * y/x, typically 1e18 * 1
+       zx=strategy('uint256', min_value=int(1.1e11), max_value=10**18),  # <- ratio 1e18 * z/x, typically 1e18 * 1
+       perm=strategy('uint8', max_value=5),  # Permutation
        gamma=strategy('uint256', min_value=10**10, max_value=10**16)  # gamma from 1e-8 up to 0.01
 )
 @settings(max_examples=MAX_SAMPLES)
-def test_newton_D(crypto_math, A, x, yx, zx, gamma):
+def test_newton_D(crypto_math, A, x, yx, zx, perm, gamma):
+    i, j, k = list(permutations(range(3)))[perm]
     X = [x, x * yx // 10**18, x * zx // 10**18]
+    X = [X[i], X[j], X[k]]
     result_sim = sim.solve_D(A, gamma, X)
     # crypto_math.newton_D_w(A, gamma, X)
     result_contract = crypto_math.newton_D(A * 3**3 * 100, gamma, X)

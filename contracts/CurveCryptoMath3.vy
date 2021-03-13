@@ -95,13 +95,14 @@ def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint
     # Safety checks
     assert ANN > N_COINS**N_COINS * A_MULTIPLIER - 1 and ANN < 10000 * N_COINS**N_COINS * A_MULTIPLIER + 1  # dev: unsafe values A
     assert gamma > 10**10-1 and gamma < 10**16+1  # dev: unsafe values gamma
-    assert x_unsorted[0] > 10**9 - 1 and x_unsorted[0] < 10**15 * 10**18 + 1  # dev: unsafe values x[0]
-    for i in range(1, N_COINS):
-        frac: uint256 = x_unsorted[i] * 10**18 / x_unsorted[0]
-        assert (frac > 10**13-1) and (frac < 10**23+1)  # dev: unsafe values x[i]
 
     # Initial value of invariant D is that for constant-product invariant
     x: uint256[N_COINS] = self.sort(x_unsorted)
+
+    assert x[0] > 10**9 - 1 and x[0] < 10**15 * 10**18 + 1  # dev: unsafe values x[0]
+    for i in range(1, N_COINS):
+        frac: uint256 = x[i] * 10**18 / x[0]
+        assert frac > 10**11-1  # dev: unsafe values x[i]
 
     D: uint256 = N_COINS * self._geometric_mean(x, False)
     S: uint256 = 0
