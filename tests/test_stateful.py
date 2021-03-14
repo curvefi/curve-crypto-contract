@@ -4,7 +4,7 @@ from brownie.test import strategy
 from .conftest import INITIAL_PRICES
 
 
-MAX_SAMPLES = 250
+MAX_SAMPLES = 25
 MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
 
 
@@ -49,6 +49,7 @@ class NumbaGoUp:
         self.balances = self.initial_deposit
         self.initial_vprice = self.swap.get_virtual_price()
         self.total_supply = self.token.balanceOf(user)
+        self.virtual_price = 10**18
 
     def convert_amounts(self, amounts):
         prices = [10**18] + [self.swap.price_scale(i) for i in range(2)]
@@ -100,7 +101,7 @@ class NumbaGoUp:
                 raise
 
     def rule_remove_liquidity(self, token_amount, user):
-        if self.token.balanceOf(user) < token_amount:
+        if self.token.balanceOf(user) < token_amount or token_amount == 0:
             with brownie.reverts():
                 self.swap.remove_liquidity(token_amount, [0] * 3, {'from': user})
         else:
@@ -111,6 +112,10 @@ class NumbaGoUp:
             self.total_supply -= tokens
             amounts = [(c.balanceOf(user) - a) for c, a in zip(self.coins, amounts)]
             self.balances = [b-a for a, b in zip(amounts, self.balances)]
+
+            # Virtual price resets if everything is withdrawn
+            if self.total_supply == 0:
+                self.virtual_price = 10**18
 
     def rule_remove_liquidity_one_coin(self, token_amount, exchange_i, user):
         try:
@@ -127,7 +132,15 @@ class NumbaGoUp:
             return
 
         d_balance = self.coins[exchange_i].balanceOf(user)
-        self.swap.remove_liquidity_one_coin(token_amount, exchange_i, 0, {'from': user})
+        try:
+            self.swap.remove_liquidity_one_coin(token_amount, exchange_i, 0, {'from': user})
+        except Exception:
+            # Small amounts may fail with rounding errors
+            if calc_out_amount > 100 and\
+               token_amount / self.total_supply > 1e-10 and\
+               calc_out_amount / self.swap.balances(exchange_i) > 1e-10:
+                raise
+            return
         d_balance = self.coins[exchange_i].balanceOf(user) - d_balance
         d_token = d_token - self.token.balanceOf(user)
 
@@ -135,6 +148,10 @@ class NumbaGoUp:
 
         self.balances[exchange_i] -= d_balance
         self.total_supply -= d_token
+
+        # Virtual price resets if everything is withdrawn
+        if self.total_supply == 0:
+            self.virtual_price = 10**18
 
     def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user):
         if exchange_i == exchange_j:
@@ -151,7 +168,16 @@ class NumbaGoUp:
 
         d_balance_i = self.coins[exchange_i].balanceOf(user)
         d_balance_j = self.coins[exchange_j].balanceOf(user)
-        self.swap.exchange(exchange_i, exchange_j, exchange_amount_in, 0, {'from': user})
+        try:
+            self.swap.exchange(exchange_i, exchange_j, exchange_amount_in, 0, {'from': user})
+        except Exception:
+            # Small amounts may fail with rounding errors
+            if calc_amount > 100 and exchange_amount_in > 100 and\
+               calc_amount / self.swap.balances(exchange_j) > 1e-13 and\
+               exchange_amount_in / self.swap.balances(exchange_i) > 1e-13:
+                raise
+            return
+
         d_balance_i -= self.coins[exchange_i].balanceOf(user)
         d_balance_j -= self.coins[exchange_j].balanceOf(user)
 
@@ -175,16 +201,20 @@ class NumbaGoUp:
         assert self.total_supply == self.token.totalSupply()
 
     def invariant_virtual_price(self):
-        xcp_profit_real = self.swap.xcp_profit_real()
+        virtual_price = self.swap.virtual_price()
         xcp_profit = self.swap.xcp_profit()
-        virtual_price = self.swap.get_virtual_price()
+        get_virtual_price = self.swap.get_virtual_price()
 
-        assert xcp_profit >= 10**18
-        assert xcp_profit_real >= 10**18
-        assert virtual_price >= 10**18
+        assert xcp_profit >= 10**18 - 10
+        assert virtual_price >= 10**18 - 10
+        assert get_virtual_price >= 10**18 - 10
 
-        assert (xcp_profit_real - 10**18) * 2 >= xcp_profit - 10**18
-        assert abs(log(xcp_profit_real / virtual_price)) < 1e-3
+        assert (virtual_price - 10**18) * 2 >= xcp_profit - 10**18
+        assert abs(log(virtual_price / get_virtual_price)) < 1e-10
+
+        assert get_virtual_price / self.virtual_price > 1 - 1e-10
+
+        self.virtual_price = get_virtual_price
 
 
 def test_numba_go_up(crypto_swap, token, chain, accounts, coins, state_machine):

@@ -350,12 +350,13 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
         virtual_price = xcp * 10**18 / total_supply
         xcp_profit = old_xcp_profit * virtual_price / old_virtual_price
 
-        # Mint admin fees XXX if admin fee > 0
         frac: uint256 = (10**18 * virtual_price / old_virtual_price - 10**18) * self.admin_fee / (2 * 10**10)
         # /2 here is because half of the fee usually goes for retargeting the price
+        # The line above also sneakily fails if virtual price decreases (and protects LPs!)
         if frac > 0:
             total_supply += CurveToken(self.token).mint_relative(self.owner, frac)
             virtual_price = xcp * 10**18 / total_supply
+            assert virtual_price >= old_virtual_price
 
     self.xcp_profit = xcp_profit
 
@@ -530,16 +531,17 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
     total_supply: uint256 = CurveToken(token).totalSupply()
     assert CurveToken(token).burnFrom(msg.sender, _amount)
     balances: uint256[N_COINS] = self.balances
+    amount: uint256 = _amount - 1  # Make rounding errors favoring other LPs a tiny bit
 
     for i in range(N_COINS):
-        d_balance: uint256 = balances[i] * _amount / total_supply
+        d_balance: uint256 = balances[i] * amount / total_supply
         assert d_balance >= min_amounts[i]
         self.balances[i] = balances[i] - d_balance
         balances[i] = d_balance  # now it's the amounts going out
         assert ERC20(self.coins[i]).transfer(msg.sender, d_balance)
 
     D: uint256 = self.D
-    self.D = D - D * _amount / total_supply  # Can be tiny rounding errors here
+    self.D = D - D * amount / total_supply
 
     log RemoveLiquidity(msg.sender, balances, total_supply - _amount)
 
