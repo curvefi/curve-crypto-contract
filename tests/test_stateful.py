@@ -1,8 +1,10 @@
 import brownie
+from hypothesis import settings  # noqa
 from brownie.test import strategy
 from .conftest import INITIAL_PRICES
 
 
+MAX_SAMPLES = 1000
 MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
 
 
@@ -12,7 +14,8 @@ class NumbaGoUp:
     """
 
     exchange_amount_in = strategy('uint256', max_value=10**9 * 10**18)  # in USD
-    exchange_i = strategy('uint8', max_value=3)  # 3 is deliberately wrong one
+    exchange_i = strategy('uint8', max_value=2)
+    exchange_j = strategy('uint8', max_value=2)
     deposit_amounts = strategy('uint256[3]', min_value=0, max_value=10**9 * 10**18)
     token_amount = strategy('uint256', max_value=10**12 * 10**18)
     sleep_time = strategy('uint256', max_value=86400 * 7)
@@ -133,6 +136,31 @@ class NumbaGoUp:
         self.balances[exchange_i] -= d_balance
         self.total_supply -= d_token
 
+    def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user):
+        if exchange_i == exchange_j:
+            return
+        try:
+            calc_amount = self.swap.get_dy(exchange_i, exchange_j, exchange_amount_in)
+        except Exception:
+            _amounts = [0] * 3
+            _amounts[exchange_i] = exchange_amount_in
+            if self.check_limits(_amounts):
+                raise
+            return
+        self.coins[exchange_i]._mint_for_testing(user, exchange_amount_in)
+
+        d_balance_i = self.coins[exchange_i].balanceOf(user)
+        d_balance_j = self.coins[exchange_j].balanceOf(user)
+        self.swap.exchange(exchange_i, exchange_j, exchange_amount_in, 0, {'from': user})
+        d_balance_i -= self.coins[exchange_i].balanceOf(user)
+        d_balance_j -= self.coins[exchange_j].balanceOf(user)
+
+        assert d_balance_i == exchange_amount_in
+        assert -d_balance_j == calc_amount
+
+        self.balances[exchange_i] += d_balance_i
+        self.balances[exchange_j] += d_balance_j
+
     def rule_sleep(self, sleep_time):
         self.chain.sleep(sleep_time)
 
@@ -146,6 +174,9 @@ class NumbaGoUp:
     def invariant_total_supply(self):
         assert self.total_supply == self.token.totalSupply()
 
+    # invariant for vprice and stuff like that!
 
+
+@settings(max_examples=MAX_SAMPLES)
 def test_numba_go_up(crypto_swap, token, chain, accounts, coins, state_machine):
     state_machine(NumbaGoUp, chain, accounts, coins, crypto_swap, token)
