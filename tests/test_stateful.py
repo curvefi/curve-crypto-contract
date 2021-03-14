@@ -1,9 +1,10 @@
 import brownie
+from math import log
 from brownie.test import strategy
 from .conftest import INITIAL_PRICES
 
 
-MAX_SAMPLES = 25
+MAX_SAMPLES = 250
 MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
 
 
@@ -173,7 +174,17 @@ class NumbaGoUp:
     def invariant_total_supply(self):
         assert self.total_supply == self.token.totalSupply()
 
-    # invariant for vprice and stuff like that!
+    def invariant_virtual_price(self):
+        xcp_profit_real = self.swap.xcp_profit_real()
+        xcp_profit = self.swap.xcp_profit()
+        virtual_price = self.swap.get_virtual_price()
+
+        assert xcp_profit >= 10**18
+        assert xcp_profit_real >= 10**18
+        assert virtual_price >= 10**18
+
+        assert (xcp_profit_real - 10**18) * 2 >= xcp_profit - 10**18
+        assert abs(log(xcp_profit_real / virtual_price)) < 1e-3
 
 
 def test_numba_go_up(crypto_swap, token, chain, accounts, coins, state_machine):

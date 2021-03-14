@@ -127,7 +127,7 @@ owner: public(address)
 future_owner: public(address)
 
 xcp_profit_real: public(uint256)  # xcp_profit_real in simulation
-xcp_profit: uint256
+xcp_profit: public(uint256)
 xcp: uint256
 
 is_killed: public(bool)
