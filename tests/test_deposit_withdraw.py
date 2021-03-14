@@ -89,7 +89,15 @@ def test_immediate_withdraw_one(crypto_swap_with_deposit, token, coins, accounts
         calculated = crypto_swap_with_deposit.calc_withdraw_one_coin(token_amount, i)
         measured = coins[i].balanceOf(user)
         d_balances = [crypto_swap_with_deposit.balances(k) for k in range(3)]
-        crypto_swap_with_deposit.remove_liquidity_one_coin(token_amount, i, int(0.999 * calculated), {'from': user})
+        try:
+            crypto_swap_with_deposit.remove_liquidity_one_coin(token_amount, i, int(0.999 * calculated), {'from': user})
+        except Exception:
+            # Check if it could fall into unsafe region here
+            frac = calculated * ([10**18] + INITIAL_PRICES)[i] // crypto_swap_with_deposit.D()
+            if frac > 5.1e15 or frac < 1.9e20:
+                raise
+            else:
+                return
         d_balances = [d_balances[k] - crypto_swap_with_deposit.balances(k) for k in range(3)]
         measured = coins[i].balanceOf(user) - measured
 
