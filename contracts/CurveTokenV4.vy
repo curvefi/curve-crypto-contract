@@ -164,7 +164,7 @@ def mint(_to: address, _value: uint256) -> bool:
 
 
 @external
-def mint_relative(_to: address, frac: uint256) -> bool:
+def mint_relative(_to: address, frac: uint256) -> uint256:
     """
     @dev Increases supply by factor of (1 + frac/1e18) and mints it for _to
     """
@@ -177,7 +177,7 @@ def mint_relative(_to: address, frac: uint256) -> bool:
         self.balanceOf[_to] += d_supply
         log Transfer(ZERO_ADDRESS, _to, d_supply)
 
-    return True
+    return d_supply
 
 
 @external

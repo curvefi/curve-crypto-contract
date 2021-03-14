@@ -6,7 +6,7 @@ from vyper.interfaces import ERC20
 interface CurveToken:
     def totalSupply() -> uint256: view
     def mint(_to: address, _value: uint256) -> bool: nonpayable
-    def mint_relative(_to: address, frac: uint256) -> bool: nonpayable
+    def mint_relative(_to: address, frac: uint256) -> uint256: nonpayable
     def burnFrom(_to: address, _value: uint256) -> bool: nonpayable
 
 
@@ -126,9 +126,8 @@ token: public(address)
 owner: public(address)
 future_owner: public(address)
 
-xcp_profit_real: public(uint256)  # xcp_profit_real in simulation
 xcp_profit: public(uint256)
-xcp: uint256
+virtual_price: public(uint256)  # Cached (fast to read) virtual price also used internally
 
 is_killed: public(bool)
 kill_deadline: public(uint256)
@@ -268,7 +267,7 @@ def get_xcp(_D: uint256 = 0) -> uint256:
     x: uint256[N_COINS] = empty(uint256[N_COINS])
     x[0] = D / N_COINS
     for i in range(N_COINS-1):
-        x[i+1] = D * 10**18 / (N_COINS * self.price_oracle[i])
+        x[i+1] = D * 10**18 / (N_COINS * self.price_scale[i])
     return Math(math).geometric_mean(x)
 
 
@@ -276,16 +275,6 @@ def get_xcp(_D: uint256 = 0) -> uint256:
 @view
 def get_virtual_price() -> uint256:
     return self.get_xcp() * 10**18 / CurveToken(self.token).totalSupply()
-
-
-@internal
-def update_xcp(only_real: bool = False):
-    xcp: uint256 = self.get_xcp()
-    old_xcp: uint256 = self.xcp
-    self.xcp_profit_real = self.xcp_profit_real * xcp / old_xcp
-    if not only_real:
-        self.xcp_profit = self.xcp_profit * xcp / old_xcp
-    self.xcp = xcp
 
 
 @internal
@@ -336,8 +325,9 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
             self.last_prices[k] = price_scale[k] * dx_price / (_xp[k+1] - Math(math).newton_y(A, gamma, __xp, D_unadjusted, k+1))
 
     norm: uint256 = 0
+    total_supply: uint256 = CurveToken(self.token).totalSupply()
     old_xcp_profit: uint256 = self.xcp_profit
-    old_xcp_profit_real: uint256 = self.xcp_profit_real
+    old_virtual_price: uint256 = self.virtual_price
     for k in range(N_COINS-1):
         ratio: uint256 = price_oracle[k] * 10**18 / price_scale[k]
         if ratio > 10**18:
@@ -352,27 +342,26 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
     xp[0] = D_unadjusted / N_COINS
     for k in range(N_COINS-1):
         xp[k+1] = D_unadjusted * 10**18 / (N_COINS * price_scale[k])
-    old_xcp: uint256 = self.xcp
-    xcp: uint256 = 0
     xcp_profit: uint256 = 10**18
-    xcp_profit_real: uint256 = 10**18
+    virtual_price: uint256 = 10**18
 
-    if old_xcp > 0:
-        xcp = Math(math).geometric_mean(xp)
-        xcp_profit_real = old_xcp_profit_real * xcp / old_xcp
-        xcp_profit = old_xcp_profit * xcp / old_xcp
+    if old_virtual_price > 0:
+        xcp: uint256 = Math(math).geometric_mean(xp)
+        virtual_price = xcp * 10**18 / total_supply
+        xcp_profit = old_xcp_profit * virtual_price / old_virtual_price
 
-        # Mint admin fees
-        frac: uint256 = (10**18 * xcp / old_xcp - 10**18) * self.admin_fee / (2 * 10**10)
+        # Mint admin fees XXX if admin fee > 0
+        frac: uint256 = (10**18 * virtual_price / old_virtual_price - 10**18) * self.admin_fee / (2 * 10**10)
         # /2 here is because half of the fee usually goes for retargeting the price
         if frac > 0:
-            assert CurveToken(self.token).mint_relative(self.owner, frac)
+            total_supply += CurveToken(self.token).mint_relative(self.owner, frac)
+            virtual_price = xcp * 10**18 / total_supply
 
     self.xcp_profit = xcp_profit
 
     # self.price_threshold must be > self.adjustment_step
     # should we pause for a bit if profit wasn't enough to not spend this gas every time?
-    if norm > self.price_threshold ** 2 and old_xcp > 0:
+    if norm > self.price_threshold ** 2 and old_virtual_price > 0:
         norm = Math(math).sqrt_int(norm)
         adjustment_step: uint256 = self.adjustment_step
 
@@ -385,19 +374,19 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
         for k in range(N_COINS-1):
             xp[k+1] = _xp[k+1] * p_new[k] / price_scale[k]
 
-        # Calculate "extended constant product" invariant xCP
+        # Calculate "extended constant product" invariant xCP and virtual price
         D: uint256 = Math(math).newton_D(A, gamma, xp)
         xp[0] = D / N_COINS
         for k in range(N_COINS-1):
             xp[k+1] = D * 10**18 / (N_COINS * p_new[k])
-        xcp = Math(math).geometric_mean(xp)
-        old_xcp_profit_real = old_xcp_profit_real * xcp / old_xcp  # Just reusing a variable here: it's not old anymore
+        # We reuse old_virtual_price here but it's not old anymore
+        old_virtual_price = Math(math).geometric_mean(xp) * 10**18 / total_supply
 
         # Proceed if we've got enough profit
-        if 2 * (old_xcp_profit_real - 10**18) > xcp_profit - 10**18:
+        if 2 * (old_virtual_price - 10**18) > xcp_profit - 10**18:
             self.price_scale = p_new
             self.D = D
-            self.xcp_profit_real = old_xcp_profit_real
+            self.virtual_price = old_virtual_price
             return
 
         # else - make a delay?
@@ -405,7 +394,7 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
     # If we are here, the price_scale adjustment did not happen
     # Still need to update the profit counter and D
     self.D = D_unadjusted
-    self.xcp_profit_real = xcp_profit_real
+    self.virtual_price = virtual_price
 
 
 @external
@@ -507,14 +496,20 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
     else:
         d_token = self.get_xcp(D)  # making initial virtual price equal to 1
     assert d_token > 0  # dev: nothing minted
+
     # XXX fee is taken at symmetric deposit here which is wrong: needs fixing?
-    d_token_fee: uint256 = self._fee(xp) * d_token / (2 * 10**10) + 1  # /2 because it's half a trade
-    d_token -= d_token_fee
+    d_token_fee: uint256 = 0
+    if old_D > 0:
+        d_token_fee = self._fee(xp) * d_token / (2 * 10**10) + 1  # /2 because it's half a trade
+        d_token -= d_token_fee
+        assert CurveToken(token).mint(for_address, d_token)
+        self.tweak_price(A, gamma, xp, 0, 0, 0, 0)
+    else:
+        self.D = D
+        self.virtual_price = 10**18
+        self.xcp_profit = 10**18
+        assert CurveToken(token).mint(for_address, d_token)
     assert d_token >= min_mint_amount, "Slippage screwed you"
-
-    assert CurveToken(token).mint(for_address, d_token)
-
-    self.tweak_price(A, gamma, xp, 0, 0, 0, 0)
 
     log AddLiquidity(for_address, amounts, d_token_fee, token_supply)
 
@@ -596,7 +591,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     dy = y0 - dy
     fee: uint256 = self._fee(xp) * dy / (2 * 10**10) + 1
     dy -= fee
-    xp[i] = y
+    xp[i] = y + fee
 
     return dy, xp
 

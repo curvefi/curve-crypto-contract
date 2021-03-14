@@ -49,7 +49,7 @@ def test_last_price_exchange(crypto_swap_with_deposit, token, coins, accounts, a
 
 
 @given(
-    token_frac=strategy('uint256', min_value=10**6, max_value=10**17),
+    token_frac=strategy('uint256', min_value=10**6, max_value=10**16),
     i=strategy('uint8', min_value=0, max_value=2))
 @settings(max_examples=MAX_SAMPLES)
 def test_last_price_remove_liq(crypto_swap_with_deposit, token, coins, accounts, token_frac, i):
