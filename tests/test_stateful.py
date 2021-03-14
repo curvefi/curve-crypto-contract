@@ -1,10 +1,9 @@
 import brownie
-from hypothesis import settings  # noqa
 from brownie.test import strategy
 from .conftest import INITIAL_PRICES
 
 
-MAX_SAMPLES = 1000
+MAX_SAMPLES = 25
 MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
 
 
@@ -177,6 +176,6 @@ class NumbaGoUp:
     # invariant for vprice and stuff like that!
 
 
-@settings(max_examples=MAX_SAMPLES)
 def test_numba_go_up(crypto_swap, token, chain, accounts, coins, state_machine):
-    state_machine(NumbaGoUp, chain, accounts, coins, crypto_swap, token)
+    state_machine(NumbaGoUp, chain, accounts, coins, crypto_swap, token,
+                  settings={'max_examples': MAX_SAMPLES, 'stateful_step_count': 20})
