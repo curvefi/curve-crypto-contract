@@ -45,6 +45,7 @@ class NumbaGoUp:
 
         self.balances = self.initial_deposit
         self.initial_vprice = self.swap.get_virtual_price()
+        self.total_supply = self.token.balanceOf(user)
 
     def convert_amounts(self, amounts):
         prices = [10**18] + [self.swap.price_scale(i) for i in range(2)]
@@ -86,7 +87,10 @@ class NumbaGoUp:
             coin._mint_for_testing(user, q)
 
         try:
+            tokens = self.token.balanceOf(user)
             self.swap.add_liquidity(amounts, 0, {'from': user})
+            tokens = self.token.balanceOf(user) - tokens
+            self.total_supply += tokens
             self.balances = new_balances
         except Exception:
             if self.check_limits(amounts):
@@ -98,9 +102,36 @@ class NumbaGoUp:
                 self.swap.remove_liquidity(token_amount, [0] * 3, {'from': user})
         else:
             amounts = [c.balanceOf(user) for c in self.coins]
+            tokens = self.token.balanceOf(user)
             self.swap.remove_liquidity(token_amount, [0] * 3, {'from': user})
+            tokens -= self.token.balanceOf(user)
+            self.total_supply -= tokens
             amounts = [(c.balanceOf(user) - a) for c, a in zip(self.coins, amounts)]
             self.balances = [b-a for a, b in zip(amounts, self.balances)]
+
+    def rule_remove_liquidity_one_coin(self, token_amount, exchange_i, user):
+        try:
+            calc_out_amount = self.swap.calc_withdraw_one_coin(token_amount, exchange_i)
+        except Exception:
+            if self.check_limits([0] * 3) and not (token_amount > self.total_supply):
+                raise
+            return
+
+        d_token = self.token.balanceOf(user)
+        if d_token < token_amount:
+            with brownie.reverts():
+                self.swap.remove_liquidity_one_coin(token_amount, exchange_i, 0, {'from': user})
+            return
+
+        d_balance = self.coins[exchange_i].balanceOf(user)
+        self.swap.remove_liquidity_one_coin(token_amount, exchange_i, 0, {'from': user})
+        d_balance = self.coins[exchange_i].balanceOf(user) - d_balance
+        d_token = d_token - self.token.balanceOf(user)
+
+        assert calc_out_amount == d_balance
+
+        self.balances[exchange_i] -= d_balance
+        self.total_supply -= d_token
 
     def rule_sleep(self, sleep_time):
         self.chain.sleep(sleep_time)
@@ -111,6 +142,9 @@ class NumbaGoUp:
         for i in range(3):
             assert self.balances[i] == balances[i]
             assert self.balances[i] == balances_of[i]
+
+    def invariant_total_supply(self):
+        assert self.total_supply == self.token.totalSupply()
 
 
 def test_numba_go_up(crypto_swap, token, chain, accounts, coins, state_machine):
