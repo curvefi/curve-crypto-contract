@@ -528,6 +528,9 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
 @external
 @nonreentrant('lock')
 def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
+    """
+    This withdrawal method is very safe, does no complex math
+    """
     token: address = self.token
     total_supply: uint256 = CurveToken(token).totalSupply()
     assert CurveToken(token).burnFrom(msg.sender, _amount)
@@ -539,6 +542,9 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
         self.balances[i] = balances[i] - d_balance
         balances[i] = d_balance  # now it's the amounts going out
         assert ERC20(self.coins[i]).transfer(msg.sender, d_balance)
+
+    D: uint256 = self.D
+    self.D = D - D * _amount / total_supply  # Can be tiny rounding errors here
 
     log RemoveLiquidity(msg.sender, balances, total_supply - _amount)
 
@@ -583,12 +589,14 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
         xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
 
     D = D * (token_supply - token_amount) / token_supply
-    dy: uint256 = Math(math).newton_y(A, gamma, xp, D, i)
+    y: uint256 = Math(math).newton_y(A, gamma, xp, D, i)
+    dy: uint256 = y
     if i > 0:
         dy = dy * PRECISION / price_scale[i-1]
     dy = y0 - dy
     fee: uint256 = self._fee(xp) * dy / (2 * 10**10) + 1
     dy -= fee
+    xp[i] = y
 
     return dy, xp
 
