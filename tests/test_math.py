@@ -102,7 +102,12 @@ def test_newton_D(crypto_math, A, x, yx, zx, perm, gamma):
 def test_newton_y(crypto_math, A, D, xD, yD, zD, gamma, j):
     X = [D * xD // 10**18, D * yD // 10**18, D * zD // 10**18]
     result_sim = sim.solve_x(A, gamma, X, D, j)
-    result_contract = crypto_math.newton_y(A * 3**3 * 100, gamma, X, D, j)
+    try:
+        result_contract = crypto_math.newton_y(A * 3**3 * 100, gamma, X, D, j)
+    except Exception as e:
+        # May revert is the state is unsafe for the next time
+        if str(e) == "revert: dev: unsafe value for y":
+            return
     assert abs(result_sim - result_contract) <= max(10000, result_sim/1e15)  # 10000 is $1e-14
 
 
