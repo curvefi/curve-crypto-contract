@@ -473,7 +473,8 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
 
     if from_address != self:
         for i in range(N_COINS):
-            assert ERC20(self.coins[i]).transferFrom(from_address, self, amounts[i])
+            if amounts[i] > 0:
+                assert ERC20(self.coins[i]).transferFrom(from_address, self, amounts[i])
 
     price_scale: uint256[N_COINS-1] = self.price_scale
     xp: uint256[N_COINS] = self.balances
