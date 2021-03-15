@@ -4,7 +4,7 @@ from brownie.test import strategy
 from .conftest import INITIAL_PRICES
 
 
-MAX_SAMPLES = 25
+MAX_SAMPLES = 100
 MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
 
 
@@ -100,6 +100,11 @@ class NumbaGoUp:
             if self.check_limits(amounts):
                 raise
 
+        # This is to check that we didn't end up in a borked state after
+        # an exchange succeeded
+        self.swap.get_dy(0, 1, 10**16)
+        self.swap.get_dy(0, 2, 10**16)
+
     def rule_remove_liquidity(self, token_amount, user):
         if self.token.balanceOf(user) < token_amount or token_amount == 0:
             with brownie.reverts():
@@ -141,6 +146,13 @@ class NumbaGoUp:
                calc_out_amount / self.swap.balances(exchange_i) > 1e-10:
                 raise
             return
+
+        # This is to check that we didn't end up in a borked state after
+        # an exchange succeeded
+        _deposit = [0] * 3
+        _deposit[exchange_i] = 10**16 * 10**18 // ([10**18] + INITIAL_PRICES)[exchange_i]
+        self.swap.calc_token_amount(_deposit, True)
+
         d_balance = self.coins[exchange_i].balanceOf(user) - d_balance
         d_token = d_token - self.token.balanceOf(user)
 
@@ -177,6 +189,10 @@ class NumbaGoUp:
                exchange_amount_in / self.swap.balances(exchange_i) > 1e-13:
                 raise
             return
+
+        # This is to check that we didn't end up in a borked state after
+        # an exchange succeeded
+        self.swap.get_dy(exchange_j, exchange_i, 10**16 * 10**18 // ([10**18] + INITIAL_PRICES)[exchange_j])
 
         d_balance_i -= self.coins[exchange_i].balanceOf(user)
         d_balance_j -= self.coins[exchange_j].balanceOf(user)
