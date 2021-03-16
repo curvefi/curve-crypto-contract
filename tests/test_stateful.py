@@ -4,7 +4,7 @@ from brownie.test import strategy
 from .conftest import INITIAL_PRICES
 
 
-MAX_SAMPLES = 100
+MAX_SAMPLES = 20
 MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
 
 
