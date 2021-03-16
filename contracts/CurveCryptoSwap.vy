@@ -293,13 +293,10 @@ def get_virtual_price() -> uint256:
 
 @internal
 def tweak_price(A: uint256, gamma: uint256,
-                _xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: uint256,
+                _xp: uint256[N_COINS], i: uint256, p_i: uint256,
                 new_D: uint256 = 0):
-    """
-    dx of coin i -> dy of coin j
+    # TODO: this can be compressed by having each number being 128 bits
 
-    TODO: this can be compressed by having each number being 128 bits
-    """
     # Update MA if needed
     price_oracle: uint256[N_COINS-1] = self.price_oracle
     last_prices_timestamp: uint256 = self.last_prices_timestamp
@@ -319,18 +316,9 @@ def tweak_price(A: uint256, gamma: uint256,
         D_unadjusted = Math(math).newton_D(A, gamma, _xp)
     price_scale: uint256[N_COINS-1] = self.price_scale
 
-    if (i > 0 or j > 0) and (dx > 10**5) and (dy > 10**5):
+    if p_i > 0:
         # Save the last price
-        p: uint256 = 0
-        ix: uint256 = j
-        if i != 0 and j != 0:
-            p = last_prices[i-1] * dx / dy
-        elif i == 0:
-            p = dx * 10**18 / dy
-        else:  # j == 0
-            p = dy * 10**18 / dx
-            ix = i
-        self.last_prices[ix-1] = p
+        self.last_prices[i-1] = p_i
     else:
         # calculate real prices
         # it would cost 70k gas for a 3-token pool. Sad. How do we do better?
@@ -452,7 +440,21 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
         xp[0] = y0 - dy
     else:
         xp[j] = (y0 - dy) * price_scale[j-1] / PRECISION
-    self.tweak_price(A, gamma, xp, i, dx, j, dy)
+
+
+    # Calculate price
+    p: uint256 = 0
+    ix: uint256 = j
+    if dx > 10**5 and dy > 10**5:
+        if i != 0 and j != 0:
+            p = self.last_prices[i-1] * dx / dy
+        elif i == 0:
+            p = dx * 10**18 / dy
+        else:  # j == 0
+            p = dy * 10**18 / dx
+            ix = i
+
+    self.tweak_price(A, gamma, xp, ix, p)
 
     log TokenExchange(msg.sender, i, dx, j, dy)
 
@@ -522,7 +524,7 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
         d_token_fee = self._fee(xp) * d_token / (2 * 10**10) + 1  # /2 because it's half a trade
         d_token -= d_token_fee
         assert CurveToken(token).mint(for_address, d_token)
-        self.tweak_price(A, gamma, xp, 0, 0, 0, 0, D)
+        self.tweak_price(A, gamma, xp, 0, 0, D)
     else:
         self.D = D
         self.virtual_price = 10**18
@@ -645,7 +647,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     assert CurveToken(token).burnFrom(msg.sender, token_amount)
     assert ERC20(_coins[i]).transfer(msg.sender, dy)
 
-    self.tweak_price(A, gamma, xp, 0, 0, 0, 0, D)
+    self.tweak_price(A, gamma, xp, 0, 0, D)
 
     log RemoveLiquidityOne(msg.sender, token_amount, dy)
 
