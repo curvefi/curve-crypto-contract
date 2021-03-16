@@ -86,7 +86,14 @@ FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
 A_MULTIPLIER: constant(uint256) = 100
 
-math: constant(address) = 0x0000000000000000000000000000000000000000  # <- to replace
+# These addresses are replaced by the deployer
+math: constant(address) = 0x0000000000000000000000000000000000000000
+token: constant(address) = 0x0000000000000000000000000000000000000001
+coins: constant(address[N_COINS]) = [
+    0x0000000000000000000000000000000000000010,
+    0x0000000000000000000000000000000000000011,
+    0x0000000000000000000000000000000000000012,
+]
 
 price_scale: public(uint256[N_COINS-1])   # Internal price scale
 price_oracle: public(uint256[N_COINS-1])  # Price target given by MA
@@ -119,10 +126,8 @@ future_out_fee: public(uint256)
 future_admin_fee: public(uint256)
 
 balances: public(uint256[N_COINS])
-coins: public(address[N_COINS])
 D: public(uint256)
 
-token: public(address)
 owner: public(address)
 future_owner: public(address)
 
@@ -147,8 +152,6 @@ MAX_A_CHANGE: constant(uint256) = 10
 @external
 def __init__(
     owner: address,
-    coins: address[N_COINS],
-    pool_token: address,
     A: uint256,
     gamma: uint256,
     mid_fee: uint256,
@@ -161,8 +164,6 @@ def __init__(
     initial_prices: uint256[N_COINS-1]
 ):
     self.owner = owner
-    self.coins = coins
-    self.token = pool_token
 
     # Pack A and gamma:
     # shifted A + gamma
@@ -185,6 +186,19 @@ def __init__(
     self.ma_half_time = ma_half_time
 
     self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
+
+
+@external
+@view
+def token() -> address:
+    return token
+
+
+@external
+@view
+def coins(i: uint256) -> address:
+    _coins: address[N_COINS] = coins
+    return _coins[i]
 
 
 @internal
@@ -274,7 +288,7 @@ def get_xcp(_D: uint256 = 0) -> uint256:
 @external
 @view
 def get_virtual_price() -> uint256:
-    return self.get_xcp() * 10**18 / CurveToken(self.token).totalSupply()
+    return self.get_xcp() * 10**18 / CurveToken(token).totalSupply()
 
 
 @internal
@@ -325,7 +339,7 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
             self.last_prices[k] = price_scale[k] * dx_price / (_xp[k+1] - Math(math).newton_y(A, gamma, __xp, D_unadjusted, k+1))
 
     norm: uint256 = 0
-    total_supply: uint256 = CurveToken(self.token).totalSupply()
+    total_supply: uint256 = CurveToken(token).totalSupply()
     old_xcp_profit: uint256 = self.xcp_profit
     old_virtual_price: uint256 = self.virtual_price
     for k in range(N_COINS-1):
@@ -354,7 +368,7 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
         # /2 here is because half of the fee usually goes for retargeting the price
         # The line above also sneakily fails if virtual price decreases (and protects LPs!)
         if frac > 0:
-            total_supply += CurveToken(self.token).mint_relative(self.owner, frac)
+            total_supply += CurveToken(token).mint_relative(self.owner, frac)
             virtual_price = xcp * 10**18 / total_supply
             assert virtual_price >= old_virtual_price
 
@@ -403,8 +417,9 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
 def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     assert not self.is_killed  # dev: the pool is killed
     assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
+    _coins: address[N_COINS] = coins
 
-    input_coin: address = self.coins[i]
+    input_coin: address = _coins[i]
     assert ERC20(input_coin).transferFrom(msg.sender, self, dx)
 
     price_scale: uint256[N_COINS-1] = self.price_scale
@@ -428,7 +443,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     assert dy >= min_dy, "Exchange resulted in fewer coins than expected"
 
     self.balances[j] = y0 - dy
-    output_coin: address = self.coins[j]
+    output_coin: address = _coins[j]
     assert ERC20(output_coin).transfer(msg.sender, dy)
 
     if j == 0:
@@ -470,11 +485,12 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
 def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
                    from_address: address, for_address: address):
     assert not self.is_killed  # dev: the pool is killed
+    _coins: address[N_COINS] = coins
 
     if from_address != self:
         for i in range(N_COINS):
             if amounts[i] > 0:
-                assert ERC20(self.coins[i]).transferFrom(from_address, self, amounts[i])
+                assert ERC20(_coins[i]).transferFrom(from_address, self, amounts[i])
 
     price_scale: uint256[N_COINS-1] = self.price_scale
     xp: uint256[N_COINS] = self.balances
@@ -486,7 +502,6 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
-    token: address = self.token
 
     D: uint256 = Math(math).newton_D(A, gamma, xp)
 
@@ -528,7 +543,7 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
     """
     This withdrawal method is very safe, does no complex math
     """
-    token: address = self.token
+    _coins: address[N_COINS] = coins
     total_supply: uint256 = CurveToken(token).totalSupply()
     assert CurveToken(token).burnFrom(msg.sender, _amount)
     balances: uint256[N_COINS] = self.balances
@@ -539,7 +554,7 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
         assert d_balance >= min_amounts[i]
         self.balances[i] = balances[i] - d_balance
         balances[i] = d_balance  # now it's the amounts going out
-        assert ERC20(self.coins[i]).transfer(msg.sender, d_balance)
+        assert ERC20(_coins[i]).transfer(msg.sender, d_balance)
 
     D: uint256 = self.D
     self.D = D - D * amount / total_supply
@@ -550,7 +565,7 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
 @view
 @external
 def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
-    token_supply: uint256 = CurveToken(self.token).totalSupply()
+    token_supply: uint256 = CurveToken(token).totalSupply()
     xp: uint256[N_COINS] = self.balances
     if deposit:
         for k in range(N_COINS):
@@ -578,7 +593,7 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
 @view
 def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i: uint256) -> (uint256, uint256[N_COINS]):
     D: uint256 = self.D
-    token_supply: uint256 = CurveToken(self.token).totalSupply()
+    token_supply: uint256 = CurveToken(token).totalSupply()
 
     xp: uint256[N_COINS] = self.balances
     y0: uint256 = xp[i]
@@ -612,8 +627,8 @@ def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
 @nonreentrant('lock')
 def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256):
     assert not self.is_killed  # dev: the pool is killed
+    _coins: address[N_COINS] = coins
 
-    token: address = self.token
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
@@ -624,8 +639,8 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     assert dy >= min_amount, "Slippage screwed you"
 
     self.balances[i] -= dy
-    assert CurveToken(self.token).burnFrom(msg.sender, token_amount)
-    assert ERC20(self.coins[i]).transfer(msg.sender, dy)
+    assert CurveToken(token).burnFrom(msg.sender, token_amount)
+    assert ERC20(_coins[i]).transfer(msg.sender, dy)
 
     self.tweak_price(A, gamma, xp, 0, 0, 0, 0)
 
@@ -825,10 +840,11 @@ def revert_transfer_ownership():
 @external
 @nonreentrant('lock')
 def withdraw_admin_fees():
+    _coins: address[N_COINS] = coins
     # Wrap as pool token and withdraw
     admin_balances: uint256[N_COINS] = empty(uint256[N_COINS])
     for i in range(N_COINS):
-        admin_balances[i] = ERC20(self.coins[i]).balanceOf(self) - self.balances[i]
+        admin_balances[i] = ERC20(_coins[i]).balanceOf(self) - self.balances[i]
     self._add_liquidity(admin_balances, 0, self, self.owner)
 
 

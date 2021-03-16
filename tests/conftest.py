@@ -27,12 +27,14 @@ def crypto_swap(crypto_math, token, coins, accounts):
     with open(path, 'r') as f:
         source = f.read()
         source = source.replace("0x0000000000000000000000000000000000000000", crypto_math.address)
-    contract = compile_source(source, vyper_version='0.2.11').Vyper  # XXX remove version once brownie supports new Vyper
+        source = source.replace("0x0000000000000000000000000000000000000001", token.address)
+        source = source.replace("0x0000000000000000000000000000000000000010", coins[0].address)
+        source = source.replace("0x0000000000000000000000000000000000000011", coins[1].address)
+        source = source.replace("0x0000000000000000000000000000000000000012", coins[2].address)
+    contract = compile_source(source).Vyper
 
     swap = contract.deploy(
             accounts[0],
-            coins,
-            token,
             135 * 3**3,  # A
             int(7e-5 * 1e18),  # gamma
             int(4e-4 * 1e10),  # mid_fee
