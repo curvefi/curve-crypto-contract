@@ -21,7 +21,7 @@ def coins(ERC20Mock, accounts):
 
 
 @pytest.fixture(scope="function", autouse=True)
-def crypto_swap(crypto_math, token, coins, accounts):
+def compiled_swap(crypto_math, token, coins):
     from brownie import CurveCryptoSwap
     path = CurveCryptoSwap._sources.get_source_path('CurveCryptoSwap')
     with open(path, 'r') as f:
@@ -31,9 +31,12 @@ def crypto_swap(crypto_math, token, coins, accounts):
         source = source.replace("0x0000000000000000000000000000000000000010", coins[0].address)
         source = source.replace("0x0000000000000000000000000000000000000011", coins[1].address)
         source = source.replace("0x0000000000000000000000000000000000000012", coins[2].address)
-    contract = compile_source(source).Vyper
+    return compile_source(source).Vyper
 
-    swap = contract.deploy(
+
+@pytest.fixture(scope="function", autouse=True)
+def crypto_swap(compiled_swap, token, accounts):
+    swap = compiled_swap.deploy(
             accounts[0],
             135 * 3**3,  # A
             int(7e-5 * 1e18),  # gamma
