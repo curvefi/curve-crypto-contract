@@ -292,14 +292,14 @@ def get_virtual_price() -> uint256:
 
 
 @internal
-def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: uint256):
+def tweak_price(A: uint256, gamma: uint256,
+                _xp: uint256[N_COINS], i: uint256, dx: uint256, j: uint256, dy: uint256,
+                new_D: uint256 = 0):
     """
     dx of coin i -> dy of coin j
 
     TODO: this can be compressed by having each number being 128 bits
     """
-    # XXX pass D in case we know it?
-    #
     # Update MA if needed
     price_oracle: uint256[N_COINS-1] = self.price_oracle
     last_prices_timestamp: uint256 = self.last_prices_timestamp
@@ -313,8 +313,10 @@ def tweak_price(A: uint256, gamma: uint256, _xp: uint256[N_COINS], i: uint256, d
         self.price_oracle = price_oracle
         self.last_prices_timestamp = block.timestamp
 
-    # We will need this a few times (35k gas)
-    D_unadjusted: uint256 = Math(math).newton_D(A, gamma, _xp)
+    D_unadjusted: uint256 = new_D  # Withdrawal methods know new D already
+    if new_D == 0:
+        # We will need this a few times (35k gas)
+        D_unadjusted = Math(math).newton_D(A, gamma, _xp)
     price_scale: uint256[N_COINS-1] = self.price_scale
 
     if (i > 0 or j > 0) and (dx > 10**5) and (dy > 10**5):
@@ -520,7 +522,7 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
         d_token_fee = self._fee(xp) * d_token / (2 * 10**10) + 1  # /2 because it's half a trade
         d_token -= d_token_fee
         assert CurveToken(token).mint(for_address, d_token)
-        self.tweak_price(A, gamma, xp, 0, 0, 0, 0)
+        self.tweak_price(A, gamma, xp, 0, 0, 0, 0, D)
     else:
         self.D = D
         self.virtual_price = 10**18
@@ -591,7 +593,7 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
 
 @internal
 @view
-def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i: uint256) -> (uint256, uint256[N_COINS]):
+def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i: uint256) -> (uint256, uint256, uint256[N_COINS]):
     D: uint256 = self.D
     token_supply: uint256 = CurveToken(token).totalSupply()
 
@@ -601,17 +603,17 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     for k in range(N_COINS-1):
         xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
 
-    D = D * (token_supply - token_amount) / token_supply
+    # Charge the fee on D, not on y, e.g. reducing invariant LESS than charging the user
+    dD: uint256 = token_amount * D / token_supply
+    D -= (dD - (self._fee(xp) * dD / (2 * 10**10) + 1))
     y: uint256 = Math(math).newton_y(A, gamma, xp, D, i)
     dy: uint256 = y
     if i > 0:
         dy = dy * PRECISION / price_scale[i-1]
     dy = y0 - dy
-    fee: uint256 = self._fee(xp) * dy / (2 * 10**10) + 1
-    dy -= fee
-    xp[i] = y + fee
+    xp[i] = y
 
-    return dy, xp
+    return dy, D, xp
 
 
 @view
@@ -634,15 +636,16 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     A, gamma = self._A_gamma()
 
     dy: uint256 = 0
+    D: uint256 = 0
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
-    dy, xp = self._calc_withdraw_one_coin(A, gamma, token_amount, i)
+    dy, D, xp = self._calc_withdraw_one_coin(A, gamma, token_amount, i)
     assert dy >= min_amount, "Slippage screwed you"
 
     self.balances[i] -= dy
     assert CurveToken(token).burnFrom(msg.sender, token_amount)
     assert ERC20(_coins[i]).transfer(msg.sender, dy)
 
-    self.tweak_price(A, gamma, xp, 0, 0, 0, 0)
+    self.tweak_price(A, gamma, xp, 0, 0, 0, 0, D)
 
     log RemoveLiquidityOne(msg.sender, token_amount, dy)
 
