@@ -318,7 +318,12 @@ def tweak_price(A: uint256, gamma: uint256,
 
     if p_i > 0:
         # Save the last price
-        self.last_prices[i-1] = p_i
+        if i > 0:
+            self.last_prices[i-1] = p_i
+        else:
+            # If 0th price changed - change all prices instead
+            for k in range(N_COINS-1):
+                self.last_prices[k] = last_prices[k] * 10**18 / p_i
     else:
         # calculate real prices
         # it would cost 70k gas for a 3-token pool. Sad. How do we do better?
@@ -595,12 +600,14 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
 
 @internal
 @view
-def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i: uint256) -> (uint256, uint256, uint256[N_COINS]):
+def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i: uint256,
+                            calc_only: bool = False) -> (uint256, uint256, uint256, uint256[N_COINS]):
     D: uint256 = self.D
+    D0: uint256 = D
     token_supply: uint256 = CurveToken(token).totalSupply()
 
-    xp: uint256[N_COINS] = self.balances
-    y0: uint256 = xp[i]
+    xx: uint256[N_COINS] = self.balances
+    xp: uint256[N_COINS] = xx
     price_scale: uint256[N_COINS-1] = self.price_scale
     for k in range(N_COINS-1):
         xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
@@ -612,10 +619,25 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     dy: uint256 = y
     if i > 0:
         dy = dy * PRECISION / price_scale[i-1]
-    dy = y0 - dy
+    dy = xx[i] - dy
     xp[i] = y
 
-    return dy, D, xp
+    # Price calc
+    p: uint256 = 0
+    if not calc_only and dy > 10**5 and token_amount > 10**5:
+        # p_i = dD / D0 * sum'(p_k * x_k) / (dy - dD / D0 * y0)
+        S: uint256 = 0
+        last_prices: uint256[N_COINS-1] = self.last_prices
+        for k in range(N_COINS):
+            if k != i:
+                if k == 0:
+                    S += xx[0]
+                else:
+                    S += xx[k] * last_prices[k-1] / PRECISION
+        S = S * dD / D0
+        p = S * 10**18 / (dy - dD * xx[i] / D0)
+
+    return dy, p, D, xp
 
 
 @view
@@ -624,7 +646,7 @@ def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
-    return self._calc_withdraw_one_coin(A, gamma, token_amount, i)[0]
+    return self._calc_withdraw_one_coin(A, gamma, token_amount, i, True)[0]
 
 
 @external
@@ -639,15 +661,16 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
     dy: uint256 = 0
     D: uint256 = 0
+    p: uint256 = 0
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
-    dy, D, xp = self._calc_withdraw_one_coin(A, gamma, token_amount, i)
+    dy, p, D, xp = self._calc_withdraw_one_coin(A, gamma, token_amount, i)
     assert dy >= min_amount, "Slippage screwed you"
 
     self.balances[i] -= dy
     assert CurveToken(token).burnFrom(msg.sender, token_amount)
     assert ERC20(_coins[i]).transfer(msg.sender, dy)
 
-    self.tweak_price(A, gamma, xp, 0, 0, D)
+    self.tweak_price(A, gamma, xp, i, p, D)
 
     log RemoveLiquidityOne(msg.sender, token_amount, dy)
 
