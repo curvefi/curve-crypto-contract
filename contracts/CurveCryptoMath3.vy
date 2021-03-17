@@ -242,6 +242,8 @@ def newton_y(ANN: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: u
 def halfpow(power: uint256, precision: uint256) -> uint256:
     """
     1e18 * 0.5 ** (power/1e18)
+
+    Inspired by: https://github.com/balancer-labs/balancer-core/blob/master/contracts/BNum.sol#L128
     """
     intpow: uint256 = power / 10**18
     otherpow: uint256 = power - intpow * 10**18
@@ -276,6 +278,10 @@ def halfpow(power: uint256, precision: uint256) -> uint256:
 @external
 @view
 def sqrt_int(x: uint256) -> uint256:
+    """
+    Originating from: https://github.com/vyperlang/vyper/issues/1266
+    """
+
     if x == 0:
         return 0
 
