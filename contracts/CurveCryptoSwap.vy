@@ -504,10 +504,11 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
     price_scale: uint256[N_COINS-1] = self.price_scale
     xp: uint256[N_COINS] = self.balances
     for i in range(N_COINS):
-        self.balances[i] = xp[i] + amounts[i]
-    xp[0] += amounts[0]
+        bal: uint256 = xp[i] + amounts[i]
+        xp[i] = bal
+        self.balances[i] = bal
     for i in range(N_COINS-1):
-        xp[i+1] = (xp[i+1] + amounts[i+1]) * price_scale[i] / PRECISION
+        xp[i+1] = xp[i+1] * price_scale[i] / PRECISION
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
