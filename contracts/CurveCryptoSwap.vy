@@ -147,6 +147,8 @@ MAX_ADMIN_FEE: constant(uint256) = 10 * 10 ** 9
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MAX_A: constant(uint256) = 10000 * A_MULTIPLIER
 MAX_A_CHANGE: constant(uint256) = 10
+MIN_GAMMA: constant(uint256) = 10**10
+MAX_GAMMA: constant(uint256) = 10**16
 
 
 @external
@@ -726,6 +728,7 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
     future_A_p: uint256 = future_A * A_MULTIPLIER
 
     assert future_A > 0 and future_A < MAX_A
+    assert future_gamma >= MIN_GAMMA and future_gamma <= MAX_GAMMA
     if future_A_p < initial_A:
         assert future_A_p * MAX_A_CHANGE >= initial_A
     else:
