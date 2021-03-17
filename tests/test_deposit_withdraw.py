@@ -51,7 +51,7 @@ def test_second_deposit(crypto_swap_with_deposit, token, coins, accounts, values
 def test_second_deposit_one(crypto_swap_with_deposit, token, coins, accounts, value, i):
     user = accounts[1]
     amounts = [0] * 3
-    amounts[i] = value * ([10**18] + INITIAL_PRICES)[i] // 10**18
+    amounts[i] = value * 10**18 // ([10**18] + INITIAL_PRICES)[i]
     for c, v in zip(coins, amounts):
         c._mint_for_testing(user, v)
 
