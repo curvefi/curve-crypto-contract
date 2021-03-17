@@ -409,13 +409,14 @@ def tweak_price(A: uint256, gamma: uint256,
 
 @external
 @nonreentrant('lock')
-def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
+def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
+             _from: address = msg.sender, _for: address = msg.sender):
     assert not self.is_killed  # dev: the pool is killed
     assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
     _coins: address[N_COINS] = coins
 
     input_coin: address = _coins[i]
-    assert ERC20(input_coin).transferFrom(msg.sender, self, dx)
+    assert ERC20(input_coin).transferFrom(_from, self, dx)
 
     price_scale: uint256[N_COINS-1] = self.price_scale
     xp: uint256[N_COINS] = self.balances
@@ -439,7 +440,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
 
     self.balances[j] = y0 - dy
     output_coin: address = _coins[j]
-    assert ERC20(output_coin).transfer(msg.sender, dy)
+    assert ERC20(output_coin).transfer(_for, dy)
 
     if j == 0:
         xp[0] = y0 - dy
@@ -461,7 +462,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
 
     self.tweak_price(A, gamma, xp, ix, p)
 
-    log TokenExchange(msg.sender, i, dx, j, dy)
+    log TokenExchange(_for, i, dx, j, dy)
 
 
 @external
@@ -571,19 +572,21 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
 
 @external
 @nonreentrant('lock')
-def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
-    self._add_liquidity(amounts, min_mint_amount, msg.sender, msg.sender)
+def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
+                  _from: address = msg.sender, _for: address = msg.sender):
+    self._add_liquidity(amounts, min_mint_amount, _from, _for)
 
 
 @external
 @nonreentrant('lock')
-def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
+def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS],
+                     _from: address = msg.sender, _for: address = msg.sender):
     """
     This withdrawal method is very safe, does no complex math
     """
     _coins: address[N_COINS] = coins
     total_supply: uint256 = CurveToken(token).totalSupply()
-    assert CurveToken(token).burnFrom(msg.sender, _amount)
+    assert CurveToken(token).burnFrom(_from, _amount)
     balances: uint256[N_COINS] = self.balances
     amount: uint256 = _amount - 1  # Make rounding errors favoring other LPs a tiny bit
 
@@ -592,12 +595,12 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
         assert d_balance >= min_amounts[i]
         self.balances[i] = balances[i] - d_balance
         balances[i] = d_balance  # now it's the amounts going out
-        assert ERC20(_coins[i]).transfer(msg.sender, d_balance)
+        assert ERC20(_coins[i]).transfer(_for, d_balance)
 
     D: uint256 = self.D
     self.D = D - D * amount / total_supply
 
-    log RemoveLiquidity(msg.sender, balances, total_supply - _amount)
+    log RemoveLiquidity(_from, balances, total_supply - _amount)
 
 
 @view
@@ -680,7 +683,8 @@ def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
 
 @external
 @nonreentrant('lock')
-def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256):
+def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256,
+                              _from: address = msg.sender, _for: address = msg.sender):
     assert not self.is_killed  # dev: the pool is killed
     _coins: address[N_COINS] = coins
 
@@ -696,12 +700,12 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     assert dy >= min_amount, "Slippage screwed you"
 
     self.balances[i] -= dy
-    assert CurveToken(token).burnFrom(msg.sender, token_amount)
-    assert ERC20(_coins[i]).transfer(msg.sender, dy)
+    assert CurveToken(token).burnFrom(_from, token_amount)
+    assert ERC20(_coins[i]).transfer(_for, dy)
 
     self.tweak_price(A, gamma, xp, i, p, D)
 
-    log RemoveLiquidityOne(msg.sender, token_amount, dy)
+    log RemoveLiquidityOne(_from, token_amount, dy)
 
 # XXX not sure if remove_liquidity_imbalance is used by anyone - can remove
 
