@@ -45,6 +45,27 @@ def test_second_deposit(crypto_swap_with_deposit, token, coins, accounts, values
     assert tuple(amounts) == tuple(d_balances)
 
 
+@given(value=strategy('uint256', min_value=10**16, max_value=10**6 * 10**18))
+@given(i=strategy('uint8', max_value=2))
+@settings(max_examples=MAX_SAMPLES)
+def test_second_deposit_one(crypto_swap_with_deposit, token, coins, accounts, value, i):
+    user = accounts[1]
+    amounts = [0] * 3
+    amounts[i] = value * ([10**18] + INITIAL_PRICES)[i] // 10**18
+    for c, v in zip(coins, amounts):
+        c._mint_for_testing(user, v)
+
+    calculated = crypto_swap_with_deposit.calc_token_amount(amounts, True)
+    measured = token.balanceOf(user)
+    d_balances = [crypto_swap_with_deposit.balances(i) for i in range(3)]
+    crypto_swap_with_deposit.add_liquidity(amounts, int(calculated * 0.999), {'from': user})
+    d_balances = [crypto_swap_with_deposit.balances(i) - d_balances[i] for i in range(3)]
+    measured = token.balanceOf(user) - measured
+
+    assert calculated == measured
+    assert tuple(amounts) == tuple(d_balances)
+
+
 @given(token_amount=strategy('uint256', min_value=10**12, max_value=4000 * 10**18))  # supply is 2400 * 1e18
 @settings(max_examples=MAX_SAMPLES)
 def test_immediate_withdraw(crypto_swap_with_deposit, token, coins, accounts, token_amount):
