@@ -507,6 +507,7 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
         bal: uint256 = xp[i] + amounts[i]
         xp[i] = bal
         self.balances[i] = bal
+    xx: uint256[N_COINS] = xp
     for i in range(N_COINS-1):
         xp[i+1] = xp[i+1] * price_scale[i] / PRECISION
     A: uint256 = 0
@@ -529,8 +530,35 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
     if old_D > 0:
         d_token_fee = self._fee(xp) * d_token / (2 * 10**10) + 1  # /2 because it's half a trade
         d_token -= d_token_fee
+        token_supply += d_token
         assert CurveToken(token).mint(for_address, d_token)
-        self.tweak_price(A, gamma, xp, 0, 0, D)
+
+        # Calculate price
+        # p_i * (dx_i - dtoken / token_supply * xx_i) = sum{k!=i}(p_k * (dtoken / token_supply * xx_k - dx_k))
+        # Only ix is nonzero
+        p: uint256 = 0
+        ix: uint256 = 0
+        if d_token > 10**5:
+            n_zeros: uint256 = 0
+            for i in range(N_COINS):
+                if amounts[i] == 0:
+                    n_zeros += 1
+                else:
+                    ix = i
+            if n_zeros == 2:
+                S: uint256 = 0
+                last_prices: uint256[N_COINS-1] = self.last_prices
+                for i in range(N_COINS):
+                    if i != ix:
+                        if i == 0:
+                            S += xx[0]
+                        else:
+                            S += xx[i] * last_prices[i-1] / PRECISION
+                S = S * d_token / token_supply
+                p = S * PRECISION / (amounts[ix] - d_token * xx[ix] / token_supply)
+
+        self.tweak_price(A, gamma, xp, ix, p, D)
+
     else:
         self.D = D
         self.virtual_price = 10**18
@@ -625,7 +653,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
 
     # Price calc
     p: uint256 = 0
-    if not calc_only and dy > 10**5 and token_amount > 10**5:
+    if (not calc_only) and dy > 10**5 and token_amount > 10**5:
         # p_i = dD / D0 * sum'(p_k * x_k) / (dy - dD / D0 * y0)
         S: uint256 = 0
         last_prices: uint256[N_COINS-1] = self.last_prices
@@ -636,7 +664,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
                 else:
                     S += xx[k] * last_prices[k-1] / PRECISION
         S = S * dD / D0
-        p = S * 10**18 / (dy - dD * xx[i] / D0)
+        p = S * PRECISION / (dy - dD * xx[i] / D0)
 
     return dy, p, D, xp
 
