@@ -102,8 +102,14 @@ class NumbaGoUp:
 
         # This is to check that we didn't end up in a borked state after
         # an exchange succeeded
-        self.swap.get_dy(0, 1, 10**16)
-        self.swap.get_dy(0, 2, 10**16)
+        try:
+            self.swap.get_dy(0, 1, 10**16)
+        except Exception:
+            self.swap.get_dy(1, 0, 10**16 * 10**18 // self.swap.price_scale(0))
+        try:
+            self.swap.get_dy(0, 2, 10**16)
+        except Exception:
+            self.swap.get_dy(2, 0, 10**16 * 10**18 // self.swap.price_scale(1))
 
     def rule_remove_liquidity(self, token_amount, user):
         if self.token.balanceOf(user) < token_amount or token_amount == 0:
