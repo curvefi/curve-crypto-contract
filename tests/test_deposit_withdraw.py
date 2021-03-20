@@ -1,4 +1,5 @@
 import brownie
+from . import simulation_int_many as sim
 from brownie.test import given, strategy
 from hypothesis import settings  # noqa
 from .conftest import INITIAL_PRICES
@@ -26,23 +27,43 @@ def test_1st_deposit_and_last_withdraw(crypto_swap, coins, token, accounts):
     assert token.balanceOf(user) == token.totalSupply() == 0
 
 
-@given(values=strategy('uint256[3]', min_value=10**16, max_value=10**6 * 10**18))
+@given(values=strategy('uint256[3]', min_value=10**16, max_value=10**9 * 10**18))
 @settings(max_examples=MAX_SAMPLES)
 def test_second_deposit(crypto_swap_with_deposit, token, coins, accounts, values):
     user = accounts[1]
     amounts = [v * 10**18 // p for v, p in zip(values, [10**18] + INITIAL_PRICES)]
+
+    xp = [10**6 * 10**18] * 3
+    prices = [10**18] + INITIAL_PRICES
+    for i in range(3):
+        xp[i] += values[i] * prices[i] // 10**18
+    _A = crypto_swap_with_deposit.A_precise() // (3**3 * 100)
+    _gamma = crypto_swap_with_deposit.gamma()
+    _D = sim.solve_D(_A, _gamma, xp)
+    safe = all(f >= 1.1e16 and f <= 0.9e20 for f in [_x * 10**18 // _D for _x in xp])
+
     for c, v in zip(coins, amounts):
         c._mint_for_testing(user, v)
 
-    calculated = crypto_swap_with_deposit.calc_token_amount(amounts, True)
-    measured = token.balanceOf(user)
-    d_balances = [crypto_swap_with_deposit.balances(i) for i in range(3)]
-    crypto_swap_with_deposit.add_liquidity(amounts, int(calculated * 0.999), {'from': user})
-    d_balances = [crypto_swap_with_deposit.balances(i) - d_balances[i] for i in range(3)]
-    measured = token.balanceOf(user) - measured
+    try:
+        calculated = crypto_swap_with_deposit.calc_token_amount(amounts, True)
+        measured = token.balanceOf(user)
+        d_balances = [crypto_swap_with_deposit.balances(i) for i in range(3)]
+        crypto_swap_with_deposit.add_liquidity(amounts, int(calculated * 0.999), {'from': user})
+        d_balances = [crypto_swap_with_deposit.balances(i) - d_balances[i] for i in range(3)]
+        measured = token.balanceOf(user) - measured
 
-    assert calculated == measured
-    assert tuple(amounts) == tuple(d_balances)
+        assert calculated == measured
+        assert tuple(amounts) == tuple(d_balances)
+
+    except Exception:
+        if safe:
+            raise
+
+    # This is to check that we didn't end up in a borked state after
+    # a deposit succeeded
+    crypto_swap_with_deposit.get_dy(0, 1, 10**16)
+    crypto_swap_with_deposit.get_dy(0, 2, 10**16)
 
 
 @given(value=strategy('uint256', min_value=10**16, max_value=10**6 * 10**18))
@@ -107,7 +128,22 @@ def test_immediate_withdraw_one(crypto_swap_with_deposit, token, coins, accounts
             crypto_swap_with_deposit.calc_withdraw_one_coin(token_amount, i)
 
     else:
-        calculated = crypto_swap_with_deposit.calc_withdraw_one_coin(token_amount, i)
+        # Test if we are safe
+        xp = [10**6 * 10**18] * 3
+        _supply = token.totalSupply()
+        _A = crypto_swap_with_deposit.A_precise() // (3**3 * 100)
+        _gamma = crypto_swap_with_deposit.gamma()
+        _D = crypto_swap_with_deposit.D() * (_supply - token_amount) // _supply
+        xp[i] = sim.solve_x(_A, _gamma, xp, _D, i)
+        safe = all(f >= 1.1e16 and f <= 0.9e20 for f in [_x * 10**18 // _D for _x in xp])
+
+        try:
+            calculated = crypto_swap_with_deposit.calc_withdraw_one_coin(token_amount, i)
+        except Exception:
+            if safe:
+                raise
+            else:
+                return
         measured = coins[i].balanceOf(user)
         d_balances = [crypto_swap_with_deposit.balances(k) for k in range(3)]
         try:
@@ -115,7 +151,7 @@ def test_immediate_withdraw_one(crypto_swap_with_deposit, token, coins, accounts
         except Exception:
             # Check if it could fall into unsafe region here
             frac = (d_balances[i] - calculated) * ([10**18] + INITIAL_PRICES)[i] // crypto_swap_with_deposit.D()
-            if frac > 5.1e15 or frac < 1.9e20:
+            if frac > 1.1e16 or frac < 0.9e20:
                 raise
             else:
                 return
@@ -129,3 +165,8 @@ def test_immediate_withdraw_one(crypto_swap_with_deposit, token, coins, accounts
                 assert d_balances[k] == measured
             else:
                 assert d_balances[k] == 0
+
+        # This is to check that we didn't end up in a borked state after
+        # a withdrawal succeeded
+        crypto_swap_with_deposit.get_dy(0, 1, 10**16)
+        crypto_swap_with_deposit.get_dy(0, 2, 10**16)

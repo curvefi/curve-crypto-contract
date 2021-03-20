@@ -75,7 +75,7 @@ class NumbaGoUp:
         if y:
             for _xp in [xp_0, xp]:
                 if (_D < 10**17) or (_D > 10**15 * 10**18) or\
-                   (min(_xp) * 10**18 // _D < 5 * 10**15) or (max(_xp) * 10**18 // _D > 2 * 10**20):
+                   (min(_xp) * 10**18 // _D < 10**16) or (max(_xp) * 10**18 // _D > 10**20):
                     return False
 
         return True

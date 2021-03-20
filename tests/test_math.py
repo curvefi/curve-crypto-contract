@@ -84,17 +84,17 @@ def test_newton_D(crypto_math, A, x, yx, zx, perm, gamma):
     X = [x, x * yx // 10**18, x * zx // 10**18]
     X = [X[i], X[j], X[k]]
     result_sim = sim.solve_D(A, gamma, X)
-    # crypto_math.newton_D_w(A, gamma, X)
-    result_contract = crypto_math.newton_D(A * 3**3 * 100, gamma, X)
-    assert abs(result_sim - result_contract) <= max(1000, result_sim/1e15)  # 1000 is $1e-15
+    if all(f >= 1.1e16 and f <= 0.9e20 for f in [_x * 10**18 / result_sim for _x in X]):
+        result_contract = crypto_math.newton_D(A * 3**3 * 100, gamma, X)
+        assert abs(result_sim - result_contract) <= max(1000, result_sim/1e15)  # 1000 is $1e-15
 
 
 @given(
        A=strategy('uint256', min_value=1, max_value=10000),
        D=strategy('uint256', min_value=10**18, max_value=10**14 * 10**18),  # 1 USD to 100T USD
-       xD=strategy('uint256', min_value=int(5.001e15), max_value=int(1.999e20)),  # <- ratio 1e18 * x/D, typically 1e18 * 1
-       yD=strategy('uint256', min_value=int(5.001e15), max_value=int(1.999e20)),  # <- ratio 1e18 * y/D, typically 1e18 * 1
-       zD=strategy('uint256', min_value=int(5.001e15), max_value=int(1.999e20)),  # <- ratio 1e18 * z/D, typically 1e18 * 1
+       xD=strategy('uint256', min_value=int(1.001e16), max_value=int(0.999e20)),  # <- ratio 1e18 * x/D, typically 1e18 * 1
+       yD=strategy('uint256', min_value=int(1.001e16), max_value=int(0.999e20)),  # <- ratio 1e18 * y/D, typically 1e18 * 1
+       zD=strategy('uint256', min_value=int(1.001e16), max_value=int(0.999e20)),  # <- ratio 1e18 * z/D, typically 1e18 * 1
        gamma=strategy('uint256', min_value=10**10, max_value=10**16),  # gamma from 1e-8 up to 0.01
        j=strategy('uint256', min_value=0, max_value=2),
 )
@@ -104,9 +104,15 @@ def test_newton_y(crypto_math, A, D, xD, yD, zD, gamma, j):
     result_sim = sim.solve_x(A, gamma, X, D, j)
     try:
         result_contract = crypto_math.newton_y(A * 3**3 * 100, gamma, X, D, j)
-    except Exception as e:
+    except Exception:
         # May revert is the state is unsafe for the next time
-        if str(e) == "revert: dev: unsafe value for y":
+        safe = all(f >= 1.1e16 and f <= 0.9e20 for f in [_x * 10**18 // D for _x in X])
+        XX = X[:]
+        XX[j] = result_sim
+        safe &= all(f >= 1.1e16 and f <= 0.9e20 for f in [_x * 10**18 // D for _x in XX])
+        if safe:
+            raise
+        else:
             return
     assert abs(result_sim - result_contract) <= max(10000, result_sim/1e15)  # 10000 is $1e-14
 

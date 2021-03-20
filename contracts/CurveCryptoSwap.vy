@@ -144,6 +144,7 @@ ADMIN_ACTIONS_DELAY: constant(uint256) = 3 * 86400
 MIN_RAMP_TIME: constant(uint256) = 86400
 
 MAX_ADMIN_FEE: constant(uint256) = 10 * 10 ** 9
+MIN_FEE: constant(uint256) = 5 * 10 ** 5  # 0.5 bps
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MAX_A: constant(uint256) = 10000 * A_MULTIPLIER
 MAX_A_CHANGE: constant(uint256) = 10
