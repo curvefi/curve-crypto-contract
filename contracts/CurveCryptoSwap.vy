@@ -787,7 +787,7 @@ def commit_new_parameters(
 
     # Fees
     if new_out_fee != MAX_UINT256:
-        assert new_out_fee <= MAX_FEE  # dev: fee is too high
+        assert new_out_fee <= MAX_FEE  and new_out_fee >= MIN_FEE  # dev: fee is out of range
     else:
         new_out_fee = self.out_fee
     if new_mid_fee == MAX_UINT256:
