@@ -494,6 +494,23 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
     return dy
 
 
+@view
+@internal
+def _calc_token_fee(xp: uint256[N_COINS]) -> uint256:
+    # fee = sum(xp_i - avg(xp)) * fee' / sum(xp)
+    S: uint256 = 0
+    for _x in xp:
+        S += _x
+    avg: uint256 = S / N_COINS
+    Sdiff: uint256 = 0
+    for _x in xp:
+        if _x > avg:
+            Sdiff += _x - avg
+        else:
+            Sdiff += avg - _x
+    return self._fee(xp) * N_COINS / (4 * (N_COINS-1)) * Sdiff / S
+
+
 @internal
 def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
                    from_address: address, for_address: address):
@@ -529,10 +546,10 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
         d_token = self.get_xcp(D)  # making initial virtual price equal to 1
     assert d_token > 0  # dev: nothing minted
 
-    # XXX fee is taken at symmetric deposit here which is wrong: needs fixing?
     d_token_fee: uint256 = 0
     if old_D > 0:
-        d_token_fee = self._fee(xp) * d_token / (2 * 10**10) + 1  # /2 because it's half a trade
+
+        d_token_fee = self._calc_token_fee(xp) * d_token / 10**10 + 1
         d_token -= d_token_fee
         token_supply += d_token
         assert CurveToken(token).mint(for_address, d_token)
@@ -623,13 +640,12 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
     D: uint256 = Math(math).newton_D(A, gamma, xp)
-    fee: uint256 = self._fee(xp)
     d_token: uint256 = token_supply * D / self.D
     if deposit:
         d_token -= token_supply
     else:
         d_token = token_supply - d_token
-    d_token -= fee * d_token / (2 * 10**10) + 1
+    d_token -= self._calc_token_fee(xp) * d_token / 10**10 + 1
     return d_token
 
 
