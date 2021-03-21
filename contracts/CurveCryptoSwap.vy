@@ -496,14 +496,14 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
 
 @view
 @internal
-def _calc_token_fee(xp: uint256[N_COINS]) -> uint256:
-    # fee = sum(xp_i - avg(xp)) * fee' / sum(xp)
+def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
+    # fee = sum(amounts_i - avg(amounts)) * fee' / sum(amounts)
     S: uint256 = 0
-    for _x in xp:
+    for _x in amounts:
         S += _x
     avg: uint256 = S / N_COINS
     Sdiff: uint256 = 0
-    for _x in xp:
+    for _x in amounts:
         if _x > avg:
             Sdiff += _x - avg
         else:
@@ -524,6 +524,7 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
 
     price_scale: uint256[N_COINS-1] = self.price_scale
     xp: uint256[N_COINS] = self.balances
+    amountsp: uint256[N_COINS] = amounts
     for i in range(N_COINS):
         bal: uint256 = xp[i] + amounts[i]
         xp[i] = bal
@@ -531,6 +532,7 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
     xx: uint256[N_COINS] = xp
     for i in range(N_COINS-1):
         xp[i+1] = xp[i+1] * price_scale[i] / PRECISION
+        amountsp[i+1] = amountsp[i+1] * price_scale[i] / PRECISION
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
@@ -548,8 +550,7 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
 
     d_token_fee: uint256 = 0
     if old_D > 0:
-
-        d_token_fee = self._calc_token_fee(xp) * d_token / 10**10 + 1
+        d_token_fee = self._calc_token_fee(amountsp, xp) * d_token / 10**10 + 1
         d_token -= d_token_fee
         token_supply += d_token
         assert CurveToken(token).mint(for_address, d_token)
@@ -628,6 +629,7 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS],
 def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
     token_supply: uint256 = CurveToken(token).totalSupply()
     xp: uint256[N_COINS] = self.balances
+    amountsp: uint256[N_COINS] = amounts
     if deposit:
         for k in range(N_COINS):
             xp[k] += amounts[k]
@@ -635,7 +637,9 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
         for k in range(N_COINS):
             xp[k] -= amounts[k]
     for k in range(N_COINS-1):
-        xp[k+1] = xp[k+1] * self.price_scale[k] / PRECISION
+        p: uint256 = self.price_scale[k]
+        xp[k+1] = xp[k+1] * p / PRECISION
+        amountsp[k+1] = amountsp[k+1] * p / PRECISION
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
@@ -645,7 +649,7 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
         d_token -= token_supply
     else:
         d_token = token_supply - d_token
-    d_token -= self._calc_token_fee(xp) * d_token / 10**10 + 1
+    d_token -= self._calc_token_fee(amountsp, xp) * d_token / 10**10 + 1
     return d_token
 
 
