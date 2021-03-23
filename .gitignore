@@ -1,4 +1,6 @@
 /.pytest_cache
-/.venv
+.venv
 /build
 *.pyc
+.pypy
+.hypothesis
