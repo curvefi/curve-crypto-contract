@@ -40,7 +40,6 @@ class StatefulBase:
         self.swap.add_liquidity(self.initial_deposit, 0, {'from': user})
 
         self.balances = self.initial_deposit
-        self.initial_vprice = self.swap.get_virtual_price()
         self.total_supply = self.token.balanceOf(user)
         self.virtual_price = 10**18
 
