@@ -1,1 +1,1 @@
-/home/michwill/Projects/stableswap/curve-crypto-contract/tests/simulation_int_many.py
+../simulation_int_many.py
