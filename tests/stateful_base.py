@@ -1,0 +1,141 @@
+from math import log
+from brownie.test import strategy
+from .conftest import INITIAL_PRICES
+
+
+MAX_SAMPLES = 20
+MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
+
+
+class StatefulBase:
+    exchange_amount_in = strategy('uint256', max_value=10**9 * 10**18)  # in USD
+    exchange_i = strategy('uint8', max_value=2)
+    exchange_j = strategy('uint8', max_value=2)
+    sleep_time = strategy('uint256', max_value=86400 * 7)
+    user = strategy('address')
+
+    def __init__(self, chain, accounts, coins, crypto_swap, token):
+        self.accounts = accounts
+        self.swap = crypto_swap
+        self.coins = coins
+        self.chain = chain
+        self.token = token
+
+    def setup(self):
+        self.user_balances = {u: [0] * 3 for u in self.accounts}
+        self.initial_deposit = [10**4 * 10**36 // p for p in [10**18] + INITIAL_PRICES]  # $10k * 3
+        self.initial_prices = [10**18] + INITIAL_PRICES
+        user = self.accounts[0]
+
+        for coin, q in zip(self.coins, self.initial_deposit):
+            coin._mint_for_testing(user, q)
+            coin.approve(self.swap, 2**256-1, {'from': user})
+
+        # Inf approve all, too. Not always that's the best way though
+        for u in self.accounts[1:]:
+            for coin in self.coins:
+                coin.approve(self.swap, 2**256-1, {'from': u})
+
+        # Very first deposit
+        self.swap.add_liquidity(self.initial_deposit, 0, {'from': user})
+
+        self.balances = self.initial_deposit
+        self.initial_vprice = self.swap.get_virtual_price()
+        self.total_supply = self.token.balanceOf(user)
+        self.virtual_price = 10**18
+
+    def convert_amounts(self, amounts):
+        prices = [10**18] + [self.swap.price_scale(i) for i in range(2)]
+        return [p * a // 10**18 for p, a in zip(prices, amounts)]
+
+    def check_limits(self, amounts, D=True, y=True):
+        """
+        Should be good if within limits, but if outside - can be either
+        """
+        _D = self.swap.D()
+        prices = [10**18] + [self.swap.price_scale(i) for i in range(2)]
+        xp_0 = [self.swap.balances(i) for i in range(3)]
+        xp = xp_0
+        xp_0 = [x * p // 10**18 for x, p in zip(xp_0, prices)]
+        xp = [(x + a) * p // 10**18 for a, x, p in zip(amounts, xp, prices)]
+
+        if D:
+            for _xp in [xp_0, xp]:
+                if (min(_xp) * 10**18 // max(_xp) < 10**11) or\
+                   (max(_xp) < 10**9 * 10**18) or (max(_xp) > 10**15 * 10**18):
+                    return False
+
+        if y:
+            for _xp in [xp_0, xp]:
+                if (_D < 10**17) or (_D > 10**15 * 10**18) or\
+                   (min(_xp) * 10**18 // _D < 10**16) or (max(_xp) * 10**18 // _D > 10**20):
+                    return False
+
+        return True
+
+    def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user):
+        if exchange_i == exchange_j:
+            return
+        try:
+            calc_amount = self.swap.get_dy(exchange_i, exchange_j, exchange_amount_in)
+        except Exception:
+            _amounts = [0] * 3
+            _amounts[exchange_i] = exchange_amount_in
+            if self.check_limits(_amounts):
+                raise
+            return
+        self.coins[exchange_i]._mint_for_testing(user, exchange_amount_in)
+
+        d_balance_i = self.coins[exchange_i].balanceOf(user)
+        d_balance_j = self.coins[exchange_j].balanceOf(user)
+        try:
+            self.swap.exchange(exchange_i, exchange_j, exchange_amount_in, 0, {'from': user})
+        except Exception:
+            # Small amounts may fail with rounding errors
+            if calc_amount > 100 and exchange_amount_in > 100 and\
+               calc_amount / self.swap.balances(exchange_j) > 1e-13 and\
+               exchange_amount_in / self.swap.balances(exchange_i) > 1e-13:
+                raise
+            return
+
+        # This is to check that we didn't end up in a borked state after
+        # an exchange succeeded
+        self.swap.get_dy(exchange_j, exchange_i, 10**16 * 10**18 // ([10**18] + INITIAL_PRICES)[exchange_j])
+
+        d_balance_i -= self.coins[exchange_i].balanceOf(user)
+        d_balance_j -= self.coins[exchange_j].balanceOf(user)
+
+        assert d_balance_i == exchange_amount_in
+        assert -d_balance_j == calc_amount
+
+        self.balances[exchange_i] += d_balance_i
+        self.balances[exchange_j] += d_balance_j
+
+    def rule_sleep(self, sleep_time):
+        self.chain.sleep(sleep_time)
+
+    def invariant_balances(self):
+        balances = [self.swap.balances(i) for i in range(3)]
+        balances_of = [c.balanceOf(self.swap) for c in self.coins]
+        for i in range(3):
+            assert self.balances[i] == balances[i]
+            assert self.balances[i] == balances_of[i]
+
+    def invariant_total_supply(self):
+        assert self.total_supply == self.token.totalSupply()
+
+    def invariant_virtual_price(self):
+        virtual_price = self.swap.virtual_price()
+        xcp_profit = self.swap.xcp_profit()
+        get_virtual_price = self.swap.get_virtual_price()
+
+        assert xcp_profit >= 10**18 - 10
+        assert virtual_price >= 10**18 - 10
+        assert get_virtual_price >= 10**18 - 10
+
+        assert (virtual_price - 10**18) * 2 >= xcp_profit - 10**18
+        assert abs(log(virtual_price / get_virtual_price)) < 1e-10
+
+        assert get_virtual_price / self.virtual_price > 1 - 1e-10
+
+        self.virtual_price = get_virtual_price
