@@ -98,7 +98,7 @@ def test_ma(chain, crypto_swap_with_deposit, token, coins, accounts, amount, i, 
     for p1, p2, p3 in zip(INITIAL_PRICES, prices2, prices3):
         alpha = 0.5 ** (t / half_time)
         theory = p1 * alpha + p2 * (1 - alpha)
-        assert abs(log2(theory / p3)) < 1e-4
+        assert abs(log2(theory / p3)) < 1e-3
 
 
 # Sanity check for price scale
