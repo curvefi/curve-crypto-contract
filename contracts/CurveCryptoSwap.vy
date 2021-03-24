@@ -150,6 +150,7 @@ MAX_A: constant(uint256) = 10000 * A_MULTIPLIER
 MAX_A_CHANGE: constant(uint256) = 10
 MIN_GAMMA: constant(uint256) = 10**10
 MAX_GAMMA: constant(uint256) = 10**16
+NOISE_FEE: constant(uint256) = 10**5  # 0.1 bps
 
 
 @external
@@ -418,6 +419,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
              _for: address = msg.sender):
     assert not self.is_killed  # dev: the pool is killed
     assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
+    assert dx > 0  # dev: do not exchange 0 coins
     _coins: address[N_COINS] = coins
 
     input_coin: address = _coins[i]
@@ -474,6 +476,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
 @view
 def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
     assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
+    assert dx > 0  # dev: do not exchange 0 coins
 
     price_scale: uint256[N_COINS-1] = self.price_scale
     xp: uint256[N_COINS] = self.balances
@@ -510,7 +513,7 @@ def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
             Sdiff += _x - avg
         else:
             Sdiff += avg - _x
-    return self._fee(xp) * N_COINS / (4 * (N_COINS-1)) * Sdiff / S
+    return self._fee(xp) * N_COINS / (4 * (N_COINS-1)) * Sdiff / S + NOISE_FEE
 
 
 @internal
