@@ -118,9 +118,9 @@ def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint
 
         _g1k0: uint256 = gamma + 10**18
         if _g1k0 > K0:
-            _g1k0 -= K0
+            _g1k0 = _g1k0 - K0 + 1
         else:
-            _g1k0 = K0 - _g1k0
+            _g1k0 = K0 - _g1k0 + 1
 
         # D / (A * N**N) * _g1k0**2 / gamma**2
         mul1: uint256 = 10**18 * D / gamma * _g1k0 / gamma * _g1k0 * A_MULTIPLIER / ANN
@@ -198,9 +198,9 @@ def newton_y(ANN: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: u
 
         _g1k0: uint256 = gamma + 10**18
         if _g1k0 > K0:
-            _g1k0 -= K0
+            _g1k0 = _g1k0 - K0 + 1
         else:
-            _g1k0 = K0 - _g1k0
+            _g1k0 = K0 - _g1k0 + 1
 
         # D / (A * N**N) * _g1k0**2 / gamma**2
         mul1: uint256 = 10**18 * D / gamma * _g1k0 / gamma * _g1k0 * A_MULTIPLIER / ANN

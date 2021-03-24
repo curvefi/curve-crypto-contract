@@ -189,7 +189,7 @@ def newton_D(A, gamma, x, D0):
         for _x in x:
             K0 = K0 * _x * N // D
 
-        _g1k0 = abs(gamma + 10**18 - K0)
+        _g1k0 = abs(gamma + 10**18 - K0) + 1
 
         # D / (A * N**N) * _g1k0**2 / gamma**2
         mul1 = 10**18 * D // gamma * _g1k0 // gamma * _g1k0 // A
@@ -234,7 +234,7 @@ def newton_y(A, gamma, x, D, i):
         K0 = K0_i * y * N // D
         S = S_i + y
 
-        _g1k0 = abs(gamma + 10**18 - K0)
+        _g1k0 = abs(gamma + 10**18 - K0) + 1
 
         # D / (A * N**N) * _g1k0**2 / gamma**2
         mul1 = 10**18 * D // gamma * _g1k0 // gamma * _g1k0 // A
