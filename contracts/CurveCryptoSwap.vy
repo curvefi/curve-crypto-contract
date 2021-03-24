@@ -363,7 +363,8 @@ def tweak_price(A: uint256, gamma: uint256,
         virtual_price = xcp * 10**18 / total_supply
         xcp_profit = old_xcp_profit * virtual_price / old_virtual_price
 
-        assert virtual_price >= old_virtual_price, "This trade causes a loss"
+        if virtual_price < old_virtual_price:
+            raise "This causes a loss"
 
         frac: uint256 = (10**18 * virtual_price / old_virtual_price - 10**18) * self.admin_fee / (2 * 10**10)
         # /2 here is because half of the fee usually goes for retargeting the price
@@ -665,6 +666,8 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     D: uint256 = self.D
     D0: uint256 = D
     token_supply: uint256 = CurveToken(token).totalSupply()
+    if token_amount > token_supply:
+        raise "amount>supply"
 
     xx: uint256[N_COINS] = self.balances
     xp: uint256[N_COINS] = xx
