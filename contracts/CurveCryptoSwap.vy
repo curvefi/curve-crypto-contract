@@ -362,6 +362,8 @@ def tweak_price(A: uint256, gamma: uint256,
         virtual_price = xcp * 10**18 / total_supply
         xcp_profit = old_xcp_profit * virtual_price / old_virtual_price
 
+        assert virtual_price >= old_virtual_price, "This trade causes a loss"
+
         frac: uint256 = (10**18 * virtual_price / old_virtual_price - 10**18) * self.admin_fee / (2 * 10**10)
         # /2 here is because half of the fee usually goes for retargeting the price
         # The line above also sneakily fails if virtual price decreases (and protects LPs!)
