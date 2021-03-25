@@ -81,6 +81,12 @@ event StopRampA:
     time: uint256
 
 
+event Kill:
+    admin: indexed(address)
+    time: uint256
+    is_killed: bool
+
+
 N_COINS: constant(int128) = 3  # <- change
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
@@ -523,10 +529,13 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
     assert not self.is_killed  # dev: the pool is killed
     _coins: address[N_COINS] = coins
 
+    n_coins_added: uint256 = 0
     if from_address != self:
         for i in range(N_COINS):
             if amounts[i] > 0:
                 assert ERC20(_coins[i]).transferFrom(from_address, self, amounts[i])
+                n_coins_added += 1
+    assert n_coins_added > 0  # dev: no coins to add
 
     price_scale: uint256[N_COINS-1] = self.price_scale
     xp: uint256[N_COINS] = self.balances
@@ -948,8 +957,12 @@ def kill_me():
     assert self.kill_deadline > block.timestamp  # dev: deadline has passed
     self.is_killed = True
 
+    log Kill(msg.sender, block.timestamp, True)
+
 
 @external
 def unkill_me():
     assert msg.sender == self.owner  # dev: only owner
     self.is_killed = False
+
+    log Kill(msg.sender, block.timestamp, False)
