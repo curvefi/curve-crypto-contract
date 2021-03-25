@@ -80,7 +80,6 @@ event StopRampA:
     current_gamma: uint256
     time: uint256
 
-
 event Kill:
     admin: indexed(address)
     time: uint256

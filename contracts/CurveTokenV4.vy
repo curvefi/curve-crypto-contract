@@ -26,6 +26,14 @@ event Approval:
     _spender: indexed(address)
     _value: uint256
 
+event SetName:
+    old_name: String[64]
+    old_symbol: String[32]
+    name: String[64]
+    symbol: String[32]
+    owner: address
+    time: uint256
+
 
 name: public(String[64])
 symbol: public(String[32])
@@ -205,5 +213,9 @@ def set_minter(_minter: address):
 @external
 def set_name(_name: String[64], _symbol: String[32]):
     assert Curve(self.minter).owner() == msg.sender
+    old_name: String[64] = self.name
+    old_symbol: String[32] = self.symbol
     self.name = _name
     self.symbol = _symbol
+
+    log SetName(old_name, old_symbol, _name, _symbol, msg.sender, block.timestamp)
