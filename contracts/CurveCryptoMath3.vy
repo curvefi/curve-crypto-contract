@@ -254,6 +254,8 @@ def halfpow(power: uint256, precision: uint256) -> uint256:
     if intpow > 59:
         return 0
     result: uint256 = 10**18 / (2**intpow)
+    if otherpow == 0:
+        return result
 
     term: uint256 = 10**18
     x: uint256 = 5 * 10**17
