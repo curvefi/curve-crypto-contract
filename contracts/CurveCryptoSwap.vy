@@ -943,6 +943,8 @@ def revert_transfer_ownership():
 @external
 @nonreentrant('lock')
 def withdraw_admin_fees():
+    assert msg.sender == self.owner  # dev: only owner
+
     _coins: address[N_COINS] = coins
     # Wrap as pool token and withdraw
     admin_balances: uint256[N_COINS] = empty(uint256[N_COINS])
