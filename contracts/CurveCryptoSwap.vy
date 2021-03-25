@@ -668,6 +668,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     token_supply: uint256 = CurveToken(token).totalSupply()
     if token_amount > token_supply:
         raise "amount>supply"
+    assert i < N_COINS  # dev: coin out of range
 
     xx: uint256[N_COINS] = self.balances
     xp: uint256[N_COINS] = xx
