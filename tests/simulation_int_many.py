@@ -189,7 +189,7 @@ def newton_D(A, gamma, x, D0):
         for _x in x:
             K0 = K0 * _x * N // D
 
-        _g1k0 = abs(gamma + 10**18 - K0) + 1
+        _g1k0 = abs(gamma + 10**18 - K0)
 
         # D / (A * N**N) * _g1k0**2 / gamma**2
         mul1 = 10**18 * D // gamma * _g1k0 // gamma * _g1k0 // A
@@ -201,11 +201,11 @@ def newton_D(A, gamma, x, D0):
         assert neg_fprime > 0  # Python only: -f' > 0
 
         # D -= f / fprime
-        D = (D * neg_fprime + D * S) // neg_fprime - D**2 // neg_fprime - D * (mul1 // neg_fprime) // 10**18 * (10**18 - K0) // K0
+        D = (D * neg_fprime + D * S - D**2) // neg_fprime - D * (mul1 // neg_fprime) // 10**18 * (10**18 - K0) // K0
 
         if D < 0:
             D = -D // 2
-        if abs(D - D_prev) * 10**14 < max(10**16, D):
+        if abs(D - D_prev) <= max(100, D // 10**14):
             return D
 
     raise ValueError("Did not converge")
@@ -234,7 +234,7 @@ def newton_y(A, gamma, x, D, i):
         K0 = K0_i * y * N // D
         S = S_i + y
 
-        _g1k0 = abs(gamma + 10**18 - K0) + 1
+        _g1k0 = abs(gamma + 10**18 - K0)
 
         # D / (A * N**N) * _g1k0**2 / gamma**2
         mul1 = 10**18 * D // gamma * _g1k0 // gamma * _g1k0 // A
@@ -317,15 +317,17 @@ def get_all():
         for trade in trades:
             if trade['t'] >= min_time and trade['t'] <= max_time:
                 trade['pair'] = pair
-                out.append((trade['t'] + sum(pair) * 1e-3, trade))
+                out.append((trade['t'] + sum(pair) * 15, trade))
     out = sorted(out)
     return [i[1] for i in out]
 
 
 class Trader:
     def __init__(self, A, gamma, D, n, p0, mid_fee=1e-3, out_fee=3e-3, price_threshold=0.01, fee_gamma=None,
-                 adjustment_step=0.003, ma_factor=0.5, log=True):
+                 adjustment_step=0.003, ma_half_time=500, log=True):
         self.p0 = p0[:]
+        self.price_oracle = self.p0[:]
+        self.last_price = self.p0[:]
         self.curve = Curve(A, gamma, D, n, p=p0[:])
         self.Amax = A
         self.dx = int(D * 1e-8)
@@ -341,7 +343,7 @@ class Trader:
         self.log = log
         self.fee_gamma = fee_gamma or gamma
         self.total_vol = 0.0
-        self.ma_factor = ma_factor
+        self.ma_half_time = ma_half_time
         self.ext_fee = 0  # 0.03e-2
         self.slippage = 0
         self.slippage_count = 0
@@ -426,12 +428,22 @@ class Trader:
         except ValueError:
             return False
 
-    def tweak_price(self, price_vector):
-        # price_vector looks like [1, p1, p2, ...] normalized to 1e18
-        # XXX should do integer algorithm for it
+    def ma_recorder(self, t, price_vector):
+        # XXX what if every block only has p_b being last
+        if t > self.t:
+            alpha = 0.5 ** ((t - self.t) / self.ma_half_time)
+            for k in [1, 2]:
+                self.price_oracle[k] = int(price_vector[k] * (1 - alpha) + self.price_oracle[k] * alpha)
+            self.t = t
+
+    def tweak_price(self, t, a, b, p):
+        self.last_price[b] = p * self.last_price[a] // self.last_price[0]
+        self.ma_recorder(t, self.last_price)
+
+        # price_oracle looks like [1, p1, p2, ...] normalized to 1e18
         norm = int(sum(
             (p_real * 10**18 // p_target - 10**18) ** 2
-            for p_real, p_target in zip(price_vector, self.curve.p)
+            for p_real, p_target in zip(self.price_oracle, self.curve.p)
         ) ** 0.5)
         if norm <= max(self.price_threshold, self.adjustment_step):
             # Already close to the target price
@@ -439,7 +451,7 @@ class Trader:
 
         p_new = [10**18]
         p_new += [p_target + self.adjustment_step * (p_real - p_target) // norm
-                  for p_real, p_target in zip(price_vector[1:], self.curve.p[1:])]
+                  for p_real, p_target in zip(self.price_oracle[1:], self.curve.p[1:])]
 
         old_p = self.curve.p[:]
         old_profit = self.xcp_profit_real
@@ -457,14 +469,14 @@ class Trader:
         return norm
 
     def simulate(self, mdata):
-        avg = self.p0[:]
         lasts = {}
+        self.t = mdata[0]['t']
         for i, d in enumerate(mdata):
             a, b = d['pair']
             vol = 0
-            ext_vol = int(d['volume'] * avg[b])  # <- now all is in USD
+            ext_vol = int(d['volume'] * self.price_oracle[b])  # <- now all is in USD
             ctr = 0
-            last = lasts.get((a, b), avg[b] * 10**18 // avg[a])
+            last = lasts.get((a, b), self.price_oracle[b] * 10**18 // self.price_oracle[a])
             _high = last
             _low = last
 
@@ -482,7 +494,7 @@ class Trader:
                 dy = self.buy(step, a, b, max_price=max_price)
                 if dy is False:
                     break
-                vol += dy * avg[b] // 10**18
+                vol += dy * self.price_oracle[b] // 10**18
                 _dx += dy
                 last = step * 10**18 // dy
                 max_price = int(1e18 * d['high'])
@@ -501,7 +513,7 @@ class Trader:
                 _dx += dx
                 if dy is False:
                     break
-                vol += dx * avg[b] // 10**18
+                vol += dx * self.price_oracle[b] // 10**18
                 last = dy * 10**18 // dx
                 min_price = int(10**18 * d['low'])
                 ctr += 1
@@ -511,10 +523,9 @@ class Trader:
                 self.slippage += _dx * self.curve.p[b] // 10**18 * (p_before + p_after) // (2 * abs(p_before - p_after))
             _low = last
             lasts[(a, b)] = last
-            avg[b] = int(avg[b] * (1 - self.ma_factor)) + int((_high + _low) * self.ma_factor / 2) * avg[a] // avg[0]  # MA price
-            # avg[b] = avg[b] * 8//10 + (_high + _low) // 10 * avg[a] // avg[0]  # MA price
-            if ctr > 0:
-                self.tweak_price(avg) / 1e18
+
+            self.tweak_price(d['t'], a, b, (_high + _low) // 2)
+
             self.total_vol += vol
             if self.log:
                 try:
@@ -523,8 +534,8 @@ class Trader:
                            """Vol: {6:.4f}\tPR:{7:.2f}\txCP-growth: {8:.5f}\t"""
                            """APY:{9:.1f}%\tfee:{10:.3f}%""").format(
                           100 * i / len(mdata), ctr,
-                          lasts.get((0, 1), avg[1] * 10**18 // avg[0]) / 1e18,
-                          lasts.get((0, 2), avg[2] * 10**18 // avg[0]) / 1e18,
+                          lasts.get((0, 1), self.price_oracle[1] * 10**18 // self.price_oracle[0]) / 1e18,
+                          lasts.get((0, 2), self.price_oracle[2] * 10**18 // self.price_oracle[0]) / 1e18,
                           self.curve.p[1] / 1e18,
                           self.curve.p[2] / 1e18,
                           self.total_vol / 1e18,
@@ -546,20 +557,11 @@ def get_price_vector(n, data):
 
 
 if __name__ == '__main__':
-    test_data = get_all()[-1000000:]
-    # test_data = test_data[-len(test_data) // 3:]
-    # trader = Trader(65, int(0.64e-4 * 1e18), 100_000_000 * 10**18, 3, get_price_vector(3, test_data),
+    test_data = get_all()
 
     trader = Trader(135, int(7e-5 * 1e18), 5_000_000 * 10**18, 3, get_price_vector(3, test_data),
                     mid_fee=4e-4, out_fee=4.0e-3,
                     price_threshold=0.0028, fee_gamma=int(0.01 * 1e18),
-                    adjustment_step=0.0015, ma_factor=0.2)
-
-    # trader = Trader(70, int(0.27e-4 * 1e18), 1000 * 10**18, 3, get_price_vector(3, test_data),
-    #                 mid_fee=0.8e-3, out_fee=4.0e-3,
-    #                 price_threshold=0.004, fee_gamma=int(0.01 * 1e18),
-    #                 adjustment_step=0.003, ma_factor=0.17)
+                    adjustment_step=0.0015, ma_half_time=600)
 
     trader.simulate(test_data)
-    # import IPython
-    # IPython.embed()
