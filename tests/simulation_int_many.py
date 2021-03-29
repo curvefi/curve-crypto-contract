@@ -483,6 +483,7 @@ class Trader:
             # Dynamic step
             # f = reduction_coefficient(self.curve.xp(), self.curve.gamma)
             candle = min(int(1e18 * abs((d['high'] - d['low']) / d['high'])), 10**17)
+            candle = max(10**15, candle)
             step1 = self.step_for_price(candle // 50, (a, b), sign=1)
             step2 = self.step_for_price(candle // 50, (a, b), sign=-1)
             step = min(step1, step2)
