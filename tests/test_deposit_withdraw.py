@@ -34,9 +34,8 @@ def test_second_deposit(crypto_swap_with_deposit, token, coins, accounts, values
     amounts = [v * 10**18 // p for v, p in zip(values, [10**18] + INITIAL_PRICES)]
 
     xp = [10**6 * 10**18] * 3
-    prices = [10**18] + INITIAL_PRICES
     for i in range(3):
-        xp[i] += values[i] * prices[i] // 10**18
+        xp[i] += values[i]
     _A = crypto_swap_with_deposit.A_precise() // (3**3 * 100)
     _gamma = crypto_swap_with_deposit.gamma()
     _D = sim.solve_D(_A, _gamma, xp)
