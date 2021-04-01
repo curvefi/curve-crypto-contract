@@ -329,7 +329,6 @@ class Trader:
         self.price_oracle = self.p0[:]
         self.last_price = self.p0[:]
         self.curve = Curve(A, gamma, D, n, p=p0[:])
-        self.Amax = A
         self.dx = int(D * 1e-8)
         self.mid_fee = int(mid_fee * 1e18)
         self.out_fee = int(out_fee * 1e18)
@@ -429,7 +428,6 @@ class Trader:
             return False
 
     def ma_recorder(self, t, price_vector):
-        # XXX what if every block only has p_b being last
         if t > self.t:
             alpha = 0.5 ** ((t - self.t) / self.ma_half_time)
             for k in [1, 2]:
