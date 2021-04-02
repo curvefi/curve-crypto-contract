@@ -8,7 +8,7 @@ MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
 
 
 class StatefulBase:
-    exchange_amount_in = strategy('uint256', max_value=10**9 * 10**18)  # in USD
+    exchange_amount_in = strategy('uint256', max_value=10**9 * 10**18)
     exchange_i = strategy('uint8', max_value=2)
     exchange_j = strategy('uint8', max_value=2)
     sleep_time = strategy('uint256', max_value=86400 * 7)
@@ -74,7 +74,7 @@ class StatefulBase:
 
     def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user):
         if exchange_i == exchange_j:
-            return
+            return False
         try:
             calc_amount = self.swap.get_dy(exchange_i, exchange_j, exchange_amount_in)
         except Exception:
@@ -82,7 +82,7 @@ class StatefulBase:
             _amounts[exchange_i] = exchange_amount_in
             if self.check_limits(_amounts):
                 raise
-            return
+            return False
         self.coins[exchange_i]._mint_for_testing(user, exchange_amount_in)
 
         d_balance_i = self.coins[exchange_i].balanceOf(user)
@@ -95,7 +95,7 @@ class StatefulBase:
                calc_amount / self.swap.balances(exchange_j) > 1e-13 and\
                exchange_amount_in / self.swap.balances(exchange_i) > 1e-13:
                 raise
-            return
+            return False
 
         # This is to check that we didn't end up in a borked state after
         # an exchange succeeded
@@ -109,6 +109,8 @@ class StatefulBase:
 
         self.balances[exchange_i] += d_balance_i
         self.balances[exchange_j] += d_balance_j
+
+        return True
 
     def rule_sleep(self, sleep_time):
         self.chain.sleep(sleep_time)

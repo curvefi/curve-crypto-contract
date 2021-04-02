@@ -390,13 +390,14 @@ class Trader:
         Buy y for x
         """
         try:
-            fee = self.fee()
             x_old = self.curve.x[:]
             x = self.curve.x[i] + dx
             y = self.curve.y(x, i, j)
             dy = self.curve.x[j] - y
             self.curve.x[i] = x
-            self.curve.x[j] = y + dy * fee // 10**18
+            self.curve.x[j] = y
+            fee = self.fee()
+            self.curve.x[j] += dy * fee // 10**18
             dy = dy * (10**18 - fee) // 10**18
             if dx * 10**18 // dy > max_price or dy < 0:
                 self.curve.x = x_old
@@ -411,13 +412,14 @@ class Trader:
         Sell y for x
         """
         try:
-            fee = self.fee()
             x_old = self.curve.x[:]
             y = self.curve.x[j] + dy
             x = self.curve.y(y, j, i)
             dx = self.curve.x[i] - x
-            self.curve.x[i] = x + dx * fee // 10**18
+            self.curve.x[i] = x
             self.curve.x[j] = y
+            fee = self.fee()
+            self.curve.x[i] += dx * fee // 10**18
             dx = dx * (10**18 - fee) // 10**18
             if dx  * 10**18 // dy < min_price or dx < 0:
                 self.curve.x = x_old
@@ -428,6 +430,7 @@ class Trader:
             return False
 
     def ma_recorder(self, t, price_vector):
+        # XXX what if every block only has p_b being last
         if t > self.t:
             alpha = 0.5 ** ((t - self.t) / self.ma_half_time)
             for k in [1, 2]:
@@ -435,8 +438,8 @@ class Trader:
             self.t = t
 
     def tweak_price(self, t, a, b, p):
-        self.last_price[b] = p * self.last_price[a] // self.last_price[0]
         self.ma_recorder(t, self.last_price)
+        self.last_price[b] = p * self.last_price[a] // self.last_price[0]
 
         # price_oracle looks like [1, p1, p2, ...] normalized to 1e18
         norm = int(sum(
@@ -556,7 +559,7 @@ def get_price_vector(n, data):
 
 
 if __name__ == '__main__':
-    test_data = get_all()
+    test_data = get_all()[-100000:]
 
     trader = Trader(135, int(7e-5 * 1e18), 5_000_000 * 10**18, 3, get_price_vector(3, test_data),
                     mid_fee=4e-4, out_fee=4.0e-3,
