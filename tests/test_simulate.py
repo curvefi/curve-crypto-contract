@@ -4,7 +4,7 @@ from .stateful_base import StatefulBase
 from . import simulation_int_many as sim
 
 MAX_SAMPLES = 30
-STEP_COUNT = 10
+STEP_COUNT = 20
 
 
 def approx(x1, x2, precision):
@@ -57,7 +57,7 @@ class StatefulSimulation(StatefulBase):
             self.trader.tweak_price(self.chain[-1].timestamp, exchange_i, exchange_j, price)
 
     def invariant_simulator(self):
-        assert abs(self.trader.xcp_profit - self.swap.xcp_profit()) / 1e18 < 1e-6
+        assert abs(self.trader.xcp_profit - self.swap.xcp_profit()) / 1e18 < 1e-8
         # virtual_price taking at least half the profit is checked in stateful_base
         for i in range(2):
             assert approx(self.trader.curve.p[i+1], self.swap.price_scale(i), 3e-3)  # adjustment_step * 2

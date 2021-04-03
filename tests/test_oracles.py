@@ -58,9 +58,7 @@ def test_last_price_remove_liq(crypto_swap_with_deposit, token, coins, accounts,
     prices = [10**18] + INITIAL_PRICES
     token_amount = token_frac * token.totalSupply() // 10**18
 
-    out = coins[i].balanceOf(user)
     crypto_swap_with_deposit.remove_liquidity_one_coin(token_amount, i, 0, {'from': user})
-    out = coins[i].balanceOf(user) - out
 
     for k in [1, 2]:
         oracle_price = crypto_swap_with_deposit.last_prices(k-1)
@@ -84,9 +82,7 @@ def test_ma(chain, crypto_swap_with_deposit, token, coins, accounts, amount, i, 
 
     half_time = crypto_swap_with_deposit.ma_half_time()
 
-    out = coins[j].balanceOf(user)
     crypto_swap_with_deposit.exchange(i, j, amount, 0, {'from': user})
-    out = coins[j].balanceOf(user) - out
 
     prices2 = [crypto_swap_with_deposit.last_prices(k) for k in [0, 1]]
 
@@ -117,9 +113,7 @@ def test_price_scale_range(chain, crypto_swap_with_deposit, coins, accounts, amo
     amount = amount * 10**18 // prices1[i]
     coins[i]._mint_for_testing(user, amount)
 
-    out = coins[j].balanceOf(user)
     crypto_swap_with_deposit.exchange(i, j, amount, 0, {'from': user})
-    out = coins[j].balanceOf(user) - out
 
     prices2 = [crypto_swap_with_deposit.last_prices(k) for k in [0, 1]]
 
