@@ -41,7 +41,7 @@ class StatefulBase:
 
         self.balances = self.initial_deposit[:]
         self.total_supply = self.token.balanceOf(user)
-        self.virtual_price = 10**18
+        self.xcp_profit = 10**18
 
     def convert_amounts(self, amounts):
         prices = [10**18] + [self.swap.price_scale(i) for i in range(2)]
@@ -134,9 +134,8 @@ class StatefulBase:
         assert virtual_price >= 10**18 - 10
         assert get_virtual_price >= 10**18 - 10
 
+        assert xcp_profit >= self.xcp_profit
         assert (virtual_price - 10**18) * 2 >= xcp_profit - 10**18
         assert abs(log(virtual_price / get_virtual_price)) < 1e-10
 
-        assert get_virtual_price / self.virtual_price > 1 - 1e-10
-
-        self.virtual_price = get_virtual_price
+        self.xcp_profit = xcp_profit
