@@ -1,0 +1,4 @@
+reports:
+  exclude_paths:
+    - contracts/testing/*.*
+  only_include_project: false
