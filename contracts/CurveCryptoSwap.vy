@@ -405,7 +405,7 @@ def tweak_price(A: uint256, gamma: uint256,
         old_virtual_price = Math(math).geometric_mean(xp) * 10**18 / total_supply
 
         # Proceed if we've got enough profit
-        if 2 * (old_virtual_price - 10**18) > xcp_profit - 10**18:
+        if (old_virtual_price > 10**18) and (2 * (old_virtual_price - 10**18) > xcp_profit - 10**18):
             self.price_scale = p_new
             self.D = D
             self.virtual_price = old_virtual_price
