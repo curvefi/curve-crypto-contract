@@ -439,7 +439,10 @@ class Trader:
 
     def tweak_price(self, t, a, b, p):
         self.ma_recorder(t, self.last_price)
-        self.last_price[b] = p * self.last_price[a] // self.last_price[0]
+        if b > 0:
+            self.last_price[b] = p * self.last_price[a] // 10**18
+        else:
+            self.last_price[a] = self.last_price[0] * 10**18 // p
 
         # price_oracle looks like [1, p1, p2, ...] normalized to 1e18
         norm = int(sum(
