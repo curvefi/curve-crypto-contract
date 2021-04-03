@@ -1,4 +1,4 @@
-from math import log2
+from math import log2, log
 from brownie.test import strategy, given
 from hypothesis import settings
 from .conftest import INITIAL_PRICES
@@ -108,7 +108,7 @@ def test_ma(chain, crypto_swap_with_deposit, token, coins, accounts, amount, i, 
     j=strategy('uint8', min_value=0, max_value=2),
     t=strategy('uint256', max_value=10 * 86400))
 @settings(max_examples=MAX_SAMPLES)
-def test_price_scale(chain, crypto_swap_with_deposit, token, coins, accounts, amount, i, j, t):
+def test_price_scale_range(chain, crypto_swap_with_deposit, coins, accounts, amount, i, j, t):
     user = accounts[1]
     if i == j:
         return
@@ -133,3 +133,46 @@ def test_price_scale(chain, crypto_swap_with_deposit, token, coins, accounts, am
             assert p3 <= p1 and p3 >= p2
         else:
             assert p3 >= p1 and p3 <= p2
+
+
+@given(
+    i=strategy('uint8', min_value=0, max_value=2),
+    j=strategy('uint8', min_value=0, max_value=2))
+def test_price_scale_change(chain, crypto_swap_with_deposit, i, j, coins, accounts):
+    amount = 10**5 * 10**18
+    t = 86400
+
+    user = accounts[1]
+    if i == j:
+        return
+
+    prices1 = [10**18] + INITIAL_PRICES
+    amount = amount * 10**18 // prices1[i]
+    coins[i]._mint_for_testing(user, amount)
+
+    out = coins[j].balanceOf(user)
+    crypto_swap_with_deposit.exchange(i, j, amount, 0, {'from': user})
+    out = coins[j].balanceOf(user) - out
+
+    price_scale_1 = [crypto_swap_with_deposit.price_scale(i) for i in range(2)]
+
+    prices2 = [crypto_swap_with_deposit.last_prices(k) for k in [0, 1]]
+    if i == 0:
+        out_price = amount * 10**18 // out
+        ix = j
+    elif j == 0:
+        out_price = out * 10**18 // amount
+        ix = i
+    else:
+        ix = j
+        out_price = amount * prices1[i] // out
+
+    assert out_price == prices2[ix-1]
+    chain.sleep(t)
+
+    coins[0]._mint_for_testing(user, 10**18)
+    crypto_swap_with_deposit.exchange(0, 1, 10**18, 0, {'from': user})
+    price_scale_2 = [crypto_swap_with_deposit.price_scale(i) for i in range(2)]
+
+    price_diff = abs(log(price_scale_2[ix-1] / price_scale_1[ix-1]))
+    assert abs(log(price_diff / (crypto_swap_with_deposit.adjustment_step() / 1e18))) < 1e-2

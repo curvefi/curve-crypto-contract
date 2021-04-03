@@ -384,7 +384,7 @@ def tweak_price(A: uint256, gamma: uint256,
     # self.price_threshold must be > self.adjustment_step
     # should we pause for a bit if profit wasn't enough to not spend this gas every time?
     if norm > self.price_threshold ** 2 and old_virtual_price > 0:
-        norm = Math(math).sqrt_int(norm)
+        norm = Math(math).sqrt_int(norm / 10**18)  # Need to convert to 1e18 units!
         adjustment_step: uint256 = self.adjustment_step
 
         p_new: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
