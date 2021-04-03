@@ -46,16 +46,15 @@ class StatefulSimulation(StatefulBase):
         # Adjust virtual prices
         self.trader.xcp_profit = self.swap.xcp_profit()
         self.trader.xcp_profit_real = self.swap.virtual_price()
-        self.trader.t = self.chain.time()
+        self.trader.t = self.chain[-1].timestamp
 
     def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user):
         exchange_amount_in = exchange_amount_in * 10**18 // self.trader.price_oracle[exchange_i]
 
-        t = self.chain.time()
         if super().rule_exchange(exchange_amount_in, exchange_i, exchange_j, user):
             dy = self.trader.buy(exchange_amount_in, exchange_i, exchange_j)
             price = exchange_amount_in * 10**18 // dy
-            self.trader.tweak_price(t, exchange_i, exchange_j, price)
+            self.trader.tweak_price(self.chain[-1].timestamp, exchange_i, exchange_j, price)
 
     def invariant_simulator(self):
         assert abs(self.trader.xcp_profit - self.swap.xcp_profit()) / 1e18 < 1e-6
