@@ -85,6 +85,10 @@ event Kill:
     time: uint256
     is_killed: bool
 
+event ClaimAdminFee:
+    admin: indexed(address)
+    tokens: uint256
+
 
 N_COINS: constant(int128) = 3  # <- change
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
@@ -137,6 +141,7 @@ owner: public(address)
 future_owner: public(address)
 
 xcp_profit: public(uint256)
+xcp_profit_a: public(uint256)  # Full profit at last claim of admin fees
 virtual_price: public(uint256)  # Cached (fast to read) virtual price also used internally
 
 is_killed: public(bool)
@@ -193,6 +198,8 @@ def __init__(
     self.last_prices = new_initial_prices
     self.last_prices_timestamp = block.timestamp
     self.ma_half_time = ma_half_time
+
+    self.xcp_profit_a = 10**18
 
     self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
 
@@ -370,15 +377,6 @@ def tweak_price(A: uint256, gamma: uint256,
 
         if virtual_price < old_virtual_price:
             raise "This causes a loss"
-
-        admin_fee: uint256 = self.admin_fee
-        if admin_fee > 0:
-            frac: uint256 = (10**18 * virtual_price / old_virtual_price - 10**18) * admin_fee / (2 * 10**10)
-            # /2 here is because half of the fee usually goes for retargeting the price
-            if frac > 0:
-                total_supply += CurveToken(token).mint_relative(self.owner, frac)
-                virtual_price = xcp * 10**18 / total_supply
-                assert virtual_price >= old_virtual_price
 
     self.xcp_profit = xcp_profit
 
@@ -748,7 +746,27 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
     log RemoveLiquidityOne(msg.sender, token_amount, dy)
 
-# XXX not sure if remove_liquidity_imbalance is used by anyone - can remove
+
+@external
+def claim_admin_fees():
+    assert msg.sender == self.owner  # dev: only owner
+
+    xcp_profit: uint256 = self.xcp_profit
+    delta: uint256 = xcp_profit - self.xcp_profit_a
+    frac: uint256 = 10**18 * delta / xcp_profit * self.admin_fee / (2 * 10**10)
+    claimed: uint256 = 0
+
+    if frac > 0:
+        total_supply: uint256 = CurveToken(token).totalSupply()
+        claimed = CurveToken(token).mint_relative(msg.sender, frac)
+        total_supply += claimed
+        self.virtual_price = self.get_xcp() * 10**18 / total_supply
+
+    xcp_profit -= delta
+    self.xcp_profit_a = xcp_profit
+    self.xcp_profit = xcp_profit
+
+    log ClaimAdminFee(msg.sender, claimed)
 
 
 # Admin parameters
