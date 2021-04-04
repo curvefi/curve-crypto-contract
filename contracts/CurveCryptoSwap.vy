@@ -105,7 +105,7 @@ coins: constant(address[N_COINS]) = [
 ]
 
 price_scale: public(uint256[N_COINS-1])   # Internal price scale
-price_oracle: public(uint256[N_COINS-1])  # Price target given by MA
+price_oracle_packed: uint256  # Price target given by MA
 
 last_prices: public(uint256[N_COINS-1])
 last_prices_timestamp: public(uint256)
@@ -162,6 +162,10 @@ MIN_GAMMA: constant(uint256) = 10**10
 MAX_GAMMA: constant(uint256) = 10**16
 NOISE_FEE: constant(uint256) = 10**5  # 0.1 bps
 
+PRICE_SIZE: constant(int128) = 256 / (N_COINS-1)
+PRICE_MASK: constant(uint256) = 2**PRICE_SIZE - 1
+PRICE_PRECISION_MUL: constant(uint256) = 10**8  # 10**18 -> 10**10
+
 
 @external
 def __init__(
@@ -192,16 +196,33 @@ def __init__(
     self.fee_gamma = fee_gamma
     self.adjustment_step = adjustment_step
     self.admin_fee = admin_fee
-    new_initial_prices: uint256[N_COINS-1] = initial_prices
-    self.price_scale = new_initial_prices
-    self.price_oracle = new_initial_prices
-    self.last_prices = new_initial_prices
+
+    # Packing prices
+    packed_prices: uint256 = 0
+    for k in range(N_COINS-1):
+        packed_prices = shift(packed_prices, PRICE_SIZE)
+        p: uint256 = initial_prices[N_COINS-2 - k] / PRICE_PRECISION_MUL
+        assert p < PRICE_MASK
+        packed_prices = bitwise_or(p, packed_prices)
+
+    self.price_scale = initial_prices
+    self.price_oracle_packed = packed_prices
+    self.last_prices = initial_prices
     self.last_prices_timestamp = block.timestamp
     self.ma_half_time = ma_half_time
 
     self.xcp_profit_a = 10**18
 
     self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
+
+
+@external
+@view
+def price_oracle(k: uint256) -> uint256:
+    return bitwise_and(
+        bitwise_shift(self.price_oracle_packed, -PRICE_SIZE*k),
+        PRICE_MASK
+    ) * PRECISION_MUL
 
 
 @external
