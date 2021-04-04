@@ -371,13 +371,14 @@ def tweak_price(A: uint256, gamma: uint256,
         if virtual_price < old_virtual_price:
             raise "This causes a loss"
 
-        frac: uint256 = (10**18 * virtual_price / old_virtual_price - 10**18) * self.admin_fee / (2 * 10**10)
-        # /2 here is because half of the fee usually goes for retargeting the price
-        # The line above also sneakily fails if virtual price decreases (and protects LPs!)
-        if frac > 0:
-            total_supply += CurveToken(token).mint_relative(self.owner, frac)
-            virtual_price = xcp * 10**18 / total_supply
-            assert virtual_price >= old_virtual_price
+        admin_fee: uint256 = self.admin_fee
+        if admin_fee > 0:
+            frac: uint256 = (10**18 * virtual_price / old_virtual_price - 10**18) * admin_fee / (2 * 10**10)
+            # /2 here is because half of the fee usually goes for retargeting the price
+            if frac > 0:
+                total_supply += CurveToken(token).mint_relative(self.owner, frac)
+                virtual_price = xcp * 10**18 / total_supply
+                assert virtual_price >= old_virtual_price
 
     self.xcp_profit = xcp_profit
 
@@ -937,19 +938,6 @@ def revert_transfer_ownership():
     assert msg.sender == self.owner  # dev: only owner
 
     self.transfer_ownership_deadline = 0
-
-
-@external
-@nonreentrant('lock')
-def withdraw_admin_fees():
-    assert msg.sender == self.owner  # dev: only owner
-
-    _coins: address[N_COINS] = coins
-    # Wrap as pool token and withdraw
-    admin_balances: uint256[N_COINS] = empty(uint256[N_COINS])
-    for i in range(N_COINS):
-        admin_balances[i] = ERC20(_coins[i]).balanceOf(self) - self.balances[i]
-    self._add_liquidity(admin_balances, 0, self, self.owner)
 
 
 @external
