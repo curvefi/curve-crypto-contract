@@ -749,7 +749,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
 @external
 def claim_admin_fees():
-    assert msg.sender == self.owner  # dev: only owner
+    owner: address = self.owner
 
     xcp_profit: uint256 = self.xcp_profit
     delta: uint256 = xcp_profit - self.xcp_profit_a
@@ -758,7 +758,7 @@ def claim_admin_fees():
 
     if frac > 0:
         total_supply: uint256 = CurveToken(token).totalSupply()
-        claimed = CurveToken(token).mint_relative(msg.sender, frac)
+        claimed = CurveToken(token).mint_relative(owner, frac)
         total_supply += claimed
         self.virtual_price = self.get_xcp() * 10**18 / total_supply
 
@@ -766,7 +766,7 @@ def claim_admin_fees():
     self.xcp_profit_a = xcp_profit
     self.xcp_profit = xcp_profit
 
-    log ClaimAdminFee(msg.sender, claimed)
+    log ClaimAdminFee(owner, claimed)
 
 
 # Admin parameters
