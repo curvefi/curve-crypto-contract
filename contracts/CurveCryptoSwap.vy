@@ -752,21 +752,22 @@ def claim_admin_fees():
     owner: address = self.owner
 
     xcp_profit: uint256 = self.xcp_profit
-    delta: uint256 = xcp_profit - self.xcp_profit_a
-    frac: uint256 = 10**18 * delta / xcp_profit * self.admin_fee / (2 * 10**10)
+    profit_vprice_ratio: uint256 = 10**18 * xcp_profit / self.virtual_price
+    frac: uint256 = 10**18 * (xcp_profit - self.xcp_profit_a) / xcp_profit * self.admin_fee / (2 * 10**10)
     claimed: uint256 = 0
 
     if frac > 0:
         total_supply: uint256 = CurveToken(token).totalSupply()
         claimed = CurveToken(token).mint_relative(owner, frac)
         total_supply += claimed
-        self.virtual_price = self.get_xcp() * 10**18 / total_supply
+        virtual_price: uint256 = self.get_xcp() * 10**18 / total_supply
+        self.virtual_price = virtual_price
 
-    xcp_profit -= delta
-    self.xcp_profit_a = xcp_profit
-    self.xcp_profit = xcp_profit
+        xcp_profit = virtual_price * profit_vprice_ratio / 10**18
+        self.xcp_profit_a = xcp_profit
+        self.xcp_profit = xcp_profit
 
-    log ClaimAdminFee(owner, claimed)
+        log ClaimAdminFee(owner, claimed)
 
 
 # Admin parameters
