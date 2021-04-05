@@ -4,7 +4,8 @@ from .conftest import INITIAL_PRICES
 from .stateful_base import StatefulBase
 
 
-MAX_SAMPLES = 20
+MAX_SAMPLES = 10
+MAX_COUNT = 100
 MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
 
 
@@ -110,4 +111,4 @@ class NumbaGoUp(StatefulBase):
 
 def test_numba_go_up(crypto_swap, token, chain, accounts, coins, state_machine):
     state_machine(NumbaGoUp, chain, accounts, coins, crypto_swap, token,
-                  settings={'max_examples': MAX_SAMPLES, 'stateful_step_count': 20})
+                  settings={'max_examples': MAX_SAMPLES, 'stateful_step_count': MAX_COUNT})
