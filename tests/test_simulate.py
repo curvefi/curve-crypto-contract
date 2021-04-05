@@ -4,7 +4,7 @@ from .stateful_base import StatefulBase
 from . import simulation_int_many as sim
 
 MAX_SAMPLES = 10
-STEP_COUNT = 20
+STEP_COUNT = 100
 
 
 def approx(x1, x2, precision):

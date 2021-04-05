@@ -171,4 +171,4 @@ def test_price_scale_change(chain, crypto_swap_with_deposit, i, j, coins, accoun
     price_diff = abs(log(price_scale_2[ix-1] / price_scale_1[ix-1]))
     assert abs(log(price_diff / (crypto_swap_with_deposit.adjustment_step() / 1e18))) < 1e-2
 
-    assert crypto_swap_with_deposit.virtual_price() == crypto_swap_with_deposit.get_virtual_price()
+    assert abs(log(crypto_swap_with_deposit.virtual_price() / crypto_swap_with_deposit.get_virtual_price())) < 1e-10
