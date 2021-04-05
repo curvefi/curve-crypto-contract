@@ -80,11 +80,6 @@ event StopRampA:
     current_gamma: uint256
     time: uint256
 
-event Kill:
-    admin: indexed(address)
-    time: uint256
-    is_killed: bool
-
 event ClaimAdminFee:
     admin: indexed(address)
     tokens: uint256
@@ -220,9 +215,9 @@ def __init__(
 @view
 def price_oracle(k: uint256) -> uint256:
     return bitwise_and(
-        bitwise_shift(self.price_oracle_packed, -PRICE_SIZE*k),
+        shift(self.price_oracle_packed, -PRICE_SIZE * convert(k, int128)),
         PRICE_MASK
-    ) * PRECISION_MUL
+    ) * PRICE_PRECISION_MUL
 
 
 @external
@@ -335,16 +330,27 @@ def tweak_price(A: uint256, gamma: uint256,
     # TODO: this can be compressed by having each number being 128 bits
 
     # Update MA if needed
-    price_oracle: uint256[N_COINS-1] = self.price_oracle
+    price_oracle: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+    packed_prices: uint256 = self.price_oracle_packed
+    for k in range(N_COINS-1):
+        price_oracle[k] = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
+        packed_prices = shift(packed_prices, -PRICE_SIZE)
+
     last_prices_timestamp: uint256 = self.last_prices_timestamp
     last_prices: uint256[N_COINS-1] = self.last_prices
     if last_prices_timestamp < block.timestamp:
         # MA update required
         ma_half_time: uint256 = self.ma_half_time
         alpha: uint256 = Math(math).halfpow((block.timestamp - last_prices_timestamp) * 10**18 / ma_half_time, 10**10)
+        packed_prices = 0
         for k in range(N_COINS-1):
             price_oracle[k] = (last_prices[k] * (10**18 - alpha) + price_oracle[k] * alpha) / 10**18
-        self.price_oracle = price_oracle
+        for k in range(N_COINS-1):
+            packed_prices = shift(packed_prices, PRICE_SIZE)
+            p: uint256 = price_oracle[N_COINS-2 - k] / PRICE_PRECISION_MUL
+            assert p < PRICE_MASK
+            packed_prices = bitwise_or(p, packed_prices)
+        self.price_oracle_packed = packed_prices
         self.last_prices_timestamp = block.timestamp
 
     D_unadjusted: uint256 = new_D  # Withdrawal methods know new D already
@@ -397,7 +403,7 @@ def tweak_price(A: uint256, gamma: uint256,
         xcp_profit = old_xcp_profit * virtual_price / old_virtual_price
 
         if virtual_price < old_virtual_price:
-            raise "This causes a loss"
+            raise "Loss"
 
     self.xcp_profit = xcp_profit
 
@@ -469,7 +475,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
     if j > 0:
         dy = dy * PRECISION / price_scale[j-1]
     dy -= self._fee(xp) * dy / 10**10
-    assert dy >= min_dy, "Exchange resulted in fewer coins than expected"
+    assert dy >= min_dy, "Slippage"
 
     self.balances[j] = y0 - dy
     output_coin: address = _coins[j]
@@ -620,7 +626,7 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
         self.virtual_price = 10**18
         self.xcp_profit = 10**18
         assert CurveToken(token).mint(for_address, d_token)
-    assert d_token >= min_mint_amount, "Slippage screwed you"
+    assert d_token >= min_mint_amount, "Slippage"
 
     log AddLiquidity(for_address, amounts, d_token_fee, token_supply)
 
@@ -694,8 +700,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     D: uint256 = self.D
     D0: uint256 = D
     token_supply: uint256 = CurveToken(token).totalSupply()
-    if token_amount > token_supply:
-        raise "amount>supply"
+    assert token_amount <= token_supply  # dev: token amount more than supply
     assert i < N_COINS  # dev: coin out of range
 
     xx: uint256[N_COINS] = self.balances
@@ -986,12 +991,8 @@ def kill_me():
     assert self.kill_deadline > block.timestamp  # dev: deadline has passed
     self.is_killed = True
 
-    log Kill(msg.sender, block.timestamp, True)
-
 
 @external
 def unkill_me():
     assert msg.sender == self.owner  # dev: only owner
     self.is_killed = False
-
-    log Kill(msg.sender, block.timestamp, False)
