@@ -108,7 +108,7 @@ coins: constant(address[N_COINS]) = [
 price_scale_packed: uint256   # Internal price scale
 price_oracle_packed: uint256  # Price target given by MA
 
-last_prices: public(uint256[N_COINS-1])
+last_prices_packed: uint256
 last_prices_timestamp: public(uint256)
 
 initial_A_gamma: public(uint256)
@@ -208,7 +208,7 @@ def __init__(
 
     self.price_scale_packed = packed_prices
     self.price_oracle_packed = packed_prices
-    self.last_prices = initial_prices
+    self.last_prices_packed = packed_prices
     self.last_prices_timestamp = block.timestamp
     self.ma_half_time = ma_half_time
 
@@ -231,6 +231,15 @@ def price_oracle(k: uint256) -> uint256:
 def price_scale(k: uint256) -> uint256:
     return bitwise_and(
         shift(self.price_scale_packed, -PRICE_SIZE * convert(k, int128)),
+        PRICE_MASK
+    ) * PRICE_PRECISION_MUL
+
+
+@external
+@view
+def last_prices(k: uint256) -> uint256:
+    return bitwise_and(
+        shift(self.last_prices_packed, -PRICE_SIZE * convert(k, int128)),
         PRICE_MASK
     ) * PRICE_PRECISION_MUL
 
@@ -364,7 +373,12 @@ def tweak_price(A: uint256, gamma: uint256,
         packed_prices = shift(packed_prices, -PRICE_SIZE)
 
     last_prices_timestamp: uint256 = self.last_prices_timestamp
-    last_prices: uint256[N_COINS-1] = self.last_prices
+    last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+    packed_prices = self.last_prices_packed
+    for k in range(N_COINS-1):
+        last_prices[k] = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
+        packed_prices = shift(packed_prices, -PRICE_SIZE)
+
     if last_prices_timestamp < block.timestamp:
         # MA update required
         ma_half_time: uint256 = self.ma_half_time
@@ -393,11 +407,11 @@ def tweak_price(A: uint256, gamma: uint256,
     if p_i > 0:
         # Save the last price
         if i > 0:
-            self.last_prices[i-1] = p_i
+            last_prices[i-1] = p_i
         else:
             # If 0th price changed - change all prices instead
             for k in range(N_COINS-1):
-                self.last_prices[k] = last_prices[k] * 10**18 / p_i
+                last_prices[k] = last_prices[k] * 10**18 / p_i
     else:
         # calculate real prices
         # it would cost 70k gas for a 3-token pool. Sad. How do we do better?
@@ -405,7 +419,15 @@ def tweak_price(A: uint256, gamma: uint256,
         dx_price: uint256 = __xp[0] / 10**6
         __xp[0] += dx_price
         for k in range(N_COINS-1):
-            self.last_prices[k] = price_scale[k] * dx_price / (_xp[k+1] - Math(math).newton_y(A, gamma, __xp, D_unadjusted, k+1))
+            last_prices[k] = price_scale[k] * dx_price / (_xp[k+1] - Math(math).newton_y(A, gamma, __xp, D_unadjusted, k+1))
+
+    packed_prices = 0
+    for k in range(N_COINS-1):
+        packed_prices = shift(packed_prices, PRICE_SIZE)
+        p: uint256 = last_prices[N_COINS-2 - k] / PRICE_PRECISION_MUL
+        assert p < PRICE_MASK
+        packed_prices = bitwise_or(p, packed_prices)
+    self.last_prices_packed = packed_prices
 
     norm: uint256 = 0
     total_supply: uint256 = CurveToken(token).totalSupply()
@@ -534,7 +556,10 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
     ix: uint256 = j
     if dx > 10**5 and dy > 10**5:
         if i != 0 and j != 0:
-            p = self.last_prices[i-1] * dx / dy
+            p = bitwise_and(
+                shift(self.last_prices_packed, -PRICE_SIZE * convert(i-1, int128)),
+                PRICE_MASK
+            ) * PRICE_PRECISION_MUL * dx / dy
         elif i == 0:
             p = dx * 10**18 / dy
         else:  # j == 0
@@ -641,7 +666,11 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
                     ix = i
             if n_zeros == 2:
                 S: uint256 = 0
-                last_prices: uint256[N_COINS-1] = self.last_prices
+                last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+                packed_prices = self.last_prices_packed
+                for k in range(N_COINS-1):
+                    last_prices[k] = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
+                    packed_prices = shift(packed_prices, -PRICE_SIZE)
                 for i in range(N_COINS):
                     if i != ix:
                         if i == 0:
@@ -738,7 +767,11 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     if (not calc_only) and dy > 10**5 and token_amount > 10**5:
         # p_i = dD / D0 * sum'(p_k * x_k) / (dy - dD / D0 * y0)
         S: uint256 = 0
-        last_prices: uint256[N_COINS-1] = self.last_prices
+        last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+        packed_prices = self.last_prices_packed
+        for k in range(N_COINS-1):
+            last_prices[k] = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
+            packed_prices = shift(packed_prices, -PRICE_SIZE)
         for k in range(N_COINS):
             if k != i:
                 if k == 0:

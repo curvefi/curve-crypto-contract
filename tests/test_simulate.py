@@ -3,7 +3,7 @@ from brownie.test import strategy
 from .stateful_base import StatefulBase
 from . import simulation_int_many as sim
 
-MAX_SAMPLES = 10
+MAX_SAMPLES = 20
 STEP_COUNT = 100
 
 

@@ -6,6 +6,10 @@ from .conftest import INITIAL_PRICES
 MAX_SAMPLES = 50
 
 
+def approx(x1, x2, precision):
+    return abs(log(x1 / x2)) <= precision
+
+
 def test_initial(crypto_swap_with_deposit):
     for i in range(2):
         assert crypto_swap_with_deposit.price_scale(i) == INITIAL_PRICES[i]
@@ -39,13 +43,13 @@ def test_last_price_exchange(crypto_swap_with_deposit, token, coins, accounts, a
 
     if i > 0 and j > 0:
         price_j = crypto_swap_with_deposit.last_prices(i-1) * amount // out
-        assert price_j == crypto_swap_with_deposit.last_prices(j-1)
+        assert approx(price_j, crypto_swap_with_deposit.last_prices(j-1), 2e-10)
     elif i == 0:
         price_j = amount * 10**18 // out
-        assert price_j == crypto_swap_with_deposit.last_prices(j-1)
+        assert approx(price_j, crypto_swap_with_deposit.last_prices(j-1), 2e-10)
     else:  # j == 0
         price_i = out * 10**18 // amount
-        assert price_i == crypto_swap_with_deposit.last_prices(i-1)
+        assert approx(price_i, crypto_swap_with_deposit.last_prices(i-1), 2e-10)
 
 
 @given(
@@ -161,7 +165,7 @@ def test_price_scale_change(chain, crypto_swap_with_deposit, i, j, coins, accoun
         ix = j
         out_price = amount * prices1[i] // out
 
-    assert out_price == prices2[ix-1]
+    assert approx(out_price, prices2[ix-1], 2e-10)
     chain.sleep(t)
 
     coins[0]._mint_for_testing(user, 10**18)
@@ -171,4 +175,4 @@ def test_price_scale_change(chain, crypto_swap_with_deposit, i, j, coins, accoun
     price_diff = abs(log(price_scale_2[ix-1] / price_scale_1[ix-1]))
     assert abs(log(price_diff / (crypto_swap_with_deposit.adjustment_step() / 1e18))) < 1e-2
 
-    assert abs(log(crypto_swap_with_deposit.virtual_price() / crypto_swap_with_deposit.get_virtual_price())) < 1e-10
+    assert approx(crypto_swap_with_deposit.virtual_price(), crypto_swap_with_deposit.get_virtual_price(), 1e-10)
