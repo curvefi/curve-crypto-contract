@@ -9,6 +9,11 @@ def crypto_math(CurveCryptoMath3, accounts):
     yield CurveCryptoMath3.deploy({'from': accounts[0]})
 
 
+@pytest.fixture(scope="module", autouse=True)
+def crypto_views(CurveCryptoViews3, crypto_math, accounts):
+    yield CurveCryptoViews3.deploy(crypto_math, {'from': accounts[0]})
+
+
 @pytest.fixture(scope="function", autouse=True)
 def token(CurveTokenV4, accounts):
     yield CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", {"from": accounts[0]})
@@ -21,13 +26,14 @@ def coins(ERC20Mock, accounts):
 
 
 @pytest.fixture(scope="function", autouse=True)
-def compiled_swap(crypto_math, token, coins):
+def compiled_swap(crypto_math, token, crypto_views, coins):
     from brownie import CurveCryptoSwap
     path = CurveCryptoSwap._sources.get_source_path('CurveCryptoSwap')
     with open(path, 'r') as f:
         source = f.read()
         source = source.replace("0x0000000000000000000000000000000000000000", crypto_math.address)
         source = source.replace("0x0000000000000000000000000000000000000001", token.address)
+        source = source.replace("0x0000000000000000000000000000000000000002", crypto_views.address)
         source = source.replace("0x0000000000000000000000000000000000000010", coins[0].address)
         source = source.replace("0x0000000000000000000000000000000000000011", coins[1].address)
         source = source.replace("0x0000000000000000000000000000000000000012", coins[2].address)

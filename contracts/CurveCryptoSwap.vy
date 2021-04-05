@@ -19,6 +19,11 @@ interface Math:
     def sqrt_int(x: uint256) -> uint256: view
 
 
+interface Views:
+    def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256: view
+    def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256: view
+
+
 # Events
 event TokenExchange:
     buyer: indexed(address)
@@ -93,6 +98,7 @@ A_MULTIPLIER: constant(uint256) = 100
 # These addresses are replaced by the deployer
 math: constant(address) = 0x0000000000000000000000000000000000000000
 token: constant(address) = 0x0000000000000000000000000000000000000001
+views: constant(address) = 0x0000000000000000000000000000000000000002
 coins: constant(address[N_COINS]) = [
     0x0000000000000000000000000000000000000010,
     0x0000000000000000000000000000000000000011,
@@ -304,6 +310,12 @@ def fee() -> uint256:
     return self._fee(self.xp())
 
 
+@external
+@view
+def fee_calc(xp: uint256[N_COINS]) -> uint256:
+    return self._fee(xp)
+
+
 @internal
 @view
 def get_xcp(_D: uint256 = 0) -> uint256:
@@ -507,28 +519,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
 @external
 @view
 def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
-    assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
-    assert dx > 0  # dev: do not exchange 0 coins
-
-    price_scale: uint256[N_COINS-1] = self.price_scale
-    xp: uint256[N_COINS] = self.balances
-    y0: uint256 = xp[j]
-    xp[i] += dx
-    for k in range(N_COINS-1):
-        xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
-
-    A: uint256 = 0
-    gamma: uint256 = 0
-    A, gamma = self._A_gamma()
-
-    y: uint256 = Math(math).newton_y(A, gamma, xp, self.D, j)
-    dy: uint256 = xp[j] - y - 1
-    xp[j] = y
-    if j > 0:
-        dy = dy * PRECISION / price_scale[j-1]
-    dy -= self._fee(xp) * dy / 10**10
-
-    return dy
+    return Views(views).get_dy(i, j, dx)
 
 
 @view
@@ -546,6 +537,12 @@ def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
         else:
             Sdiff += avg - _x
     return self._fee(xp) * N_COINS / (4 * (N_COINS-1)) * Sdiff / S + NOISE_FEE
+
+
+@external
+@view
+def calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
+    return self._calc_token_fee(amounts, xp)
 
 
 @internal
@@ -667,30 +664,7 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS],
 @view
 @external
 def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
-    token_supply: uint256 = CurveToken(token).totalSupply()
-    xp: uint256[N_COINS] = self.balances
-    amountsp: uint256[N_COINS] = amounts
-    if deposit:
-        for k in range(N_COINS):
-            xp[k] += amounts[k]
-    else:
-        for k in range(N_COINS):
-            xp[k] -= amounts[k]
-    for k in range(N_COINS-1):
-        p: uint256 = self.price_scale[k]
-        xp[k+1] = xp[k+1] * p / PRECISION
-        amountsp[k+1] = amountsp[k+1] * p / PRECISION
-    A: uint256 = 0
-    gamma: uint256 = 0
-    A, gamma = self._A_gamma()
-    D: uint256 = Math(math).newton_D(A, gamma, xp)
-    d_token: uint256 = token_supply * D / self.D
-    if deposit:
-        d_token -= token_supply
-    else:
-        d_token = token_supply - d_token
-    d_token -= self._calc_token_fee(amountsp, xp) * d_token / 10**10 + 1
-    return d_token
+    return Views(views).calc_token_amount(amounts, deposit)
 
 
 @internal

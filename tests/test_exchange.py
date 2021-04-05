@@ -15,9 +15,9 @@ def test_exchange(crypto_swap_with_deposit, token, coins, accounts, amount, i, j
     user = accounts[1]
 
     if i == j or i > 2 or j > 2:
-        with brownie.reverts("dev: coin index out of range"):
+        with brownie.reverts():
             crypto_swap_with_deposit.get_dy(i, j, 10**6)
-        with brownie.reverts("dev: coin index out of range"):
+        with brownie.reverts():
             crypto_swap_with_deposit.exchange(i, j, 10**6, 0, {'from': user})
 
     else:
