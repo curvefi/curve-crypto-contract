@@ -21,20 +21,21 @@ class StatefulBase:
         self.chain = chain
         self.token = token
 
-    def setup(self):
+    def setup(self, user_id=0):
         self.user_balances = {u: [0] * 3 for u in self.accounts}
         self.initial_deposit = [10**4 * 10**36 // p for p in [10**18] + INITIAL_PRICES]  # $10k * 3
         self.initial_prices = [10**18] + INITIAL_PRICES
-        user = self.accounts[0]
+        user = self.accounts[user_id]
 
         for coin, q in zip(self.coins, self.initial_deposit):
             coin._mint_for_testing(user, q)
             coin.approve(self.swap, 2**256-1, {'from': user})
 
         # Inf approve all, too. Not always that's the best way though
-        for u in self.accounts[1:]:
-            for coin in self.coins:
-                coin.approve(self.swap, 2**256-1, {'from': u})
+        for u in self.accounts:
+            if u != user:
+                for coin in self.coins:
+                    coin.approve(self.swap, 2**256-1, {'from': u})
 
         # Very first deposit
         self.swap.add_liquidity(self.initial_deposit, 0, {'from': user})
