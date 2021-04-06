@@ -359,7 +359,7 @@ def get_xcp(_D: uint256 = 0) -> uint256:
 @external
 @view
 def get_virtual_price() -> uint256:
-    return (N_COINS * 10**18) * self.get_xcp() / CurveToken(token).totalSupply()
+    return 10**18 * self.get_xcp() / CurveToken(token).totalSupply()
 
 
 @internal
@@ -455,7 +455,7 @@ def tweak_price(A: uint256, gamma: uint256,
 
     if old_virtual_price > 0:
         xcp: uint256 = Math(math).geometric_mean(xp)
-        virtual_price = (N_COINS * 10**18) * xcp / total_supply
+        virtual_price = 10**18 * xcp / total_supply
         xcp_profit = old_xcp_profit * virtual_price / old_virtual_price
 
         if virtual_price < old_virtual_price:
@@ -484,7 +484,7 @@ def tweak_price(A: uint256, gamma: uint256,
         for k in range(N_COINS-1):
             xp[k+1] = D * 10**18 / (N_COINS * p_new[k])
         # We reuse old_virtual_price here but it's not old anymore
-        old_virtual_price = (N_COINS * 10**18) * Math(math).geometric_mean(xp) / total_supply
+        old_virtual_price = 10**18 * Math(math).geometric_mean(xp) / total_supply
 
         # Proceed if we've got enough profit
         if (old_virtual_price > 10**18) and (2 * (old_virtual_price - 10**18) > xcp_profit - 10**18):
@@ -645,7 +645,7 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
     if old_D > 0:
         d_token = token_supply * D / old_D - token_supply
     else:
-        d_token = N_COINS * self.get_xcp(D)  # making initial virtual price equal to 1
+        d_token = self.get_xcp(D)  # making initial virtual price equal to 1
     assert d_token > 0  # dev: nothing minted
 
     d_token_fee: uint256 = 0
@@ -836,7 +836,7 @@ def claim_admin_fees():
         total_supply: uint256 = CurveToken(token).totalSupply()
         claimed = CurveToken(token).mint_relative(owner, frac)
         total_supply += claimed
-        virtual_price: uint256 = (N_COINS * 10**18) * self.get_xcp() / total_supply
+        virtual_price: uint256 = 10**18 * self.get_xcp() / total_supply
         self.virtual_price = virtual_price
 
         xcp_profit = virtual_price * profit_vprice_ratio / 10**18

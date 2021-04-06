@@ -25,6 +25,9 @@ class StatefulAdmin(StatefulBase):
         self.chain.sleep(3 * 86400 + 1)
         self.swap.apply_new_parameters({'from': admin})
         assert self.swap.admin_fee() == 5 * 10**9
+        self.mid_fee = self.swap.mid_fee()
+        self.out_fee = self.swap.out_fee()
+        self.admin_fee = 5 * 10**9
 
     def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user):
         if exchange_i > 0:
@@ -32,7 +35,7 @@ class StatefulAdmin(StatefulBase):
         else:
             exchange_amount_in_converted = exchange_amount_in
         if super().rule_exchange(exchange_amount_in_converted, exchange_i, exchange_j, user):
-            self.vol += exchange_amount_in
+            self.vol += exchange_amount_in * self.swap.virtual_price() // 10**18
 
     def rule_claim_admin_fees(self):
         balance = self.token.balanceOf(self.accounts[0])
@@ -42,6 +45,15 @@ class StatefulAdmin(StatefulBase):
             self.xcp_profit = self.xcp_profit * self.total_supply // (self.total_supply + balance)
             self.total_supply += balance
             assert self.vol > 0
+
+            prices = [10**18] + [self.swap.price_scale(i) for i in range(2)]
+
+            measured_profit = self.token.balanceOf(self.accounts[0]) * sum(self.swap.balances(i) * prices[i] // 10**18 for i in range(3)) // self.total_supply
+            min_profit = self.vol * self.mid_fee // 10**10 * self.admin_fee // 10**10 // 2
+            max_profit = self.vol * self.out_fee // 10**10 * self.admin_fee // 10**10 // 2
+            # USD prices change a little bit, so we accommodate for that here
+            assert measured_profit >= min_profit * 0.9
+            assert measured_profit <= max_profit * 1.1
 
 
 def test_admin(crypto_swap, token, chain, accounts, coins, state_machine):
