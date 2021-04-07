@@ -1,14 +1,19 @@
 from .stateful_base import StatefulBase
+from math import log
 from brownie.test import strategy
 
 MAX_SAMPLES = 20
-STEP_COUNT = 70
+STEP_COUNT = 100
 NO_CHANGE = 2**256-1
+
+
+def approx(x1, x2, precision):
+    return abs(log(x1 / x2)) <= precision
 
 
 class StatefulAdmin(StatefulBase):
     exchange_amount_in = strategy('uint256', min_value=10**17, max_value=10**5 * 10**18)
-    vol = 0
+    all_profit = 1.0
 
     def setup(self):
         super().setup(user_id=1)
@@ -30,12 +35,14 @@ class StatefulAdmin(StatefulBase):
         self.admin_fee = 5 * 10**9
 
     def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user):
+        p = self.swap.xcp_profit()
         if exchange_i > 0:
             exchange_amount_in_converted = exchange_amount_in * 10**18 // self.swap.price_oracle(exchange_i - 1)
         else:
             exchange_amount_in_converted = exchange_amount_in
         if super().rule_exchange(exchange_amount_in_converted, exchange_i, exchange_j, user):
-            self.vol += exchange_amount_in * self.swap.virtual_price() // 10**18
+            p = self.swap.xcp_profit() / p
+            self.all_profit *= p
 
     def rule_claim_admin_fees(self):
         balance = self.token.balanceOf(self.accounts[0])
@@ -44,16 +51,8 @@ class StatefulAdmin(StatefulBase):
         if balance > 0:
             self.xcp_profit = self.swap.xcp_profit()
             self.total_supply += balance
-            assert self.vol > 0
-
-            prices = [10**18] + [self.swap.price_scale(i) for i in range(2)]
-
-            measured_profit = self.token.balanceOf(self.accounts[0]) * sum(self.swap.balances(i) * prices[i] // 10**18 for i in range(3)) // self.total_supply
-            min_profit = self.vol * self.mid_fee // 10**10 * self.admin_fee // 10**10 // 2
-            max_profit = self.vol * self.out_fee // 10**10 * self.admin_fee // 10**10 // 2
-            # USD prices change a little bit, so we accommodate for that here
-            assert measured_profit >= min_profit * 0.9
-            assert measured_profit <= max_profit * 1.1
+            measured_profit = self.token.balanceOf(self.accounts[0]) / self.total_supply
+            assert approx(measured_profit, (self.all_profit - 1) / 4, 0.05)
 
 
 def test_admin(crypto_swap, token, chain, accounts, coins, state_machine):
