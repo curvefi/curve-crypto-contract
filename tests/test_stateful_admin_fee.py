@@ -2,7 +2,7 @@ from .stateful_base import StatefulBase
 from brownie.test import strategy
 
 MAX_SAMPLES = 20
-STEP_COUNT = 20
+STEP_COUNT = 70
 NO_CHANGE = 2**256-1
 
 
@@ -42,7 +42,7 @@ class StatefulAdmin(StatefulBase):
         self.swap.claim_admin_fees()
         balance = self.token.balanceOf(self.accounts[0]) - balance
         if balance > 0:
-            self.xcp_profit = self.xcp_profit * self.total_supply // (self.total_supply + balance)
+            self.xcp_profit = self.swap.xcp_profit()
             self.total_supply += balance
             assert self.vol > 0
 
