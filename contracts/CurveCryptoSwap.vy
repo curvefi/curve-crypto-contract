@@ -514,45 +514,47 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
     assert not self.is_killed  # dev: the pool is killed
     assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
     assert dx > 0  # dev: do not exchange 0 coins
-    _coins: address[N_COINS] = coins
-
-    input_coin: address = _coins[i]
-    assert ERC20(input_coin).transferFrom(msg.sender, self, dx)
-
-    packed_prices: uint256 = self.price_scale_packed
-    price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
-    for k in range(N_COINS-1):
-        price_scale[k] = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
-        packed_prices = shift(packed_prices, -PRICE_SIZE)
-
-    xp: uint256[N_COINS] = self.balances
-    y0: uint256 = xp[j]
-    xp[i] += dx
-    self.balances[i] = xp[i]
-    for k in range(N_COINS-1):
-        xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
 
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
 
-    y: uint256 = Math(math).newton_y(A, gamma, xp, self.D, j)
-    dy: uint256 = xp[j] - y - 1
-    xp[j] = y
+    _coins: address[N_COINS] = coins
+
+    assert ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
+
+    price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+    if True:  # scope to clear packed_prices
+        packed_prices: uint256 = self.price_scale_packed
+        for k in range(N_COINS-1):
+            price_scale[k] = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
+            packed_prices = shift(packed_prices, -PRICE_SIZE)
+
+    xp: uint256[N_COINS] = self.balances
+    y: uint256 = xp[j]
+    xp[i] += dx
+    self.balances[i] = xp[i]
+    for k in range(N_COINS-1):
+        xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
+
+    dy: uint256 = xp[j] - Math(math).newton_y(A, gamma, xp, self.D, j)
+    # Not defining new "y" here to have less variables / make subsequent calls cheaper
+    xp[j] -= dy
+    dy -= 1
+
     if j > 0:
         dy = dy * PRECISION / price_scale[j-1]
     dy -= self._fee(xp) * dy / 10**10
     assert dy >= min_dy, "Slippage"
+    y -= dy
 
-    self.balances[j] = y0 - dy
-    output_coin: address = _coins[j]
-    assert ERC20(output_coin).transfer(_for, dy)
+    self.balances[j] = y
+    assert ERC20(_coins[j]).transfer(_for, dy)
 
     if j == 0:
-        xp[0] = y0 - dy
+        xp[0] = y
     else:
-        xp[j] = (y0 - dy) * price_scale[j-1] / PRECISION
-
+        xp[j] = y * price_scale[j-1] / PRECISION
 
     # Calculate price
     p: uint256 = 0
