@@ -584,6 +584,7 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
 @internal
 def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
     # fee = sum(amounts_i - avg(amounts)) * fee' / sum(amounts)
+    fee: uint256 = self._fee(xp) * N_COINS / (4 * (N_COINS-1))
     S: uint256 = 0
     for _x in amounts:
         S += _x
@@ -594,7 +595,7 @@ def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
             Sdiff += _x - avg
         else:
             Sdiff += avg - _x
-    return self._fee(xp) * N_COINS / (4 * (N_COINS-1)) * Sdiff / S + NOISE_FEE
+    return fee * Sdiff / S + NOISE_FEE
 
 
 @external
