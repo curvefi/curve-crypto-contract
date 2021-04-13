@@ -604,19 +604,27 @@ def calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
     return self._calc_token_fee(amounts, xp)
 
 
-@internal
-def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
-                   from_address: address, for_address: address):
+
+
+@external
+@nonreentrant('lock')
+def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
+                  _for: address = msg.sender):
     assert not self.is_killed  # dev: the pool is killed
+
+    A: uint256 = 0
+    gamma: uint256 = 0
+    A, gamma = self._A_gamma()
+
     _coins: address[N_COINS] = coins
 
-    n_coins_added: uint256 = 0
-    if from_address != self:
+    if True:  # Scope to avoid having an extra variable later
+        n_coins_added: uint256 = 0
         for i in range(N_COINS):
             if amounts[i] > 0:
-                assert ERC20(_coins[i]).transferFrom(from_address, self, amounts[i])
+                assert ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
                 n_coins_added += 1
-    assert n_coins_added > 0  # dev: no coins to add
+        assert n_coins_added > 0  # dev: no coins to add
 
     packed_prices: uint256 = self.price_scale_packed
     price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
@@ -634,9 +642,6 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
     for i in range(N_COINS-1):
         xp[i+1] = xp[i+1] * price_scale[i] / PRECISION
         amountsp[i+1] = amountsp[i+1] * price_scale[i] / PRECISION
-    A: uint256 = 0
-    gamma: uint256 = 0
-    A, gamma = self._A_gamma()
 
     D: uint256 = Math(math).newton_D(A, gamma, xp)
 
@@ -654,7 +659,7 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
         d_token_fee = self._calc_token_fee(amountsp, xp) * d_token / 10**10 + 1
         d_token -= d_token_fee
         token_supply += d_token
-        assert CurveToken(token).mint(for_address, d_token)
+        assert CurveToken(token).mint(_for, d_token)
 
         # Calculate price
         # p_i * (dx_i - dtoken / token_supply * xx_i) = sum{k!=i}(p_k * (dtoken / token_supply * xx_k - dx_k))
@@ -690,17 +695,11 @@ def _add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
         self.D = D
         self.virtual_price = 10**18
         self.xcp_profit = 10**18
-        assert CurveToken(token).mint(for_address, d_token)
+        assert CurveToken(token).mint(_for, d_token)
+
     assert d_token >= min_mint_amount, "Slippage"
 
-    log AddLiquidity(for_address, amounts, d_token_fee, token_supply)
-
-
-@external
-@nonreentrant('lock')
-def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
-                  _for: address = msg.sender):
-    self._add_liquidity(amounts, min_mint_amount, msg.sender, _for)
+    log AddLiquidity(_for, amounts, d_token_fee, token_supply)
 
 
 @external
