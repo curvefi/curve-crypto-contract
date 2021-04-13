@@ -343,16 +343,17 @@ def fee_calc(xp: uint256[N_COINS]) -> uint256:
 @internal
 @view
 def get_xcp(_D: uint256 = 0) -> uint256:
-    D: uint256 = _D
-    if D == 0:
-        D = self.D
     x: uint256[N_COINS] = empty(uint256[N_COINS])
-    x[0] = D / N_COINS
-    packed_prices: uint256 = self.price_scale_packed
-    for i in range(N_COINS-1):
-        p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
-        x[i+1] = D * 10**18 / (N_COINS * p)
-        packed_prices = shift(packed_prices, -PRICE_SIZE)
+    if True:  # Remove unneeded variables from memory before the call
+        D: uint256 = _D
+        if D == 0:
+            D = self.D
+        x[0] = D / N_COINS
+        packed_prices: uint256 = self.price_scale_packed
+        for i in range(N_COINS-1):
+            p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
+            x[i+1] = D * 10**18 / (N_COINS * p)
+            packed_prices = shift(packed_prices, -PRICE_SIZE)
     return Math(math).geometric_mean(x)
 
 
@@ -602,8 +603,6 @@ def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
 @view
 def calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
     return self._calc_token_fee(amounts, xp)
-
-
 
 
 @external
