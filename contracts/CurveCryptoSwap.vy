@@ -618,7 +618,11 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
 
     _coins: address[N_COINS] = coins
 
-    if True:  # Scope to avoid having an extra variable later
+    xp: uint256[N_COINS] = self.balances
+    amountsp: uint256[N_COINS] = amounts
+    xx: uint256[N_COINS] = empty(uint256[N_COINS])
+
+    if True:  # Scope to avoid having extra variables in memory later
         n_coins_added: uint256 = 0
         for i in range(N_COINS):
             if amounts[i] > 0:
@@ -626,22 +630,18 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
                 n_coins_added += 1
         assert n_coins_added > 0  # dev: no coins to add
 
-    packed_prices: uint256 = self.price_scale_packed
-    price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
-    for k in range(N_COINS-1):
-        price_scale[k] = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
-        packed_prices = shift(packed_prices, -PRICE_SIZE)
+        for i in range(N_COINS):
+            bal: uint256 = xp[i] + amounts[i]
+            xp[i] = bal
+            self.balances[i] = bal
+        xx = xp
 
-    xp: uint256[N_COINS] = self.balances
-    amountsp: uint256[N_COINS] = amounts
-    for i in range(N_COINS):
-        bal: uint256 = xp[i] + amounts[i]
-        xp[i] = bal
-        self.balances[i] = bal
-    xx: uint256[N_COINS] = xp
-    for i in range(N_COINS-1):
-        xp[i+1] = xp[i+1] * price_scale[i] / PRECISION
-        amountsp[i+1] = amountsp[i+1] * price_scale[i] / PRECISION
+        packed_prices: uint256 = self.price_scale_packed
+        for i in range(N_COINS-1):
+            price_scale: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
+            xp[i+1] = xp[i+1] * price_scale / PRECISION
+            amountsp[i+1] = amountsp[i+1] * price_scale / PRECISION
+            packed_prices = shift(packed_prices, -PRICE_SIZE)
 
     D: uint256 = Math(math).newton_D(A, gamma, xp)
 
@@ -673,10 +673,10 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
                     n_zeros += 1
                 else:
                     ix = i
-            if n_zeros == 2:
+            if n_zeros == N_COINS-1:
                 S: uint256 = 0
                 last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
-                packed_prices = self.last_prices_packed
+                packed_prices: uint256 = self.last_prices_packed
                 for k in range(N_COINS-1):
                     last_prices[k] = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
                     packed_prices = shift(packed_prices, -PRICE_SIZE)
