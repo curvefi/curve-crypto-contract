@@ -46,6 +46,7 @@ event RemoveLiquidity:
 event RemoveLiquidityOne:
     provider: indexed(address)
     token_amount: uint256
+    coin_index: uint256
     coin_amount: uint256
 
 event CommitNewAdmin:
@@ -746,21 +747,24 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     xx: uint256[N_COINS] = self.balances
     xp: uint256[N_COINS] = xx
 
-    packed_prices: uint256 = self.price_scale_packed
-    price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
-    for k in range(N_COINS-1):
-        p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
-        price_scale[k] = p
-        xp[k+1] = xp[k+1] * p / PRECISION
-        packed_prices = shift(packed_prices, -PRICE_SIZE)
+    price_scale_i: uint256 = 0
+    if True:  # To remove oacked_prices from memory
+        packed_prices: uint256 = self.price_scale_packed
+        for k in range(N_COINS-1):
+            p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
+            if i == k+1:
+                price_scale_i = p
+            xp[k+1] = xp[k+1] * p / PRECISION
+            packed_prices = shift(packed_prices, -PRICE_SIZE)
 
     # Charge the fee on D, not on y, e.g. reducing invariant LESS than charging the user
+    fee: uint256 = self._fee(xp)
     dD: uint256 = token_amount * D / token_supply
-    D -= (dD - (self._fee(xp) * dD / (2 * 10**10) + 1))
+    D -= (dD - (fee * dD / (2 * 10**10) + 1))
     y: uint256 = Math(math).newton_y(A, gamma, xp, D, i)
     dy: uint256 = y
     if i > 0:
-        dy = dy * PRECISION / price_scale[i-1]
+        dy = dy * PRECISION / price_scale_i
     dy = xx[i] - dy
     xp[i] = y
 
@@ -770,7 +774,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
         # p_i = dD / D0 * sum'(p_k * x_k) / (dy - dD / D0 * y0)
         S: uint256 = 0
         last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
-        packed_prices = self.last_prices_packed
+        packed_prices: uint256 = self.last_prices_packed
         for k in range(N_COINS-1):
             last_prices[k] = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
             packed_prices = shift(packed_prices, -PRICE_SIZE)
@@ -800,7 +804,6 @@ def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
 def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256,
                               _for: address = msg.sender):
     assert not self.is_killed  # dev: the pool is killed
-    _coins: address[N_COINS] = coins
 
     A: uint256 = 0
     gamma: uint256 = 0
@@ -815,11 +818,13 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
     self.balances[i] -= dy
     assert CurveToken(token).burnFrom(msg.sender, token_amount)
-    assert ERC20(_coins[i]).transfer(_for, dy)
+    if True:  # Remove _coins from the scope
+        _coins: address[N_COINS] = coins
+        assert ERC20(_coins[i]).transfer(_for, dy)
 
     self.tweak_price(A, gamma, xp, i, p, D)
 
-    log RemoveLiquidityOne(msg.sender, token_amount, dy)
+    log RemoveLiquidityOne(msg.sender, token_amount, i, dy)
 
 
 @external
