@@ -366,8 +366,6 @@ def get_virtual_price() -> uint256:
 def tweak_price(A: uint256, gamma: uint256,
                 _xp: uint256[N_COINS], i: uint256, p_i: uint256,
                 new_D: uint256 = 0):
-    # TODO: this can be compressed by having each number being 128 bits
-
     # Update MA if needed
     price_oracle: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
     packed_prices: uint256 = self.price_oracle_packed
