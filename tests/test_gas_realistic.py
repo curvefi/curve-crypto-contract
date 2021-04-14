@@ -2,13 +2,13 @@ import pytest
 from .stateful_base import StatefulBase
 from brownie.test import strategy
 
-MAX_SAMPLES = 20
+MAX_SAMPLES = 40
 STEP_COUNT = 50
 
 
 class StatefulGas(StatefulBase):
-    exchange_amount_in = strategy('uint256', min_value=10 * 10**18, max_value=1000 * 10**18)
-    deposit_amount = strategy('uint256', min_value=10 * 10**18, max_value=1000 * 10**18)
+    exchange_amount_in = strategy('uint256', min_value=10 * 10**18, max_value=100 * 10**18)
+    deposit_amount = strategy('uint256', min_value=10 * 10**18, max_value=100 * 10**18)
     token_fraction = strategy('uint256', min_value=10**14, max_value=5 * 10**16)
     sleep_time = strategy('uint256', max_value=100)
 
