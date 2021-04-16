@@ -37,7 +37,7 @@ def compiled_swap(crypto_math, token, crypto_views, coins):
         source = source.replace("0x0000000000000000000000000000000000000010", coins[0].address)
         source = source.replace("0x0000000000000000000000000000000000000011", coins[1].address)
         source = source.replace("0x0000000000000000000000000000000000000012", coins[2].address)
-    return compile_source(source).Vyper
+    return compile_source(source, vyper_version='0.2.12').Vyper
 
 
 @pytest.fixture(scope="function", autouse=True)
