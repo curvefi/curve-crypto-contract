@@ -827,8 +827,8 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     log RemoveLiquidityOne(msg.sender, token_amount, i, dy)
 
 
-@external
-def claim_admin_fees():
+@internal
+def _claim_admin_fees():
     owner: address = self.owner
 
     xcp_profit: uint256 = self.xcp_profit
@@ -848,6 +848,11 @@ def claim_admin_fees():
         self.xcp_profit = xcp_profit
 
         log ClaimAdminFee(owner, claimed)
+
+
+@external
+def claim_admin_fees():
+    self._claim_admin_fees()
 
 
 # Admin parameters
@@ -980,7 +985,10 @@ def apply_new_parameters():
     self.admin_actions_deadline = 0
 
     admin_fee: uint256 = self.future_admin_fee
-    self.admin_fee = admin_fee
+    if self.admin_fee != admin_fee:
+        self._claim_admin_fees()
+        self.admin_fee = admin_fee
+
     mid_fee: uint256 = self.future_mid_fee
     self.mid_fee = mid_fee
     out_fee: uint256 = self.future_out_fee
