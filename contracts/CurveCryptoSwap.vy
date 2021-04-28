@@ -221,7 +221,7 @@ def __init__(
 @external
 @view
 def price_oracle(k: uint256) -> uint256:
-    assert k < N_COINS
+    assert k < N_COINS-1
     return bitwise_and(
         shift(self.price_oracle_packed, -PRICE_SIZE * convert(k, int128)),
         PRICE_MASK
@@ -231,7 +231,7 @@ def price_oracle(k: uint256) -> uint256:
 @external
 @view
 def price_scale(k: uint256) -> uint256:
-    assert k < N_COINS
+    assert k < N_COINS-1
     return bitwise_and(
         shift(self.price_scale_packed, -PRICE_SIZE * convert(k, int128)),
         PRICE_MASK
@@ -241,7 +241,7 @@ def price_scale(k: uint256) -> uint256:
 @external
 @view
 def last_prices(k: uint256) -> uint256:
-    assert k < N_COINS
+    assert k < N_COINS-1
     return bitwise_and(
         shift(self.last_prices_packed, -PRICE_SIZE * convert(k, int128)),
         PRICE_MASK
