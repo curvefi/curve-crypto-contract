@@ -62,9 +62,9 @@ def geometric_mean(unsorted_x: uint256[N_COINS], sort: bool = True) -> uint256:
 
 @external
 @view
-def reduction_coefficient(x: uint256[N_COINS], gamma: uint256) -> uint256:
+def reduction_coefficient(x: uint256[N_COINS], fee_gamma: uint256) -> uint256:
     """
-    gamma / (gamma + (1 - K))
+    fee_gamma / (fee_gamma + (1 - K))
     where
     K = prod(x) / (sum(x) / N)**N
     (all normalized to 1e18)
@@ -77,8 +77,8 @@ def reduction_coefficient(x: uint256[N_COINS], gamma: uint256) -> uint256:
     # so that is not so important
     for x_i in x:
         K = K * N_COINS * x_i / S
-    if gamma > 0:
-        K = gamma * 10**18 / (gamma + 10**18 - K)
+    if fee_gamma > 0:
+        K = fee_gamma * 10**18 / (fee_gamma + 10**18 - K)
     return K
 
 

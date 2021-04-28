@@ -12,7 +12,7 @@ interface CurveToken:
 
 interface Math:
     def geometric_mean(unsorted_x: uint256[N_COINS]) -> uint256: view
-    def reduction_coefficient(x: uint256[N_COINS], gamma: uint256) -> uint256: view
+    def reduction_coefficient(x: uint256[N_COINS], fee_gamma: uint256) -> uint256: view
     def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint256: view
     def newton_y(ANN: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: uint256) -> uint256: view
     def halfpow(power: uint256, precision: uint256) -> uint256: view
