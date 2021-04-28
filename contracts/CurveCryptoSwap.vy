@@ -837,9 +837,8 @@ def _claim_admin_fees():
 
     if fees > 0:
         frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
-        total_supply: uint256 = CurveToken(token).totalSupply()
         claimed: uint256 = CurveToken(token).mint_relative(owner, frac)
-        total_supply += claimed
+        total_supply: uint256 = CurveToken(token).totalSupply()
         new_vprice: uint256 = 10**18 * self.get_xcp() / total_supply
         self.virtual_price = new_vprice
 
