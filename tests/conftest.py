@@ -14,18 +14,18 @@ def crypto_views(CurveCryptoViews3, crypto_math, accounts):
     yield CurveCryptoViews3.deploy(crypto_math, {'from': accounts[0]})
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def token(CurveTokenV4, accounts):
     yield CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", {"from": accounts[0]})
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def coins(ERC20Mock, accounts):
     yield [ERC20Mock.deploy(name, name, 18, {"from": accounts[0]})
            for name in ['USD', 'BTC', 'ETH']]
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def compiled_swap(crypto_math, token, crypto_views, coins):
     from brownie import CurveCryptoSwap
     path = CurveCryptoSwap._sources.get_source_path('CurveCryptoSwap')
@@ -40,7 +40,7 @@ def compiled_swap(crypto_math, token, crypto_views, coins):
     return compile_source(source, vyper_version='0.2.12').Vyper
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def crypto_swap(compiled_swap, token, accounts):
     swap = compiled_swap.deploy(
             accounts[0],
@@ -60,7 +60,7 @@ def crypto_swap(compiled_swap, token, accounts):
     return swap
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def crypto_swap_with_deposit(crypto_swap, coins, accounts):
     user = accounts[1]
     quantities = [10**6 * 10**36 // p for p in [10**18] + INITIAL_PRICES]  # $3M worth
