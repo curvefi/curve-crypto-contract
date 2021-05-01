@@ -172,6 +172,11 @@ PRICE_MASK: constant(uint256) = 2**PRICE_SIZE - 1
 # N_COINS = 3 -> 1  (10**18 -> 10**18)
 # N_COINS = 4 -> 10**8  (10**18 -> 10**10)
 PRICE_PRECISION_MUL: constant(uint256) = 1
+PRECISIONS: constant(uint256[N_COINS]) = [
+    1,#0
+    1,#1
+    1,#2
+]
 
 
 @external
