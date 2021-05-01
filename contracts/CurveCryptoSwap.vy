@@ -768,7 +768,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     xx: uint256[N_COINS] = self.balances
     xp: uint256[N_COINS] = PRECISIONS
 
-    price_scale_i: uint256 = xp[0]
+    price_scale_i: uint256 = PRECISION * xp[0]
     if True:  # To remove oacked_prices from memory
         packed_prices: uint256 = self.price_scale_packed
         xp[0] *= xx[0]
