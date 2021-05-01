@@ -276,11 +276,15 @@ def coins(i: uint256) -> address:
 def xp() -> uint256[N_COINS]:
     result: uint256[N_COINS] = self.balances
     packed_prices: uint256 = self.price_scale_packed
-    # PRECISION_MUL is already contained in self.price_scale
+
+    precisions: uint256[N_COINS] = PRECISIONS
+
+    result[0] *= precisions[0]
     for i in range(N_COINS-1):
-        p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
+        p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL * precisions[i+1]
         result[i+1] = result[i+1] * p / PRECISION
         packed_prices = shift(packed_prices, -PRICE_SIZE)
+
     return result
 
 
@@ -361,6 +365,8 @@ def get_xcp(_D: uint256 = 0) -> uint256:
             D = self.D
         x[0] = D / N_COINS
         packed_prices: uint256 = self.price_scale_packed
+        # No precisions here because we don't switch to "real" units
+
         for i in range(N_COINS-1):
             p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
             x[i+1] = D * 10**18 / (N_COINS * p)
@@ -544,8 +550,10 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
     y: uint256 = xp[j]
     xp[i] += dx
     self.balances[i] = xp[i]
+    precisions: uint256[N_COINS] = PRECISIONS
+    xp[0] *= precisions[0]
     for k in range(N_COINS-1):
-        xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
+        xp[k+1] = xp[k+1] * price_scale[k] * precisions[k+1] / PRECISION
 
     dy: uint256 = xp[j] - Math(math).newton_y(A, gamma, xp, self.D, j)
     # Not defining new "y" here to have less variables / make subsequent calls cheaper
@@ -554,6 +562,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
 
     if j > 0:
         dy = dy * PRECISION / price_scale[j-1]
+    dy /= precisions[j]
     dy -= self._fee(xp) * dy / 10**10
     assert dy >= min_dy, "Slippage"
     y -= dy
@@ -561,10 +570,9 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
     self.balances[j] = y
     assert ERC20(_coins[j]).transfer(_for, dy)
 
-    if j == 0:
-        xp[0] = y
-    else:
-        xp[j] = y * price_scale[j-1] / PRECISION
+    xp[j] = y * precisions[j]
+    if j > 0:
+        xp[j] *= price_scale[j-1] / PRECISION
 
     # Calculate price
     p: uint256 = 0
@@ -574,11 +582,11 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
             p = bitwise_and(
                 shift(self.last_prices_packed, -PRICE_SIZE * convert(i-1, int128)),
                 PRICE_MASK
-            ) * PRICE_PRECISION_MUL * dx / dy
+            ) * PRICE_PRECISION_MUL * (dx * precisions[i]) / (dy * precisions[j])
         elif i == 0:
-            p = dx * 10**18 / dy
+            p = (dx * precisions[i]) * 10**18 / (dy * precisions[j])
         else:  # j == 0
-            p = dy * 10**18 / dx
+            p = (dy * precisions[j]) * 10**18 / (dx * precisions[i])
             ix = i
 
     self.tweak_price(A, gamma, xp, ix, p)
@@ -646,9 +654,11 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
             self.balances[i] = bal
         xx = xp
 
+        precisions: uint256[N_COINS] = PRECISIONS
         packed_prices: uint256 = self.price_scale_packed
+        xp[0] *= precisions[0]
         for i in range(N_COINS-1):
-            price_scale: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
+            price_scale: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL * precisions[i+1]
             xp[i+1] = xp[i+1] * price_scale / PRECISION
             amountsp[i+1] = amountsp[i+1] * price_scale / PRECISION
             packed_prices = shift(packed_prices, -PRICE_SIZE)
@@ -687,17 +697,18 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
                 S: uint256 = 0
                 last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
                 packed_prices: uint256 = self.last_prices_packed
+                precisions: uint256[N_COINS] = PRECISIONS
                 for k in range(N_COINS-1):
                     last_prices[k] = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
                     packed_prices = shift(packed_prices, -PRICE_SIZE)
                 for i in range(N_COINS):
                     if i != ix:
                         if i == 0:
-                            S += xx[0]
+                            S += xx[0] * precisions[0]
                         else:
-                            S += xx[i] * last_prices[i-1] / PRECISION
+                            S += xx[i] * last_prices[i-1] * precisions[i] / PRECISION
                 S = S * d_token / token_supply
-                p = S * PRECISION / (amounts[ix] - d_token * xx[ix] / token_supply)
+                p = S * PRECISION / (amounts[ix] * precisions[ix] - d_token * xx[ix] / token_supply)
 
         self.tweak_price(A, gamma, xp, ix, p, D)
 
@@ -755,16 +766,17 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     assert i < N_COINS  # dev: coin out of range
 
     xx: uint256[N_COINS] = self.balances
-    xp: uint256[N_COINS] = xx
+    xp: uint256[N_COINS] = PRECISIONS
 
-    price_scale_i: uint256 = 0
+    price_scale_i: uint256 = xp[0]
     if True:  # To remove oacked_prices from memory
         packed_prices: uint256 = self.price_scale_packed
+        xp[0] *= xx[0]
         for k in range(N_COINS-1):
             p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
             if i == k+1:
-                price_scale_i = p
-            xp[k+1] = xp[k+1] * p / PRECISION
+                price_scale_i = p * xp[i]
+            xp[k+1] = xp[k+1] * xx[k+1] * p / PRECISION
             packed_prices = shift(packed_prices, -PRICE_SIZE)
 
     # Charge the fee on D, not on y, e.g. reducing invariant LESS than charging the user
@@ -772,9 +784,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     dD: uint256 = token_amount * D / token_supply
     D -= (dD - (fee * dD / (2 * 10**10) + 1))
     y: uint256 = Math(math).newton_y(A, gamma, xp, D, i)
-    dy: uint256 = y
-    if i > 0:
-        dy = dy * PRECISION / price_scale_i
+    dy: uint256 = y * PRECISION / price_scale_i
     dy = xx[i] - dy
     xp[i] = y
 
@@ -783,6 +793,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     if (not calc_only) and dy > 10**5 and token_amount > 10**5:
         # p_i = dD / D0 * sum'(p_k * x_k) / (dy - dD / D0 * y0)
         S: uint256 = 0
+        precisions: uint256[N_COINS] = PRECISIONS
         last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
         packed_prices: uint256 = self.last_prices_packed
         for k in range(N_COINS-1):
@@ -791,11 +802,11 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
         for k in range(N_COINS):
             if k != i:
                 if k == 0:
-                    S += xx[0]
+                    S += xx[0] * precisions[0]
                 else:
-                    S += xx[k] * last_prices[k-1] / PRECISION
+                    S += xx[k] * last_prices[k-1] * precisions[k] / PRECISION
         S = S * dD / D0
-        p = S * PRECISION / (dy - dD * xx[i] / D0)
+        p = S * PRECISION / (dy * precisions[i] - dD * xx[i] * precisions[i] / D0)
 
     return dy, p, D, xp
 
