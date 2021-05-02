@@ -572,7 +572,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
 
     xp[j] = y * precisions[j]
     if j > 0:
-        xp[j] *= price_scale[j-1] / PRECISION
+        xp[j] = xp[j] * price_scale[j-1] / PRECISION
 
     # Calculate price
     p: uint256 = 0
