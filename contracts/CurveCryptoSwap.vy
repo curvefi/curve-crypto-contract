@@ -708,7 +708,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
                         else:
                             S += xx[i] * last_prices[i-1] * precisions[i] / PRECISION
                 S = S * d_token / token_supply
-                p = S * PRECISION / (amounts[ix] * precisions[ix] - d_token * xx[ix] / token_supply)
+                p = S * PRECISION / (amounts[ix] * precisions[ix] - d_token * xx[ix] * precisions[ix] / token_supply)
 
         self.tweak_price(A, gamma, xp, ix, p, D)
 
