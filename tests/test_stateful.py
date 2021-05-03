@@ -40,13 +40,13 @@ class NumbaGoUp(StatefulBase):
         # This is to check that we didn't end up in a borked state after
         # an exchange succeeded
         try:
-            self.swap.get_dy(0, 1, 10**16)
+            self.swap.get_dy(0, 1, 10**(self.decimals[0]-2))
         except Exception:
-            self.swap.get_dy(1, 0, 10**16 * 10**18 // self.swap.price_scale(0))
+            self.swap.get_dy(1, 0, 10**16 * 10**self.decimals[1] // self.swap.price_scale(0))
         try:
-            self.swap.get_dy(0, 2, 10**16)
+            self.swap.get_dy(0, 2, 10**(self.decimals[0]-2))
         except Exception:
-            self.swap.get_dy(2, 0, 10**16 * 10**18 // self.swap.price_scale(1))
+            self.swap.get_dy(2, 0, 10**16 * 10**self.decimals[2] // self.swap.price_scale(1))
 
     def rule_remove_liquidity(self, token_amount, user):
         if self.token.balanceOf(user) < token_amount or token_amount == 0:
@@ -93,7 +93,7 @@ class NumbaGoUp(StatefulBase):
         # This is to check that we didn't end up in a borked state after
         # an exchange succeeded
         _deposit = [0] * 3
-        _deposit[exchange_i] = 10**16 * 10**18 // ([10**18] + INITIAL_PRICES)[exchange_i]
+        _deposit[exchange_i] = 10**16 * 10**self.decimals[exchange_i] // ([10**18] + INITIAL_PRICES)[exchange_i]
         self.swap.calc_token_amount(_deposit, True)
 
         d_balance = self.coins[exchange_i].balanceOf(user) - d_balance

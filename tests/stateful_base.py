@@ -22,8 +22,9 @@ class StatefulBase:
         self.token = token
 
     def setup(self, user_id=0):
+        self.decimals = [int(c.decimals()) for c in self.coins]
         self.user_balances = {u: [0] * 3 for u in self.accounts}
-        self.initial_deposit = [10**4 * 10**36 // p for p in [10**18] + INITIAL_PRICES]  # $10k * 3
+        self.initial_deposit = [10**4 * 10**(18 + d) // p for p, d in zip([10**18] + INITIAL_PRICES, self.decimals)]  # $10k * 3
         self.initial_prices = [10**18] + INITIAL_PRICES
         user = self.accounts[user_id]
 
@@ -46,7 +47,7 @@ class StatefulBase:
 
     def convert_amounts(self, amounts):
         prices = [10**18] + [self.swap.price_scale(i) for i in range(2)]
-        return [p * a // 10**18 for p, a in zip(prices, amounts)]
+        return [p * a // 10**d for p, a, d in zip(prices, amounts, self.decimals)]
 
     def check_limits(self, amounts, D=True, y=True):
         """
@@ -56,8 +57,8 @@ class StatefulBase:
         prices = [10**18] + [self.swap.price_scale(i) for i in range(2)]
         xp_0 = [self.swap.balances(i) for i in range(3)]
         xp = xp_0
-        xp_0 = [x * p // 10**18 for x, p in zip(xp_0, prices)]
-        xp = [(x + a) * p // 10**18 for a, x, p in zip(amounts, xp, prices)]
+        xp_0 = [x * p // 10**d for x, p, d in zip(xp_0, prices, self.decimals)]
+        xp = [(x + a) * p // 10**d for a, x, p, d in zip(amounts, xp, prices, self.decimals)]
 
         if D:
             for _xp in [xp_0, xp]:
@@ -100,7 +101,8 @@ class StatefulBase:
 
         # This is to check that we didn't end up in a borked state after
         # an exchange succeeded
-        self.swap.get_dy(exchange_j, exchange_i, 10**16 * 10**18 // ([10**18] + INITIAL_PRICES)[exchange_j])
+        self.swap.get_dy(exchange_j, exchange_i,
+                         10**16 * 10**self.decimals[exchange_j] // ([10**18] + INITIAL_PRICES)[exchange_j])
 
         d_balance_i -= self.coins[exchange_i].balanceOf(user)
         d_balance_j -= self.coins[exchange_j].balanceOf(user)
