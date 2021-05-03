@@ -22,6 +22,11 @@ interface Math:
 
 N_COINS: constant(int128) = 3  # <- change
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
+PRECISIONS: constant(uint256[N_COINS]) = [
+    1,#0
+    1,#1
+    1,#2
+]
 
 math: address
 
@@ -37,6 +42,8 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
     assert i != j and i < N_COINS and j < N_COINS, "coin index out of range"
     assert dx > 0, "do not exchange 0 coins"
 
+    precisions: uint256[N_COINS] = PRECISIONS
+
     price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
     for k in range(N_COINS-1):
         price_scale[k] = Curve(msg.sender).price_scale(k)
@@ -45,8 +52,9 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
         xp[k] = Curve(msg.sender).balances(k)
     y0: uint256 = xp[j]
     xp[i] += dx
+    xp[0] *= precisions[0]
     for k in range(N_COINS-1):
-        xp[k+1] = xp[k+1] * price_scale[k] / PRECISION
+        xp[k+1] = xp[k+1] * price_scale[k] * precisions[k+1] / PRECISION
 
     A: uint256 = Curve(msg.sender).A_precise()
     gamma: uint256 = Curve(msg.sender).gamma()
@@ -56,6 +64,7 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
     xp[j] = y
     if j > 0:
         dy = dy * PRECISION / price_scale[j-1]
+    dy /= precisions[j]
     dy -= Curve(msg.sender).fee_calc(xp) * dy / 10**10
 
     return dy
@@ -64,6 +73,7 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
 @view
 @external
 def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
+    precisions: uint256[N_COINS] = PRECISIONS
     token_supply: uint256 = ERC20(Curve(msg.sender).token()).totalSupply()
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     for k in range(N_COINS):
@@ -75,8 +85,10 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
     else:
         for k in range(N_COINS):
             xp[k] -= amounts[k]
+    xp[0] *= precisions[0]
+    amountsp[0] *= precisions[0]
     for k in range(N_COINS-1):
-        p: uint256 = Curve(msg.sender).price_scale(k)
+        p: uint256 = Curve(msg.sender).price_scale(k) * precisions[k+1]
         xp[k+1] = xp[k+1] * p / PRECISION
         amountsp[k+1] = amountsp[k+1] * p / PRECISION
     A: uint256 = Curve(msg.sender).A_precise()
