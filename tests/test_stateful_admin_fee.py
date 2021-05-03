@@ -56,5 +56,7 @@ class StatefulAdmin(StatefulBase):
 
 
 def test_admin(crypto_swap, token, chain, accounts, coins, state_machine):
+    from hypothesis._settings import HealthCheck
+
     state_machine(StatefulAdmin, chain, accounts, coins, crypto_swap, token,
-                  settings={'max_examples': MAX_SAMPLES, 'stateful_step_count': STEP_COUNT})
+                  settings={'max_examples': MAX_SAMPLES, 'stateful_step_count': STEP_COUNT, 'suppress_health_check': HealthCheck.all()})
