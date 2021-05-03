@@ -36,6 +36,8 @@ class NumbaGoUp(StatefulBase):
         except Exception:
             if self.check_limits(amounts):
                 raise
+            else:
+                return
 
         # This is to check that we didn't end up in a borked state after
         # an exchange succeeded

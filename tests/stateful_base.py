@@ -47,7 +47,7 @@ class StatefulBase:
 
     def convert_amounts(self, amounts):
         prices = [10**18] + [self.swap.price_scale(i) for i in range(2)]
-        return [p * a // 10**d for p, a, d in zip(prices, amounts, self.decimals)]
+        return [p * a // 10**(36-d) for p, a, d in zip(prices, amounts, self.decimals)]
 
     def check_limits(self, amounts, D=True, y=True):
         """
