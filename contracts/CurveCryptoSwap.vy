@@ -835,7 +835,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     p: uint256 = 0
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     dy, p, D, xp = self._calc_withdraw_one_coin(A, gamma, token_amount, i)
-    assert dy >= min_amount, "Slippage screwed you"
+    assert dy >= min_amount, "Slippage"
 
     self.balances[i] -= dy
     assert CurveToken(token).burnFrom(msg.sender, token_amount)
@@ -857,6 +857,8 @@ def _claim_admin_fees():
     fees: uint256 = (xcp_profit - self.xcp_profit_a) * self.admin_fee / (2 * 10**10)
 
     if fees > 0:
+        # Would be nice to recalc D, but we have no bytespace left
+
         frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
         claimed: uint256 = CurveToken(token).mint_relative(owner, frac)
         total_supply: uint256 = CurveToken(token).totalSupply()
@@ -871,6 +873,7 @@ def _claim_admin_fees():
 
 
 @external
+@nonreentrant('lock')
 def claim_admin_fees():
     self._claim_admin_fees()
 
