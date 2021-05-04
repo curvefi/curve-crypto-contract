@@ -6,18 +6,36 @@ from brownie import (
     CurveCryptoSwap,
     ERC20Mock,
     compile_source,
+    Contract
 )
 
 INITIAL_PRICES = [47500 * 10 ** 18, 1500 * 10 ** 18]
+
+# Addresses are taken for Matic
+COINS = [
+    "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171",  # am3Crv
+    "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6",  # WBTC (POS)
+    "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"   # WETH
+]
 
 
 def main():
     crypto_math = CurveCryptoMath3.deploy({"from": accounts[0]})
     token = CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", {"from": accounts[0]})
-    crypto_views = CurveCryptoViews3.deploy(crypto_math, {"from": accounts[0]})
-    coins = [
-        ERC20Mock.deploy(name, name, 18, {"from": accounts[0]}) for name in ["USD", "BTC", "ETH"]
-    ]
+
+    if COINS:
+        coins = [Contract(addr) for addr in COINS]
+    else:
+        coins = [
+            ERC20Mock.deploy(name, name, 18, {"from": accounts[0]}) for name in ["USD", "BTC", "ETH"]
+        ]
+
+    source = CurveCryptoViews3._build["source"]
+    source = source.replace("1,#0", str(10 ** (18 - coins[0].decimals())) + ',')
+    source = source.replace("1,#1", str(10 ** (18 - coins[1].decimals())) + ',')
+    source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
+    deployer = compile_source(source, vyper_version="0.2.12").Vyper
+    crypto_views = deployer.deploy(crypto_math, {"from": accounts[0]})
 
     source = CurveCryptoSwap._build["source"]
     source = source.replace("0x0000000000000000000000000000000000000000", crypto_math.address)
@@ -26,6 +44,9 @@ def main():
     source = source.replace("0x0000000000000000000000000000000000000010", coins[0].address)
     source = source.replace("0x0000000000000000000000000000000000000011", coins[1].address)
     source = source.replace("0x0000000000000000000000000000000000000012", coins[2].address)
+    source = source.replace("1,#0", str(10 ** (18 - coins[0].decimals())) + ',')
+    source = source.replace("1,#1", str(10 ** (18 - coins[1].decimals())) + ',')
+    source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
     deployer = compile_source(source, vyper_version="0.2.12").Vyper
 
     swap = deployer.deploy(

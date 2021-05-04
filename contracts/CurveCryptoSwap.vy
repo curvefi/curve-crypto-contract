@@ -280,9 +280,9 @@ def xp() -> uint256[N_COINS]:
     precisions: uint256[N_COINS] = PRECISIONS
 
     result[0] *= precisions[0]
-    for i in range(N_COINS-1):
-        p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL * precisions[i+1]
-        result[i+1] = result[i+1] * p / PRECISION
+    for i in range(1, N_COINS):
+        p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL * precisions[i]
+        result[i] = result[i] * p / PRECISION
         packed_prices = shift(packed_prices, -PRICE_SIZE)
 
     return result
@@ -300,20 +300,19 @@ def _A_gamma() -> (uint256, uint256):
     if block.timestamp < t1:
         # handle ramping up and down of A
         A_gamma_0: uint256 = self.initial_A_gamma
-        gamma0: uint256 = bitwise_and(A_gamma_0, 2**128-1)
-        A0: uint256 = shift(A_gamma_0, -128)
-
         t0: uint256 = self.initial_A_gamma_time
-        # Expressions in uint256 cannot have negative numbers, thus "if"
-        if A1 > A0:
-            A1 = A0 + (A1 - A0) * (block.timestamp - t0) / (t1 - t0)
-        else:
-            A1 = A0 - (A0 - A1) * (block.timestamp - t0) / (t1 - t0)
-        # Expressions in uint256 cannot have negative numbers, thus "if"
-        if gamma1 > gamma0:
-            gamma1 = gamma0 + (gamma1 - gamma0) * (block.timestamp - t0) / (t1 - t0)
-        else:
-            gamma1 = gamma0 - (gamma0 - gamma1) * (block.timestamp - t0) / (t1 - t0)
+
+        # Less readable but more compact way of writing and converting to uint256
+        # gamma0: uint256 = bitwise_and(A_gamma_0, 2**128-1)
+        # A0: uint256 = shift(A_gamma_0, -128)
+        # A1 = A0 + (A1 - A0) * (block.timestamp - t0) / (t1 - t0)
+        # gamma1 = gamma0 + (gamma1 - gamma0) * (block.timestamp - t0) / (t1 - t0)
+
+        t1 -= t0
+        t0 = block.timestamp - t0
+
+        A1 = (shift(A_gamma_0, -128) * (t1 - t0) + A1 * t0) / t1
+        gamma1 = (bitwise_and(A_gamma_0, 2**128-1) * (t1 - t0) + gamma1 * t0) / t1
 
     return A1, gamma1
 
@@ -359,18 +358,17 @@ def fee_calc(xp: uint256[N_COINS]) -> uint256:
 @view
 def get_xcp(_D: uint256 = 0) -> uint256:
     x: uint256[N_COINS] = empty(uint256[N_COINS])
-    if True:  # Remove unneeded variables from memory before the call
-        D: uint256 = _D
-        if D == 0:
-            D = self.D
-        x[0] = D / N_COINS
-        packed_prices: uint256 = self.price_scale_packed
-        # No precisions here because we don't switch to "real" units
+    D: uint256 = _D
+    if D == 0:
+        D = self.D
+    x[0] = D / N_COINS
+    packed_prices: uint256 = self.price_scale_packed
+    # No precisions here because we don't switch to "real" units
 
-        for i in range(N_COINS-1):
-            p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
-            x[i+1] = D * 10**18 / (N_COINS * p)
-            packed_prices = shift(packed_prices, -PRICE_SIZE)
+    for i in range(1, N_COINS):
+        x[i] = D * 10**18 / (N_COINS * bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL)
+        packed_prices = shift(packed_prices, -PRICE_SIZE)
+
     return Math(math).geometric_mean(x)
 
 
@@ -552,8 +550,8 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
     self.balances[i] = xp[i]
     precisions: uint256[N_COINS] = PRECISIONS
     xp[0] *= precisions[0]
-    for k in range(N_COINS-1):
-        xp[k+1] = xp[k+1] * price_scale[k] * precisions[k+1] / PRECISION
+    for k in range(1, N_COINS):
+        xp[k] = xp[k] * price_scale[k-1] * precisions[k] / PRECISION
 
     dy: uint256 = xp[j] - Math(math).newton_y(A, gamma, xp, self.D, j)
     # Not defining new "y" here to have less variables / make subsequent calls cheaper
@@ -657,10 +655,10 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
         precisions: uint256[N_COINS] = PRECISIONS
         packed_prices: uint256 = self.price_scale_packed
         xp[0] *= precisions[0]
-        for i in range(N_COINS-1):
-            price_scale: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL * precisions[i+1]
-            xp[i+1] = xp[i+1] * price_scale / PRECISION
-            amountsp[i+1] = amountsp[i+1] * price_scale / PRECISION
+        for i in range(1, N_COINS):
+            price_scale: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL * precisions[i]
+            xp[i] = xp[i] * price_scale / PRECISION
+            amountsp[i] = amountsp[i] * price_scale / PRECISION
             packed_prices = shift(packed_prices, -PRICE_SIZE)
 
     D: uint256 = Math(math).newton_D(A, gamma, xp)
@@ -772,11 +770,11 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     if True:  # To remove oacked_prices from memory
         packed_prices: uint256 = self.price_scale_packed
         xp[0] *= xx[0]
-        for k in range(N_COINS-1):
+        for k in range(1, N_COINS):
             p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * PRICE_PRECISION_MUL
-            if i == k+1:
+            if i == k:
                 price_scale_i = p * xp[i]
-            xp[k+1] = xp[k+1] * xx[k+1] * p / PRECISION
+            xp[k] = xp[k] * xx[k] * p / PRECISION
             packed_prices = shift(packed_prices, -PRICE_SIZE)
 
     # Charge the fee on D, not on y, e.g. reducing invariant LESS than charging the user
@@ -862,7 +860,20 @@ def _claim_admin_fees():
         frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
         claimed: uint256 = CurveToken(token).mint_relative(owner, frac)
         total_supply: uint256 = CurveToken(token).totalSupply()
-        new_vprice: uint256 = 10**18 * self.get_xcp() / total_supply
+
+        # Gulp here
+        _coins: address[N_COINS] = coins
+        for i in range(N_COINS):
+            self.balances[i] = ERC20(_coins[i]).balanceOf(self)
+
+        # Recalculate D b/c we gulped
+        A: uint256 = 0
+        gamma: uint256 = 0
+        A, gamma = self._A_gamma()
+        xp: uint256[N_COINS] = self.xp()
+        D: uint256 = Math(math).newton_D(A, gamma, xp)
+
+        new_vprice: uint256 = 10**18 * self.get_xcp(D) / total_supply
         self.virtual_price = new_vprice
 
         xcp_profit = new_vprice + xcp_profit - vprice - fees
@@ -1000,6 +1011,7 @@ def commit_new_parameters(
 
 
 @external
+@nonreentrant('lock')
 def apply_new_parameters():
     assert msg.sender == self.owner  # dev: only owner
     assert block.timestamp >= self.admin_actions_deadline  # dev: insufficient time

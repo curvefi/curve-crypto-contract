@@ -52,7 +52,7 @@ class StatefulAdmin(StatefulBase):
             self.xcp_profit = self.swap.xcp_profit()
             self.total_supply += balance
             measured_profit = self.token.balanceOf(self.accounts[0]) / self.total_supply
-            assert approx(measured_profit, (self.all_profit - 1) / 4, 0.3)
+            assert approx(measured_profit, (self.all_profit - 1) / 4, 0.2)
 
 
 def test_admin(crypto_swap, token, chain, accounts, coins, state_machine):
