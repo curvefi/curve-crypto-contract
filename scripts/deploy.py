@@ -16,8 +16,8 @@ INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
 # Addresses are taken for Matic
 COINS = [
     "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171",  # am3Crv
-    "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6",  # WBTC (POS)
-    "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"   # WETH
+    "0x5c2ed810328349100A66B82b78a1791B101C9D61",  # amWBTC
+    "0x28424507fefb6f7f8E9D3860F56504E4e5f5f390"   # amWETH
 ]
 
 
@@ -27,6 +27,8 @@ def main():
 
     if COINS:
         coins = [Contract(addr) for addr in COINS]
+        vprice = coins[0].get_virtual_price()
+        INITIAL_PRICES = [p * 10**18 // vprice for p in INITIAL_PRICES]
     else:
         coins = [
             ERC20Mock.deploy(name, name, 18, {"from": accounts[0]}) for name in ["USD", "BTC", "ETH"]
