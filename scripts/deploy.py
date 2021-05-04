@@ -1,3 +1,4 @@
+import requests
 from brownie import (
     accounts,
     CurveCryptoMath3,
@@ -9,7 +10,8 @@ from brownie import (
     Contract
 )
 
-INITIAL_PRICES = [47500 * 10 ** 18, 1500 * 10 ** 18]
+p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
+INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
 
 # Addresses are taken for Matic
 COINS = [
