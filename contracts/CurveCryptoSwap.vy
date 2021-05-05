@@ -179,6 +179,11 @@ PRECISIONS: constant(uint256[N_COINS]) = [
 ]
 
 
+# Matic extras. Not needed on Ethereum!
+MATIC_REWARDS: constant(address) = 0x357D51124f59836DeD84c8a1730D72B749d8BC23
+WMATIC: constant(address) = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270
+
+
 @external
 def __init__(
     owner: address,
@@ -1093,3 +1098,26 @@ def kill_me():
 def unkill_me():
     assert msg.sender == self.owner  # dev: only owner
     self.is_killed = False
+
+
+@internal
+def _claim_rewards():
+    # push wMatic rewards into the reward receiver
+    reward_receiver: address = self.reward_receiver
+    if reward_receiver != ZERO_ADDRESS:
+        response: Bytes[32] = raw_call(
+            MATIC_REWARDS,
+            concat(
+                method_id("claimRewards(address[],uint256,address)"),
+                convert(32 * 3, bytes32),
+                convert(MAX_UINT256, bytes32),
+                convert(self, bytes32),
+                convert(2, bytes32),
+                convert(self.coins[1], bytes32),
+                convert(self.coins[2], bytes32),
+            ),
+            max_outsize=32
+        )
+        amount: uint256 = convert(response, uint256)
+        if amount > 0:
+            assert ERC20(WMATIC).transfer(reward_receiver, amount)
