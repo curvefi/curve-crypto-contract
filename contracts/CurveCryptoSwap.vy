@@ -460,7 +460,6 @@ def tweak_price(A: uint256, gamma: uint256,
             ratio = 10**18 - ratio
         norm += ratio**2
 
-
     # Update profit numbers without price adjustment first
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     xp[0] = D_unadjusted / N_COINS
@@ -525,8 +524,7 @@ def tweak_price(A: uint256, gamma: uint256,
 
 @external
 @nonreentrant('lock')
-def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
-             _for: address = msg.sender):
+def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     assert not self.is_killed  # dev: the pool is killed
     assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
     assert dx > 0  # dev: do not exchange 0 coins
@@ -570,7 +568,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
 
     self.balances[j] = y
     # assert might be needed for some tokens - removed one to save bytespace
-    ERC20(_coins[j]).transfer(_for, dy)
+    ERC20(_coins[j]).transfer(msg.sender, dy)
 
     xp[j] = y * precisions[j]
     if j > 0:
@@ -593,7 +591,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
 
     self.tweak_price(A, gamma, xp, ix, p)
 
-    log TokenExchange(_for, i, dx, j, dy)
+    log TokenExchange(msg.sender, i, dx, j, dy)
 
 
 @external
@@ -628,8 +626,7 @@ def calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
 
 @external
 @nonreentrant('lock')
-def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
-                  _for: address = msg.sender):
+def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     assert not self.is_killed  # dev: the pool is killed
 
     A: uint256 = 0
@@ -682,7 +679,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
         d_token_fee = self._calc_token_fee(amountsp, xp) * d_token / 10**10 + 1
         d_token -= d_token_fee
         token_supply += d_token
-        assert CurveToken(token).mint(_for, d_token)
+        CurveToken(token).mint(msg.sender, d_token)
 
         # Calculate price
         # p_i * (dx_i - dtoken / token_supply * xx_i) = sum{k!=i}(p_k * (dtoken / token_supply * xx_k - dx_k))
@@ -719,17 +716,16 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
         self.D = D
         self.virtual_price = 10**18
         self.xcp_profit = 10**18
-        assert CurveToken(token).mint(_for, d_token)
+        assert CurveToken(token).mint(msg.sender, d_token)
 
     assert d_token >= min_mint_amount, "Slippage"
 
-    log AddLiquidity(_for, amounts, d_token_fee, token_supply)
+    log AddLiquidity(msg.sender, amounts, d_token_fee, token_supply)
 
 
 @external
 @nonreentrant('lock')
-def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS],
-                     _for: address = msg.sender):
+def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
     """
     This withdrawal method is very safe, does no complex math
     """
@@ -745,7 +741,7 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS],
         self.balances[i] = balances[i] - d_balance
         balances[i] = d_balance  # now it's the amounts going out
         # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(_coins[i]).transfer(_for, d_balance)
+        ERC20(_coins[i]).transfer(msg.sender, d_balance)
 
     D: uint256 = self.D
     self.D = D - D * amount / total_supply
@@ -762,7 +758,7 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
 @internal
 @view
 def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i: uint256,
-                            calc_only: bool = False) -> (uint256, uint256, uint256, uint256[N_COINS]):
+                            calc_price: bool) -> (uint256, uint256, uint256, uint256[N_COINS]):
     D: uint256 = self.D
     D0: uint256 = D
     token_supply: uint256 = CurveToken(token).totalSupply()
@@ -794,7 +790,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
 
     # Price calc
     p: uint256 = 0
-    if (not calc_only) and dy > 10**5 and token_amount > 10**5:
+    if calc_price and dy > 10**5 and token_amount > 10**5:
         # p_i = dD / D0 * sum'(p_k * x_k) / (dy - dD / D0 * y0)
         S: uint256 = 0
         precisions: uint256[N_COINS] = PRECISIONS
@@ -821,13 +817,12 @@ def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
-    return self._calc_withdraw_one_coin(A, gamma, token_amount, i, True)[0]
+    return self._calc_withdraw_one_coin(A, gamma, token_amount, i, False)[0]
 
 
 @external
 @nonreentrant('lock')
-def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256,
-                              _for: address = msg.sender):
+def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256):
     assert not self.is_killed  # dev: the pool is killed
 
     A: uint256 = 0
@@ -838,7 +833,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     D: uint256 = 0
     p: uint256 = 0
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
-    dy, p, D, xp = self._calc_withdraw_one_coin(A, gamma, token_amount, i)
+    dy, p, D, xp = self._calc_withdraw_one_coin(A, gamma, token_amount, i, True)
     assert dy >= min_amount, "Slippage"
 
     self.balances[i] -= dy
@@ -846,7 +841,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     if True:  # Remove _coins from the scope
         _coins: address[N_COINS] = coins
         # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(_coins[i]).transfer(_for, dy)
+        ERC20(_coins[i]).transfer(msg.sender, dy)
 
     self.tweak_price(A, gamma, xp, i, p, D)
 
@@ -920,8 +915,8 @@ def claim_admin_fees():
 @external
 def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256):
     assert msg.sender == self.owner  # dev: only owner
-    assert block.timestamp >= self.initial_A_gamma_time + MIN_RAMP_TIME
-    assert future_time >= block.timestamp + MIN_RAMP_TIME  # dev: insufficient time
+    assert block.timestamp > self.initial_A_gamma_time + (MIN_RAMP_TIME-1)
+    assert future_time > block.timestamp + (MIN_RAMP_TIME-1)  # dev: insufficient time
 
     initial_A: uint256 = 0
     initial_gamma: uint256 = 0
@@ -932,7 +927,7 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
     future_A_p: uint256 = future_A * A_MULTIPLIER
 
     assert future_A > 0 and future_A < MAX_A
-    assert future_gamma >= MIN_GAMMA and future_gamma <= MAX_GAMMA
+    assert future_gamma > MIN_GAMMA-1 and future_gamma < MAX_GAMMA+1
     if future_A_p < initial_A:
         assert future_A_p * MAX_A_CHANGE >= initial_A
     else:
@@ -990,14 +985,14 @@ def commit_new_parameters(
 
     # Fees
     if new_out_fee != MAX_UINT256:
-        assert new_out_fee <= MAX_FEE  and new_out_fee >= MIN_FEE  # dev: fee is out of range
+        assert new_out_fee < MAX_FEE+1  and new_out_fee > MIN_FEE-1  # dev: fee is out of range
     else:
         new_out_fee = self.out_fee
     if new_mid_fee == MAX_UINT256:
         new_mid_fee = self.mid_fee
     assert new_mid_fee <= new_out_fee  # dev: mid-fee is too high
     if new_admin_fee != MAX_UINT256:
-        assert new_admin_fee <= MAX_ADMIN_FEE  # dev: admin fee exceeds maximum
+        assert new_admin_fee < MAX_ADMIN_FEE+1  # dev: admin fee exceeds maximum
     else:
         new_admin_fee = self.admin_fee
 
