@@ -235,34 +235,32 @@ def __init__(
     self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
 
 
+@internal
+@view
+def _packed_view(k: uint256, p: uint256) -> uint256:
+    assert k < N_COINS-1
+    return bitwise_and(
+        shift(p, -PRICE_SIZE * convert(k, int128)),
+        PRICE_MASK
+    ) * PRICE_PRECISION_MUL
+
+
 @external
 @view
 def price_oracle(k: uint256) -> uint256:
-    assert k < N_COINS-1
-    return bitwise_and(
-        shift(self.price_oracle_packed, -PRICE_SIZE * convert(k, int128)),
-        PRICE_MASK
-    ) * PRICE_PRECISION_MUL
+    return self._packed_view(k, self.price_oracle_packed)
 
 
 @external
 @view
 def price_scale(k: uint256) -> uint256:
-    assert k < N_COINS-1
-    return bitwise_and(
-        shift(self.price_scale_packed, -PRICE_SIZE * convert(k, int128)),
-        PRICE_MASK
-    ) * PRICE_PRECISION_MUL
+    return self._packed_view(k, self.price_scale_packed)
 
 
 @external
 @view
 def last_prices(k: uint256) -> uint256:
-    assert k < N_COINS-1
-    return bitwise_and(
-        shift(self.last_prices_packed, -PRICE_SIZE * convert(k, int128)),
-        PRICE_MASK
-    ) * PRICE_PRECISION_MUL
+    return self._packed_view(k, self.last_prices_packed)
 
 
 @external
