@@ -151,6 +151,8 @@ kill_deadline: public(uint256)
 transfer_ownership_deadline: public(uint256)
 admin_actions_deadline: public(uint256)
 
+reward_receiver: public(address)
+
 KILL_DEADLINE_DT: constant(uint256) = 2 * 30 * 86400
 ADMIN_ACTIONS_DELAY: constant(uint256) = 3 * 86400
 MIN_RAMP_TIME: constant(uint256) = 86400
@@ -540,7 +542,8 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
 
     _coins: address[N_COINS] = coins
 
-    assert ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
+    # assert might be needed for some tokens - removed one to save bytespace
+    ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
 
     price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
     if True:  # scope to clear packed_prices
@@ -571,7 +574,8 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
     y -= dy
 
     self.balances[j] = y
-    assert ERC20(_coins[j]).transfer(_for, dy)
+    # assert might be needed for some tokens - removed one to save bytespace
+    ERC20(_coins[j]).transfer(_for, dy)
 
     xp[j] = y * precisions[j]
     if j > 0:
@@ -647,7 +651,8 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
         n_coins_added: uint256 = 0
         for i in range(N_COINS):
             if amounts[i] > 0:
-                assert ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
+                # assert might be needed for some tokens - removed one to save bytespace
+                ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
                 n_coins_added += 1
         assert n_coins_added > 0  # dev: no coins to add
 
@@ -744,7 +749,8 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS],
         assert d_balance >= min_amounts[i]
         self.balances[i] = balances[i] - d_balance
         balances[i] = d_balance  # now it's the amounts going out
-        assert ERC20(_coins[i]).transfer(_for, d_balance)
+        # assert might be needed for some tokens - removed one to save bytespace
+        ERC20(_coins[i]).transfer(_for, d_balance)
 
     D: uint256 = self.D
     self.D = D - D * amount / total_supply
@@ -844,7 +850,8 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     assert CurveToken(token).burnFrom(msg.sender, token_amount)
     if True:  # Remove _coins from the scope
         _coins: address[N_COINS] = coins
-        assert ERC20(_coins[i]).transfer(_for, dy)
+        # assert might be needed for some tokens - removed one to save bytespace
+        ERC20(_coins[i]).transfer(_for, dy)
 
     self.tweak_price(A, gamma, xp, i, p, D)
 
@@ -1113,11 +1120,17 @@ def _claim_rewards():
                 convert(MAX_UINT256, bytes32),
                 convert(self, bytes32),
                 convert(2, bytes32),
-                convert(self.coins[1], bytes32),
-                convert(self.coins[2], bytes32),
+                convert(coins[1], bytes32),
+                convert(coins[2], bytes32),
             ),
             max_outsize=32
         )
-        amount: uint256 = convert(response, uint256)
-        if amount > 0:
-            assert ERC20(WMATIC).transfer(reward_receiver, amount)
+        # can do if amount > 0, but here we try to save space rather than anything else
+        # assert might be needed for some tokens - removed one to save bytespace
+        ERC20(WMATIC).transfer(reward_receiver, convert(response, uint256))
+
+
+@external
+def set_reward_receiver(_reward_receiver: address):
+    assert msg.sender == self.owner
+    self.reward_receiver = _reward_receiver
