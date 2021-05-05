@@ -361,11 +361,8 @@ def fee_calc(xp: uint256[N_COINS]) -> uint256:
 
 @internal
 @view
-def get_xcp(_D: uint256 = 0) -> uint256:
+def get_xcp(D: uint256) -> uint256:
     x: uint256[N_COINS] = empty(uint256[N_COINS])
-    D: uint256 = _D
-    if D == 0:
-        D = self.D
     x[0] = D / N_COINS
     packed_prices: uint256 = self.price_scale_packed
     # No precisions here because we don't switch to "real" units
@@ -380,7 +377,7 @@ def get_xcp(_D: uint256 = 0) -> uint256:
 @external
 @view
 def get_virtual_price() -> uint256:
-    return 10**18 * self.get_xcp() / CurveToken(token).totalSupply()
+    return 10**18 * self.get_xcp(self.D) / CurveToken(token).totalSupply()
 
 
 @internal
