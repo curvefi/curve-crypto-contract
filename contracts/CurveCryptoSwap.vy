@@ -894,6 +894,26 @@ def _claim_admin_fees():
 
         log ClaimAdminFee(owner, claimed)
 
+    # push wMatic rewards into the reward receiver
+    reward_receiver: address = self.reward_receiver
+    if reward_receiver != ZERO_ADDRESS:
+        response: Bytes[32] = raw_call(
+            MATIC_REWARDS,
+            concat(
+                method_id("claimRewards(address[],uint256,address)"),
+                convert(32 * 3, bytes32),
+                convert(MAX_UINT256, bytes32),
+                convert(self, bytes32),
+                convert(2, bytes32),
+                convert(coins[1], bytes32),
+                convert(coins[2], bytes32),
+            ),
+            max_outsize=32
+        )
+        # can do if amount > 0, but here we try to save space rather than anything else
+        # assert might be needed for some tokens - removed one to save bytespace
+        ERC20(WMATIC).transfer(reward_receiver, convert(response, uint256))
+
 
 @external
 @nonreentrant('lock')
@@ -1105,29 +1125,6 @@ def kill_me():
 def unkill_me():
     assert msg.sender == self.owner  # dev: only owner
     self.is_killed = False
-
-
-@internal
-def _claim_rewards():
-    # push wMatic rewards into the reward receiver
-    reward_receiver: address = self.reward_receiver
-    if reward_receiver != ZERO_ADDRESS:
-        response: Bytes[32] = raw_call(
-            MATIC_REWARDS,
-            concat(
-                method_id("claimRewards(address[],uint256,address)"),
-                convert(32 * 3, bytes32),
-                convert(MAX_UINT256, bytes32),
-                convert(self, bytes32),
-                convert(2, bytes32),
-                convert(coins[1], bytes32),
-                convert(coins[2], bytes32),
-            ),
-            max_outsize=32
-        )
-        # can do if amount > 0, but here we try to save space rather than anything else
-        # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(WMATIC).transfer(reward_receiver, convert(response, uint256))
 
 
 @external
