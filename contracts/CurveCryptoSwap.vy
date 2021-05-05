@@ -152,6 +152,7 @@ transfer_ownership_deadline: public(uint256)
 admin_actions_deadline: public(uint256)
 
 reward_receiver: public(address)
+admin_fee_receiver: public(address)
 
 KILL_DEADLINE_DT: constant(uint256) = 2 * 30 * 86400
 ADMIN_ACTIONS_DELAY: constant(uint256) = 3 * 86400
@@ -233,6 +234,8 @@ def __init__(
     self.xcp_profit_a = 10**18
 
     self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
+
+    self.admin_fee_receiver = msg.sender
 
 
 @internal
@@ -850,7 +853,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
 @internal
 def _claim_admin_fees():
-    owner: address = self.owner
+    receiver: address = self.admin_fee_receiver
 
     xcp_profit: uint256 = self.xcp_profit
     vprice: uint256 = self.virtual_price
@@ -860,7 +863,7 @@ def _claim_admin_fees():
         # Would be nice to recalc D, but we have no bytespace left
 
         frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
-        claimed: uint256 = CurveToken(token).mint_relative(owner, frac)
+        claimed: uint256 = CurveToken(token).mint_relative(receiver, frac)
         total_supply: uint256 = CurveToken(token).totalSupply()
 
         # Gulp here
@@ -882,11 +885,11 @@ def _claim_admin_fees():
         self.xcp_profit_a = xcp_profit
         self.xcp_profit = xcp_profit
 
-        log ClaimAdminFee(owner, claimed)
+        log ClaimAdminFee(receiver, claimed)
 
     # push wMatic rewards into the reward receiver
-    reward_receiver: address = self.reward_receiver
-    if reward_receiver != ZERO_ADDRESS:
+    receiver = self.reward_receiver
+    if receiver != ZERO_ADDRESS:
         response: Bytes[32] = raw_call(
             MATIC_REWARDS,
             concat(
@@ -902,7 +905,7 @@ def _claim_admin_fees():
         )
         # can do if amount > 0, but here we try to save space rather than anything else
         # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(WMATIC).transfer(reward_receiver, convert(response, uint256))
+        ERC20(WMATIC).transfer(receiver, convert(response, uint256))
 
 
 @external
@@ -1119,5 +1122,11 @@ def unkill_me():
 
 @external
 def set_reward_receiver(_reward_receiver: address):
-    assert msg.sender == self.owner
+    assert msg.sender == self.owner  # dev: only owner
     self.reward_receiver = _reward_receiver
+
+
+@external
+def set_admin_fee_receiver(_admin_fee_receiver: address):
+    assert msg.sender == self.owner  # dev: only owner
+    self.admin_fee_receiver = _admin_fee_receiver
