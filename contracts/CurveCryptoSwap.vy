@@ -384,6 +384,63 @@ def get_virtual_price() -> uint256:
 
 
 @internal
+def _claim_admin_fees():
+    receiver: address = self.admin_fee_receiver
+
+    xcp_profit: uint256 = self.xcp_profit
+    vprice: uint256 = self.virtual_price
+    fees: uint256 = (xcp_profit - self.xcp_profit_a) * self.admin_fee / (2 * 10**10)
+
+    if fees > 0:
+        # Would be nice to recalc D, but we have no bytespace left
+
+        frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
+        claimed: uint256 = CurveToken(token).mint_relative(receiver, frac)
+        total_supply: uint256 = CurveToken(token).totalSupply()
+
+        # Gulp here
+        _coins: address[N_COINS] = coins
+        for i in range(N_COINS):
+            self.balances[i] = ERC20(_coins[i]).balanceOf(self)
+
+        # Recalculate D b/c we gulped
+        A: uint256 = 0
+        gamma: uint256 = 0
+        A, gamma = self._A_gamma()
+        xp: uint256[N_COINS] = self.xp()
+        D: uint256 = Math(math).newton_D(A, gamma, xp)
+
+        new_vprice: uint256 = 10**18 * self.get_xcp(D) / total_supply
+        self.virtual_price = new_vprice
+
+        xcp_profit = new_vprice + xcp_profit - vprice
+        self.xcp_profit_a = xcp_profit
+        self.xcp_profit = xcp_profit
+
+        log ClaimAdminFee(receiver, claimed)
+
+    # push wMatic rewards into the reward receiver
+    receiver = self.reward_receiver
+    if receiver != ZERO_ADDRESS:
+        response: Bytes[32] = raw_call(
+            MATIC_REWARDS,
+            concat(
+                method_id("claimRewards(address[],uint256,address)"),
+                convert(32 * 3, bytes32),
+                convert(MAX_UINT256, bytes32),
+                convert(self, bytes32),
+                convert(2, bytes32),
+                convert(coins[1], bytes32),
+                convert(coins[2], bytes32),
+            ),
+            max_outsize=32
+        )
+        # can do if amount > 0, but here we try to save space rather than anything else
+        # assert might be needed for some tokens - removed one to save bytespace
+        ERC20(WMATIC).transfer(receiver, convert(response, uint256))
+
+
+@internal
 def tweak_price(A: uint256, gamma: uint256,
                 _xp: uint256[N_COINS], i: uint256, p_i: uint256,
                 new_D: uint256 = 0):
@@ -515,6 +572,9 @@ def tweak_price(A: uint256, gamma: uint256,
             self.price_scale_packed = packed_prices
             self.D = D
             self.virtual_price = old_virtual_price
+
+            # XXX Remove for non-Matic
+            self._claim_admin_fees()
             return
 
         # else - make a delay?
@@ -523,6 +583,9 @@ def tweak_price(A: uint256, gamma: uint256,
     # Still need to update the profit counter and D
     self.D = D_unadjusted
     self.virtual_price = virtual_price
+
+    # XXX Remove for non-Matic
+    self._claim_admin_fees()
 
 
 @external
@@ -849,63 +912,6 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     self.tweak_price(A, gamma, xp, i, p, D)
 
     log RemoveLiquidityOne(msg.sender, token_amount, i, dy)
-
-
-@internal
-def _claim_admin_fees():
-    receiver: address = self.admin_fee_receiver
-
-    xcp_profit: uint256 = self.xcp_profit
-    vprice: uint256 = self.virtual_price
-    fees: uint256 = (xcp_profit - self.xcp_profit_a) * self.admin_fee / (2 * 10**10)
-
-    if fees > 0:
-        # Would be nice to recalc D, but we have no bytespace left
-
-        frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
-        claimed: uint256 = CurveToken(token).mint_relative(receiver, frac)
-        total_supply: uint256 = CurveToken(token).totalSupply()
-
-        # Gulp here
-        _coins: address[N_COINS] = coins
-        for i in range(N_COINS):
-            self.balances[i] = ERC20(_coins[i]).balanceOf(self)
-
-        # Recalculate D b/c we gulped
-        A: uint256 = 0
-        gamma: uint256 = 0
-        A, gamma = self._A_gamma()
-        xp: uint256[N_COINS] = self.xp()
-        D: uint256 = Math(math).newton_D(A, gamma, xp)
-
-        new_vprice: uint256 = 10**18 * self.get_xcp(D) / total_supply
-        self.virtual_price = new_vprice
-
-        xcp_profit = new_vprice + xcp_profit - vprice - fees
-        self.xcp_profit_a = xcp_profit
-        self.xcp_profit = xcp_profit
-
-        log ClaimAdminFee(receiver, claimed)
-
-    # push wMatic rewards into the reward receiver
-    receiver = self.reward_receiver
-    if receiver != ZERO_ADDRESS:
-        response: Bytes[32] = raw_call(
-            MATIC_REWARDS,
-            concat(
-                method_id("claimRewards(address[],uint256,address)"),
-                convert(32 * 3, bytes32),
-                convert(MAX_UINT256, bytes32),
-                convert(self, bytes32),
-                convert(2, bytes32),
-                convert(coins[1], bytes32),
-                convert(coins[2], bytes32),
-            ),
-            max_outsize=32
-        )
-        # can do if amount > 0, but here we try to save space rather than anything else
-        # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(WMATIC).transfer(receiver, convert(response, uint256))
 
 
 @external
