@@ -2,7 +2,7 @@ from .stateful_base import StatefulBase
 from math import log
 from brownie.test import strategy
 
-MAX_SAMPLES = 100
+MAX_SAMPLES = 20
 STEP_COUNT = 100
 NO_CHANGE = 2**256-1
 
