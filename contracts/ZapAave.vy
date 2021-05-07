@@ -13,7 +13,7 @@ interface CurveCryptoSwap:
 interface StableSwap:
     def coins(i: uint256) -> address: view
     def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, use_underlying: bool) -> uint256: nonpayable
-    def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256, use_underlying: bool) -> uint256: nonpayable
+    def remove_liquidity_one_coin(token_amount: uint256, i: int128, min_amount: uint256, use_underlying: bool) -> uint256: nonpayable
     def remove_liquidity(amount: uint256, min_amounts: uint256[N_COINS], use_underlying: bool) -> uint256[N_COINS]: nonpayable
 
 interface LendingPool:
@@ -191,7 +191,7 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
 
     if base_j == 0:
         # if `j` is in the base pool, withdraw the desired underlying asset and transfer to caller
-        amount = StableSwap(self.base_pool).remove_liquidity_one_coin(amount, j, _min_dy, True)
+        amount = StableSwap(self.base_pool).remove_liquidity_one_coin(amount, convert(j, int128), _min_dy, True)
         response = raw_call(
             self.underlying_coins[j],
             concat(
@@ -247,7 +247,7 @@ def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: u
 
     value: uint256 = ERC20(self.coins[base_i]).balanceOf(self)
     if base_i == 0:
-        value = StableSwap(self.base_pool).remove_liquidity_one_coin(value, i, _min_amount, True)
+        value = StableSwap(self.base_pool).remove_liquidity_one_coin(value, convert(i, int128), _min_amount, True)
         response: Bytes[32] = raw_call(
             self.underlying_coins[i],
             concat(
