@@ -5,6 +5,9 @@ from vyper.interfaces import ERC20
 interface CurveCryptoSwap:
     def token() -> address: view
     def coins(i: uint256) -> address: view
+    def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256: view
+    def calc_token_amount(amounts: uint256[N_COINS], is_deposit: bool) -> uint256: view
+    def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256: view
     def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, receiver: address): nonpayable
     def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256): nonpayable
     def remove_liquidity(amount: uint256, min_amounts: uint256[N_COINS]): nonpayable
@@ -12,9 +15,13 @@ interface CurveCryptoSwap:
 
 interface StableSwap:
     def coins(i: uint256) -> address: view
+    def get_dy(i: int128, j: int128, dx: uint256) -> uint256: view
+    def calc_token_amount(amounts: uint256[N_COINS], is_deposit: bool) -> uint256: view
+    def calc_withdraw_one_coin(token_amount: uint256, i: int128) -> uint256: view
     def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, use_underlying: bool) -> uint256: nonpayable
     def remove_liquidity_one_coin(token_amount: uint256, i: int128, min_amount: uint256, use_underlying: bool) -> uint256: nonpayable
     def remove_liquidity(amount: uint256, min_amounts: uint256[N_COINS], use_underlying: bool) -> uint256[N_COINS]: nonpayable
+
 
 interface LendingPool:
     def withdraw(underlying_asset: address, amount: uint256, receiver: address): nonpayable
@@ -160,14 +167,11 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
     dx: uint256 = _dx
     base_i: uint256 = 0
     base_j: uint256 = 0
-    if j < N_COINS:
-        base_j = 0
-    else:
+    if j >= N_COINS:
         base_j = j - (N_COINS - 1)
 
     if i < N_COINS:
         # if `i` is in the base pool, deposit to get LP tokens
-        base_i = 0
         deposit_amounts: uint256[N_COINS] = empty(uint256[N_COINS])
         deposit_amounts[i] = dx
         dx = StableSwap(self.base_pool).add_liquidity(deposit_amounts, 0, True)
@@ -262,3 +266,51 @@ def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: u
     else:
         assert value >= _min_amount
         LendingPool(AAVE_LENDING_POOL).withdraw(self.underlying_coins[i], value, _receiver)
+
+
+@view
+@external
+def get_dy_underlying(i: uint256, j: uint256, _dx: uint256) -> uint256:
+    if max(i, j) < N_COINS:
+        return StableSwap(self.base_pool).get_dy(convert(i, int128), convert(j, int128), _dx)
+
+    dx: uint256 = _dx
+    base_i: uint256 = 0
+    base_j: uint256 = 0
+    if j < N_COINS:
+        base_j = 0
+    else:
+        base_j = j - (N_COINS - 1)
+
+    if i < N_COINS:
+        base_i = 0
+        amounts: uint256[N_COINS] = empty(uint256[N_COINS])
+        amounts[i] = dx
+        dx = StableSwap(self.base_pool).calc_token_amount(amounts, True)
+    else:
+        base_i = i - (N_COINS - 1)
+
+    dy: uint256 = CurveCryptoSwap(self.pool).get_dy(base_i, base_j, dx)
+    if base_j == 0:
+        return StableSwap(self.base_pool).calc_withdraw_one_coin(dy, convert(j, int128))
+    else:
+        return dy
+
+
+@view
+@external
+def calc_token_amount(_amounts: uint256[N_UL_COINS], _is_deposit: bool) -> uint256:
+    base_amounts: uint256[3] = [_amounts[0], _amounts[1], _amounts[2]]
+    base_lp: uint256 = StableSwap(self.base_pool).calc_token_amount(base_amounts, _is_deposit)
+    amounts: uint256[3] = [base_lp, _amounts[3], _amounts[4]]
+    return CurveCryptoSwap(self.pool).calc_token_amount(amounts, _is_deposit)
+
+
+@view
+@external
+def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
+    if i >= N_COINS:
+        return CurveCryptoSwap(self.pool).calc_withdraw_one_coin(token_amount, i - (N_COINS - 1))
+
+    base_amount: uint256 = CurveCryptoSwap(self.pool).calc_withdraw_one_coin(token_amount, 0)
+    return StableSwap(self.base_pool).calc_withdraw_one_coin(base_amount, convert(i, int128))
