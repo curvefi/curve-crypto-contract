@@ -7,11 +7,8 @@ from brownie import (
     CurveCryptoSwap,
     ERC20Mock,
     compile_source,
-    Contract
 )
-
-p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
-INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
+from brownie import interface
 
 # Addresses are taken for Matic
 COINS = [
@@ -19,15 +16,19 @@ COINS = [
     "0x5c2ed810328349100A66B82b78a1791B101C9D61",  # amWBTC
     "0x28424507fefb6f7f8E9D3860F56504E4e5f5f390"   # amWETH
 ]
+SWAP = "0x445FE580eF8d70FF569aB36e80c647af338db351"
 
 
 def main():
+    p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
+    INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
+
     crypto_math = CurveCryptoMath3.deploy({"from": accounts[0]})
     token = CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", {"from": accounts[0]})
 
     if COINS:
-        coins = [Contract(addr) for addr in COINS]
-        vprice = coins[0].get_virtual_price()
+        coins = [interface.ERC20(addr) for addr in COINS]
+        vprice = interface.Swap(SWAP).get_virtual_price()
         INITIAL_PRICES = [p * 10**18 // vprice for p in INITIAL_PRICES]
     else:
         coins = [
