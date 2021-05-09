@@ -1,4 +1,5 @@
 import requests
+from brownie.network.gas.strategies import GasNowScalingStrategy
 from brownie import (
     accounts,
     CurveCryptoMath3,
@@ -8,7 +9,12 @@ from brownie import (
     ERC20Mock,
     compile_source,
 )
-from brownie import interface
+from brownie import interface, network
+
+try:
+    network.gas_price(GasNowScalingStrategy("slow", "fast"))
+except ConnectionError:
+    pass
 
 COINS = [
     "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",  # USDC
@@ -65,5 +71,9 @@ def main():
         {"from": accounts[0]},
     )
     token.set_minter(swap, {"from": accounts[0]})
+
+    print("Deployed at:")
+    print("Swap:", swap.address)
+    print("Token:", token.address)
 
     return swap, token
