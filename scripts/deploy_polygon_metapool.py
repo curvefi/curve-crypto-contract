@@ -10,11 +10,13 @@ from brownie import (
 )
 from brownie import interface
 
+# Addresses are taken for Matic
 COINS = [
-    "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",  # USDC
-    "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",  # WBTC
-    "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"   # WETH
+    "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171",  # am3Crv
+    "0x5c2ed810328349100A66B82b78a1791B101C9D61",  # amWBTC
+    "0x28424507fefb6f7f8E9D3860F56504E4e5f5f390"   # amWETH
 ]
+SWAP = "0x445FE580eF8d70FF569aB36e80c647af338db351"
 
 
 def main():
@@ -22,10 +24,12 @@ def main():
     INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
 
     crypto_math = CurveCryptoMath3.deploy({"from": accounts[0]})
-    token = CurveTokenV4.deploy("Curve.fi USD-BTC-ETH", "crvUSDBTCETH", {"from": accounts[0]})
+    token = CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", {"from": accounts[0]})
 
     if COINS:
         coins = [interface.ERC20(addr) for addr in COINS]
+        vprice = interface.Swap(SWAP).get_virtual_price()
+        INITIAL_PRICES = [p * 10**18 // vprice for p in INITIAL_PRICES]
     else:
         coins = [
             ERC20Mock.deploy(name, name, 18, {"from": accounts[0]}) for name in ["USD", "BTC", "ETH"]
