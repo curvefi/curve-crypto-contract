@@ -8,13 +8,13 @@ interface CurveCryptoSwap:
     def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256: view
     def calc_token_amount(amounts: uint256[N_COINS], is_deposit: bool) -> uint256: view
     def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256: view
-    def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, receiver: address): nonpayable
+    def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256): nonpayable
     def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256): nonpayable
     def remove_liquidity(amount: uint256, min_amounts: uint256[N_COINS]): nonpayable
     def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256): nonpayable
 
 interface StableSwap:
-    def coins(i: uint256) -> address: view
+    def underlying_coins(i: uint256) -> address: view
     def get_dy(i: int128, j: int128, dx: uint256) -> uint256: view
     def calc_token_amount(amounts: uint256[N_COINS], is_deposit: bool) -> uint256: view
     def calc_withdraw_one_coin(token_amount: uint256, i: int128) -> uint256: view
@@ -50,10 +50,10 @@ def __init__(_pool: address, _base_pool: address):
     self.token = CurveCryptoSwap(_pool).token()
 
     for i in range(N_COINS):
-        coin: address = StableSwap(_base_pool).coins(i)
+        coin: address = StableSwap(_base_pool).underlying_coins(i)
         self.underlying_coins[i] = coin
         # approve transfer of underlying coin to base pool
-        _response: Bytes[32] = raw_call(
+        response: Bytes[32] = raw_call(
             coin,
             concat(
                 method_id("approve(address,uint256)"),
@@ -62,33 +62,48 @@ def __init__(_pool: address, _base_pool: address):
             ),
             max_outsize=32
         )
-        if len(_response) != 0:
-            assert convert(_response, bool)
-
+        if len(response) != 0:
+            assert convert(response, bool)
 
     for i in range(N_COINS):
         coin: address = CurveCryptoSwap(_pool).coins(i)
         self.coins[i] = coin
-        coin = aToken(coin).UNDERLYING_ASSET_ADDRESS()
-        self.underlying_coins[i+(N_COINS-1)] = coin
-        # approve transfer of underlying coin to aave lending pool
-        _response: Bytes[32] = raw_call(
+        # approve transfer of coin to main pool
+        response: Bytes[32] = raw_call(
             coin,
             concat(
                 method_id("approve(address,uint256)"),
-                convert(AAVE_LENDING_POOL, bytes32),
+                convert(_pool, bytes32),
                 convert(MAX_UINT256, bytes32)
             ),
             max_outsize=32
         )
-        if len(_response) != 0:
-            assert convert(_response, bool)
+        if len(response) != 0:
+            assert convert(response, bool)
+
+        if i != 0:
+            # coins >= 1 are aTokens, we must get the underlying asset address
+            # and approve transfer into the aave lending pool
+            coin = aToken(coin).UNDERLYING_ASSET_ADDRESS()
+            self.underlying_coins[i+(N_COINS-1)] = coin
+            response = raw_call(
+                coin,
+                concat(
+                    method_id("approve(address,uint256)"),
+                    convert(AAVE_LENDING_POOL, bytes32),
+                    convert(MAX_UINT256, bytes32)
+                ),
+                max_outsize=32
+            )
+            if len(response) != 0:
+                assert convert(response, bool)
 
 
 @external
 def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _receiver: address = msg.sender):
     base_deposit_amounts: uint256[N_COINS] = empty(uint256[N_COINS])
     deposit_amounts: uint256[N_COINS] = empty(uint256[N_COINS])
+    is_base_deposit: bool = False
 
     # transfer base pool coins from caller and deposit to get LP tokens
     for i in range(N_COINS):
@@ -109,8 +124,9 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
             if len(_response) != 0:
                 assert convert(_response, bool)
             base_deposit_amounts[i] = ERC20(coin).balanceOf(self)
+            is_base_deposit = True
 
-    if base_deposit_amounts != empty(uint256[N_COINS]):
+    if is_base_deposit:
         deposit_amounts[0] = StableSwap(self.base_pool).add_liquidity(base_deposit_amounts, 0, True)
 
     # transfer remaining underlying coins and deposit into aave
@@ -146,7 +162,10 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
             )
             deposit_amounts[i-(N_COINS-1)] = amount
 
-    CurveCryptoSwap(self.pool).add_liquidity(deposit_amounts, _min_mint_amount, _receiver)
+    CurveCryptoSwap(self.pool).add_liquidity(deposit_amounts, _min_mint_amount)
+    token: address = self.token
+    amount: uint256 = ERC20(token).balanceOf(self)
+    ERC20(token).transfer(_receiver, amount)
 
 
 @external
@@ -191,8 +210,9 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
         )
 
     # perform the exchange
-    CurveCryptoSwap(self.pool).exchange(base_i, base_j, dx, 0)
-    amount: uint256 = ERC20(self.coins[j]).balanceOf(self)
+    if max(base_i, base_j) > 0:
+        CurveCryptoSwap(self.pool).exchange(base_i, base_j, dx, 0)
+    amount: uint256 = ERC20(self.coins[base_j]).balanceOf(self)
 
     if base_j == 0:
         # if `j` is in the base pool, withdraw the desired underlying asset and transfer to caller
@@ -250,7 +270,7 @@ def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: u
     base_i: uint256 = 0
     if i >= N_COINS:
         base_i = i - (N_COINS-1)
-    CurveCryptoSwap(self.pool).remove_liquidity_one_coin(_token_amount, i, 0)
+    CurveCryptoSwap(self.pool).remove_liquidity_one_coin(_token_amount, base_i, 0)
 
     value: uint256 = ERC20(self.coins[base_i]).balanceOf(self)
     if base_i == 0:
