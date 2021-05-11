@@ -169,7 +169,7 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
 
 
 @external
-def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, _receiver: address):
+def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, _receiver: address = msg.sender):
     # transfer `i` from caller into the zap
     response: Bytes[32] = raw_call(
         self.underlying_coins[i],
@@ -235,7 +235,7 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
 
 
 @external
-def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _receiver: address):
+def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _receiver: address = msg.sender):
     # transfer LP token from caller and remove liquidity
     ERC20(self.token).transferFrom(msg.sender, self, _amount)
     min_amounts: uint256[N_COINS] = [0, _min_amounts[3], _min_amounts[4]]
@@ -265,7 +265,7 @@ def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _recei
 
 
 @external
-def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: uint256, _receiver: address):
+def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: uint256, _receiver: address = msg.sender):
     ERC20(self.token).transferFrom(msg.sender, self, _token_amount)
     base_i: uint256 = 0
     if i >= N_COINS:
@@ -300,13 +300,10 @@ def get_dy_underlying(i: uint256, j: uint256, _dx: uint256) -> uint256:
     dx: uint256 = _dx
     base_i: uint256 = 0
     base_j: uint256 = 0
-    if j < N_COINS:
-        base_j = 0
-    else:
+    if j >= N_COINS:
         base_j = j - (N_COINS - 1)
 
     if i < N_COINS:
-        base_i = 0
         amounts: uint256[N_COINS] = empty(uint256[N_COINS])
         amounts[i] = dx
         dx = StableSwap(self.base_pool).calc_token_amount(amounts, True)
