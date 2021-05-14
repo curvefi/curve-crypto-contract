@@ -229,7 +229,7 @@ def __init__(
 
     self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
 
-    self.admin_fee_receiver = msg.sender
+    self.admin_fee_receiver = owner
 
 
 @internal
