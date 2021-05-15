@@ -1,0 +1,31 @@
+Transaction sent: 0x97e2631749ae9946800b02a3b5e9e742745d75b090395772e39e2d3108ecc80f
+  Gas price: 112.0 gwei   Gas limit: 1922346   Nonce: 294
+  CurveCryptoMath3.constructor confirmed - Block: 12434071   Gas used: 1747588 (90.91%)
+  CurveCryptoMath3 deployed at: 0xc54106A999bedE585C9574f2e4CB31df46CbDd83
+
+Transaction sent: 0xb9a8aba3b6a728c3457fb95a66fd2d491f4a8b7cddaf8a7a5460492180fff82d
+  Gas price: 95.0 gwei   Gas limit: 971235   Nonce: 295
+Transaction sent: 0xdf3a9e101d77d72e56bd07a1a0cdb509eb5402c643bdf0b97810861b0a0a0614
+  Gas price: 106.875 gwei   Gas limit: 971235   Nonce: 295
+Transaction sent: 0x764e2440f7840edf04cd4fb36dae362bbede567e50cf09250d4e55df11475471
+  Gas price: 120.234375 gwei   Gas limit: 971235   Nonce: 295
+Transaction sent: 0xcb10eff2708d6db2643ec8191b2c11e8809a4c53f92d66bf5ac26dfa89c2c577
+  Gas price: 134.0 gwei   Gas limit: 971235   Nonce: 295
+Transaction sent: 0xe099f03f664813056a48b5f94e8472cb602655445514297140d2f1c975fd5229
+  Gas price: 101.0 gwei   Gas limit: 863293   Nonce: 296
+Transaction sent: 0x890e6cad88f6bc13e2080ae1fa4a51a658c1ced3c3b557f287e1c20b68d63563
+  Gas price: 113.625 gwei   Gas limit: 863293   Nonce: 296
+Transaction sent: 0x01abab0d1bcde4bb6352eb10cafb2847605ed4766801e51839cc89dfcdadda8b
+  Gas price: 127.828125 gwei   Gas limit: 863293   Nonce: 296
+Transaction sent: 0x5d40773e0a1b04fd06db72602d59359c8888d359caf653ebe011b2b7632bd7c5
+  Gas price: 115.0 gwei   Gas limit: 6069836   Nonce: 297
+Transaction sent: 0xdd5214a64f869c2cc41a440c3b73b49ab1e0543846f4b688d7a24f727d8616c4
+  Gas price: 136.0 gwei   Gas limit: 6069836   Nonce: 297
+Transaction sent: 0x4d3d082036a009a942b94bb14e487f1f0c6011e4d9ddf508dc0a35ea78e14a5d
+  Gas price: 115.0 gwei   Gas limit: 29500   Nonce: 298
+Transaction sent: 0x751a075b474d3aa84b84d2fe6b0e06dfb1c136d4dd4c9c5db954e34c4c34f252
+  Gas price: 134.1 gwei   Gas limit: 29500   Nonce: 298
+Deployed at:
+Swap: 0x65a8b215F34Df5c30c64523D638eA698065FFa15
+Token: 0x0D89774935e3d88b91f0CEA0991F4FCD7d9f5470
+(0x65a8b215F34Df5c30c64523D638eA698065FFa15, 0x0D89774935e3d88b91f0CEA0991F4FCD7d9f5470)
