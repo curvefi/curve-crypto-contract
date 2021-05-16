@@ -221,7 +221,7 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
             self.underlying_coins[j],
             concat(
                 method_id("transfer(address,uint256)"),
-                convert(msg.sender, bytes32),
+                convert(_receiver, bytes32),
                 convert(amount, bytes32)
             ),
             max_outsize=32
@@ -279,7 +279,7 @@ def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: u
             self.underlying_coins[i],
             concat(
                 method_id("transfer(address,uint256)"),
-                convert(msg.sender, bytes32),
+                convert(_receiver, bytes32),
                 convert(value, bytes32)
             ),
             max_outsize=32
