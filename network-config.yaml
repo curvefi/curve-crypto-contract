@@ -1,0 +1,27 @@
+development:
+- name: Ganache-CLI (Polygon-Mainnet Fork)
+  id: polygon-main-fork
+  cmd: ganache-cli
+  host: http://127.0.0.1
+  timeout: 120
+  cmd_settings:
+    port: 8545
+    gas_limit: 20000000
+    accounts: 10
+    evm_version: istanbul
+    mnemonic: brownie
+    fork: polygon-main
+
+live:
+- name: Polygon
+  networks:
+    - name: Mainnet
+      chainid: 137
+      id: polygon-main
+      host: https://rpc-mainnet.maticvigil.com/v1/942b14b4e70695ae02bf1c1a74e7246e97435108
+      explorer: https://explorer.matic.network
+    - name: Mumbai Testnet
+      chainid: 80001
+      id: polygon-testnet
+      host: https://rpc-mumbai.maticvigil.com/
+      explorer: https://explorer-mumbai.maticvigil.com/
