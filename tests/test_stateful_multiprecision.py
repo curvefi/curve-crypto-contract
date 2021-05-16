@@ -52,5 +52,7 @@ class Multiprecision(NumbaGoUp):
 
 
 def test_multiprecision(crypto_swap_mp, token_mp, chain, accounts, coins_mp, state_machine):
+    from hypothesis._settings import HealthCheck
+
     state_machine(Multiprecision, chain, accounts, coins_mp, crypto_swap_mp, token_mp,
-                  settings={'max_examples': MAX_SAMPLES, 'stateful_step_count': MAX_COUNT})
+                  settings={'max_examples': MAX_SAMPLES, 'stateful_step_count': MAX_COUNT, 'suppress_health_check': HealthCheck.all()})

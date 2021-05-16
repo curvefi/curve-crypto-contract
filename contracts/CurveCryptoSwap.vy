@@ -145,6 +145,7 @@ future_owner: public(address)
 xcp_profit: public(uint256)
 xcp_profit_a: public(uint256)  # Full profit at last claim of admin fees
 virtual_price: public(uint256)  # Cached (fast to read) virtual price also used internally
+not_adjusted: bool
 
 is_killed: public(bool)
 kill_deadline: public(uint256)
@@ -512,9 +513,13 @@ def tweak_price(A: uint256, gamma: uint256,
 
     self.xcp_profit = xcp_profit
 
+    needs_adjustment: bool = self.not_adjusted
+    if not needs_adjustment and (virtual_price-10**18 > (xcp_profit-10**18)/2 + 10**13):  # 0.1 bps above the baseline
+        needs_adjustment = True
+        self.not_adjusted = True
+
     # self.price_threshold must be > self.adjustment_step
-    # should we pause for a bit if profit wasn't enough to not spend this gas every time?
-    if norm > self.price_threshold ** 2 and old_virtual_price > 0:
+    if needs_adjustment and norm > self.price_threshold ** 2 and old_virtual_price > 0:
         norm = Math(math).sqrt_int(norm / 10**18)  # Need to convert to 1e18 units!
         adjustment_step: uint256 = self.adjustment_step
 
@@ -549,7 +554,8 @@ def tweak_price(A: uint256, gamma: uint256,
 
             return
 
-        # else - make a delay?
+        else:
+            self.not_adjusted = False
 
     # If we are here, the price_scale adjustment did not happen
     # Still need to update the profit counter and D
