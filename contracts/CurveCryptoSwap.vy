@@ -582,7 +582,9 @@ def tweak_price(A: uint256, gamma: uint256,
 @nonreentrant('lock')
 def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool = False):
     assert not self.is_killed  # dev: the pool is killed
-    assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
+    assert i != j  # dev: coin index out of range
+    assert i < N_COINS  # dev: coin index out of range
+    assert j < N_COINS  # dev: coin index out of range
     assert dx > 0  # dev: do not exchange 0 coins
 
     A: uint256 = 0
@@ -904,12 +906,11 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
     self.balances[i] -= dy
     assert CurveToken(token).burnFrom(msg.sender, token_amount)
-    if True:  # Remove _coins from the scope
-        _coins: address[N_COINS] = coins
-        # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(_coins[i]).transfer(msg.sender, dy)
-
     self.tweak_price(A, gamma, xp, i, p, D)
+
+    _coins: address[N_COINS] = coins
+    # assert might be needed for some tokens - removed one to save bytespace
+    ERC20(_coins[i]).transfer(msg.sender, dy)
 
     log RemoveLiquidityOne(msg.sender, token_amount, i, dy)
 
@@ -935,8 +936,10 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
 
     future_A_p: uint256 = future_A * A_MULTIPLIER
 
-    assert future_A > 0 and future_A < MAX_A
-    assert future_gamma > MIN_GAMMA-1 and future_gamma < MAX_GAMMA+1
+    assert future_A > 0
+    assert future_A < MAX_A
+    assert future_gamma > MIN_GAMMA-1
+    assert future_gamma < MAX_GAMMA+1
     if future_A_p < initial_A:
         assert future_A_p * MAX_A_CHANGE >= initial_A
     else:
@@ -994,7 +997,8 @@ def commit_new_parameters(
 
     # Fees
     if new_out_fee != MAX_UINT256:
-        assert new_out_fee < MAX_FEE+1  and new_out_fee > MIN_FEE-1  # dev: fee is out of range
+        assert new_out_fee < MAX_FEE+1  # dev: fee is out of range
+        assert new_out_fee > MIN_FEE-1  # dev: fee is out of range
     else:
         new_out_fee = self.out_fee
     if new_mid_fee == MAX_UINT256:
@@ -1007,7 +1011,8 @@ def commit_new_parameters(
 
     # AMM parameters
     if new_fee_gamma != MAX_UINT256:
-        assert new_fee_gamma > 0 and new_fee_gamma < 2**100  # dev: fee_gamma out of range [1 .. 2**100]
+        assert new_fee_gamma > 0  # dev: fee_gamma out of range [1 .. 2**100]
+        assert new_fee_gamma < 2**100  # dev: fee_gamma out of range [1 .. 2**100]
     else:
         new_fee_gamma = self.fee_gamma
     if new_price_threshold != MAX_UINT256:
@@ -1020,7 +1025,8 @@ def commit_new_parameters(
 
     # MA
     if new_ma_half_time != MAX_UINT256:
-        assert new_ma_half_time > 0 and new_ma_half_time < 7*86400  # dev: MA time should be shorter than 1 week
+        assert new_ma_half_time > 0  # dev: MA time should be shorter than 1 week
+        assert new_ma_half_time < 7*86400  # dev: MA time should be shorter than 1 week
     else:
         new_ma_half_time = self.ma_half_time
 
