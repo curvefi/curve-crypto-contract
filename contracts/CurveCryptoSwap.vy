@@ -590,72 +590,77 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
+    xp: uint256[N_COINS] = self.balances
+    ix: uint256 = j
+    p: uint256 = 0
+    dy: uint256 = 0
 
-    _coins: address[N_COINS] = coins
+    if True:  # scope to reduce size of memory when making internal calls later
+        _coins: address[N_COINS] = coins
+        if i == 2 and use_eth:
+            assert msg.value == dx
+            WETH(coins[2]).deposit(value=msg.value)
+        else:
+            assert msg.value == 0
 
-    if i == 2 and use_eth:
-        assert msg.value == dx
-        WETH(coins[2]).deposit(value=msg.value)
-    else:
-        assert msg.value == 0
+        # assert might be needed for some tokens - removed one to save bytespace
+        ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
+        y: uint256 = xp[j]
+        xp[i] += dx
+        self.balances[i] = xp[i]
+        prec_i: uint256 = 0
+        prec_j: uint256 = 0
 
-    # assert might be needed for some tokens - removed one to save bytespace
-    ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
-
-    price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
-    if True:  # scope to clear packed_prices
+        price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
         packed_prices: uint256 = self.price_scale_packed
         for k in range(N_COINS-1):
             price_scale[k] = bitwise_and(packed_prices, PRICE_MASK)  # * PRICE_PRECISION_MUL
             packed_prices = shift(packed_prices, -PRICE_SIZE)
 
-    xp: uint256[N_COINS] = self.balances
-    y: uint256 = xp[j]
-    xp[i] += dx
-    self.balances[i] = xp[i]
-    precisions: uint256[N_COINS] = PRECISIONS
-    xp[0] *= precisions[0]
-    for k in range(1, N_COINS):
-        xp[k] = xp[k] * price_scale[k-1] * precisions[k] / PRECISION
+        precisions: uint256[N_COINS] = PRECISIONS
+        xp[0] *= precisions[0]
+        for k in range(1, N_COINS):
+            xp[k] = xp[k] * price_scale[k-1] * precisions[k] / PRECISION
+        prec_i = precisions[i]
+        prec_j = precisions[j]
 
-    dy: uint256 = xp[j] - Math(math).newton_y(A, gamma, xp, self.D, j)
-    # Not defining new "y" here to have less variables / make subsequent calls cheaper
-    xp[j] -= dy
-    dy -= 1
+        dy = xp[j] - Math(math).newton_y(A, gamma, xp, self.D, j)
+        # Not defining new "y" here to have less variables / make subsequent calls cheaper
+        xp[j] -= dy
+        dy -= 1
 
-    if j > 0:
-        dy = dy * PRECISION / price_scale[j-1]
-    dy /= precisions[j]
-    dy -= self._fee(xp) * dy / 10**10
-    assert dy >= min_dy, "Slippage"
-    y -= dy
+        if j > 0:
+            dy = dy * PRECISION / price_scale[j-1]
+        dy /= prec_j
 
-    self.balances[j] = y
-    # assert might be needed for some tokens - removed one to save bytespace
-    if j == 2 and use_eth:
-        WETH(coins[2]).withdraw(dy)
-        raw_call(msg.sender, b"", value=dy)
-    else:
-        ERC20(_coins[j]).transfer(msg.sender, dy)
+        dy -= self._fee(xp) * dy / 10**10
+        assert dy >= min_dy, "Slippage"
+        y -= dy
 
-    xp[j] = y * precisions[j]
-    if j > 0:
-        xp[j] = xp[j] * price_scale[j-1] / PRECISION
+        self.balances[j] = y
+        # assert might be needed for some tokens - removed one to save bytespace
+        if j == 2 and use_eth:
+            WETH(coins[2]).withdraw(dy)
+            raw_call(msg.sender, b"", value=dy)
+        else:
+            ERC20(_coins[j]).transfer(msg.sender, dy)
 
-    # Calculate price
-    p: uint256 = 0
-    ix: uint256 = j
-    if dx > 10**5 and dy > 10**5:
-        if i != 0 and j != 0:
-            p = bitwise_and(
-                shift(self.last_prices_packed, -PRICE_SIZE * convert(i-1, int128)),
-                PRICE_MASK
-            ) * (dx * precisions[i]) / (dy * precisions[j])  # * PRICE_PRECISION_MUL
-        elif i == 0:
-            p = (dx * precisions[i]) * 10**18 / (dy * precisions[j])
-        else:  # j == 0
-            p = (dy * precisions[j]) * 10**18 / (dx * precisions[i])
-            ix = i
+        xp[j] = y * prec_j
+        if j > 0:
+            xp[j] = xp[j] * price_scale[j-1] / PRECISION
+
+        # Calculate price
+        if dx > 10**5 and dy > 10**5:
+            if i != 0 and j != 0:
+                p = bitwise_and(
+                    shift(self.last_prices_packed, -PRICE_SIZE * convert(i-1, int128)),
+                    PRICE_MASK
+                ) * (dx * prec_i) / (dy * prec_j)  # * PRICE_PRECISION_MUL
+            elif i == 0:
+                p = (dx * prec_i) * 10**18 / (dy * prec_j)
+            else:  # j == 0
+                p = (dy * prec_j) * 10**18 / (dx * prec_i)
+                ix = i
 
     self.tweak_price(A, gamma, xp, ix, p)
 
