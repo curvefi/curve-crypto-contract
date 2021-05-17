@@ -430,15 +430,20 @@ def _claim_admin_fees():
 def tweak_price(A: uint256, gamma: uint256,
                 _xp: uint256[N_COINS], i: uint256, p_i: uint256,
                 new_D: uint256 = 0):
-    # Update MA if needed
     price_oracle: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+    last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+    price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+    xp: uint256[N_COINS] = empty(uint256[N_COINS])
+    p_new: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+
+
+    # Update MA if needed
     packed_prices: uint256 = self.price_oracle_packed
     for k in range(N_COINS-1):
         price_oracle[k] = bitwise_and(packed_prices, PRICE_MASK)  # * PRICE_PRECISION_MUL
         packed_prices = shift(packed_prices, -PRICE_SIZE)
 
     last_prices_timestamp: uint256 = self.last_prices_timestamp
-    last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
     packed_prices = self.last_prices_packed
     for k in range(N_COINS-1):
         last_prices[k] = bitwise_and(packed_prices, PRICE_MASK)   # * PRICE_PRECISION_MUL
@@ -464,7 +469,6 @@ def tweak_price(A: uint256, gamma: uint256,
         # We will need this a few times (35k gas)
         D_unadjusted = Math(math).newton_D(A, gamma, _xp)
     packed_prices = self.price_scale_packed
-    price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
     for k in range(N_COINS-1):
         price_scale[k] = bitwise_and(packed_prices, PRICE_MASK)  # * PRICE_PRECISION_MUL
         packed_prices = shift(packed_prices, -PRICE_SIZE)
@@ -507,7 +511,6 @@ def tweak_price(A: uint256, gamma: uint256,
         norm += ratio**2
 
     # Update profit numbers without price adjustment first
-    xp: uint256[N_COINS] = empty(uint256[N_COINS])
     xp[0] = D_unadjusted / N_COINS
     for k in range(N_COINS-1):
         xp[k+1] = D_unadjusted * 10**18 / (N_COINS * price_scale[k])
@@ -534,7 +537,6 @@ def tweak_price(A: uint256, gamma: uint256,
         norm = Math(math).sqrt_int(norm / 10**18)  # Need to convert to 1e18 units!
         adjustment_step: uint256 = self.adjustment_step
 
-        p_new: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
         for k in range(N_COINS-1):
             p_new[k] = (price_scale[k] * (norm - adjustment_step) + adjustment_step * price_oracle[k]) / norm
 
