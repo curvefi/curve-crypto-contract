@@ -1,0 +1,28 @@
+Transaction sent: 0xaa314a286afcdd03d23cda1fea96ed51504caec2a6376c4b272c1a9cf75a4c85
+  Gas price: 60.0 gwei   Gas limit: 1922346   Nonce: 302
+Transaction sent: 0x1f0167a084974baa352b8be154af496daeea67ce87ee657be236ac3e80b79964
+  Gas price: 67.5 gwei   Gas limit: 1922346   Nonce: 302
+Transaction sent: 0x2f3820a8fb94dba9c020feeb233abf757da7e9e76cc9b0b0b07b447b1095ab97
+  Gas price: 77.06250082 gwei   Gas limit: 1922346   Nonce: 302
+Transaction sent: 0xad12dd6bcea21d270dc36aabf84dc99cfed81f31a9fb3169b685b8987c495d95
+  Gas price: 60.0 gwei   Gas limit: 971235   Nonce: 303
+Transaction sent: 0x347263ac2d9ec6bd01845a7ef4bd49bd2274927dc9d8f267cb293a45046d67df
+  Gas price: 67.5 gwei   Gas limit: 971235   Nonce: 303
+Transaction sent: 0xba871a6fe27c6da0269eb20f950bd6c0a9601ddc280a15adc73227de226ddc4b
+  Gas price: 60.0 gwei   Gas limit: 863293   Nonce: 304
+Transaction sent: 0x952c0f6a23fd949556c1cceb13963bc09bc0ad2fa68d1712a27f5c0b7037fddd
+  Gas price: 67.0 gwei   Gas limit: 863293   Nonce: 304
+Transaction sent: 0x87c74c50ce6041debb3fbdf6140c177387c5eaac68dd1cb45a517ff17963b6ec
+  Gas price: 59.0 gwei   Gas limit: 6111251   Nonce: 305
+Transaction sent: 0x52984f5137be9bbcb7b8943884061a2384523064d010b0f258ef019f67d05e69
+  Gas price: 66.375 gwei   Gas limit: 6111251   Nonce: 305
+Transaction sent: 0xe0e6bf6058003b17f5b011bc9a97e14914e9210b1e283eed04d44bf7831d9adb
+  Gas price: 76.9 gwei   Gas limit: 6111251   Nonce: 305
+Transaction sent: 0x80f566b28d36e5752a6de3377cfbbe6a9076f6263ca4d93ff9ab0d75d14bb757
+  Gas price: 63.0 gwei   Gas limit: 29500   Nonce: 306
+Transaction sent: 0xb26047ff8a8d673ba2b1c760349dec0a19295f0de5a7bb11654d9f3705b71007
+  Gas price: 70.0 gwei   Gas limit: 29500   Nonce: 306
+Deployed at:
+Swap: 0x5a0D404d2042b92eB7948ac5943128E1088fD24b
+Token: 0x31aA15da826DA3311788B208D31CaE34074D1Dc7
+(0x5a0D404d2042b92eB7948ac5943128E1088fD24b, 0x31aA15da826DA3311788B208D31CaE34074D1Dc7)
