@@ -24,6 +24,11 @@ interface Views:
     def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256: view
 
 
+interface WETH:
+    def deposit(): payable
+    def withdraw(_amount: uint256): nonpayable
+
+
 # Events
 event TokenExchange:
     buyer: indexed(address)
@@ -231,6 +236,12 @@ def __init__(
     self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
 
     self.admin_fee_receiver = owner
+
+
+@payable
+@external
+def __default__():
+    pass
 
 
 @internal
@@ -563,9 +574,11 @@ def tweak_price(A: uint256, gamma: uint256,
     self.virtual_price = virtual_price
 
 
+
+@payable
 @external
 @nonreentrant('lock')
-def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
+def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool = False):
     assert not self.is_killed  # dev: the pool is killed
     assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
     assert dx > 0  # dev: do not exchange 0 coins
@@ -575,6 +588,12 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     A, gamma = self._A_gamma()
 
     _coins: address[N_COINS] = coins
+
+    if i == 2 and use_eth:
+        assert msg.value == dx
+        WETH(coins[2]).deposit(value=msg.value)
+    else:
+        assert msg.value == 0
 
     # assert might be needed for some tokens - removed one to save bytespace
     ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
@@ -609,7 +628,11 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
 
     self.balances[j] = y
     # assert might be needed for some tokens - removed one to save bytespace
-    ERC20(_coins[j]).transfer(msg.sender, dy)
+    if j == 2 and use_eth:
+        WETH(coins[2]).withdraw(dy)
+        raw_call(msg.sender, b"", value=dy)
+    else:
+        ERC20(_coins[j]).transfer(msg.sender, dy)
 
     xp[j] = y * precisions[j]
     if j > 0:
