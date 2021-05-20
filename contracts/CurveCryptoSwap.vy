@@ -24,6 +24,11 @@ interface Views:
     def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256: view
 
 
+interface WETH:
+    def deposit(): payable
+    def withdraw(_amount: uint256): nonpayable
+
+
 # Events
 event TokenExchange:
     buyer: indexed(address)
@@ -233,6 +238,12 @@ def __init__(
     self.admin_fee_receiver = owner
 
 
+@payable
+@external
+def __default__():
+    pass
+
+
 @internal
 @view
 def _packed_view(k: uint256, p: uint256) -> uint256:
@@ -282,7 +293,7 @@ def xp() -> uint256[N_COINS]:
 
     precisions: uint256[N_COINS] = PRECISIONS
 
-    result[0] *= precisions[0]
+    result[0] *= PRECISIONS[0]
     for i in range(1, N_COINS):
         p: uint256 = bitwise_and(packed_prices, PRICE_MASK) * precisions[i]  # * PRICE_PRECISION_MUL
         result[i] = result[i] * p / PRECISION
@@ -419,15 +430,20 @@ def _claim_admin_fees():
 def tweak_price(A: uint256, gamma: uint256,
                 _xp: uint256[N_COINS], i: uint256, p_i: uint256,
                 new_D: uint256 = 0):
-    # Update MA if needed
     price_oracle: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+    last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+    price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+    xp: uint256[N_COINS] = empty(uint256[N_COINS])
+    p_new: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+
+
+    # Update MA if needed
     packed_prices: uint256 = self.price_oracle_packed
     for k in range(N_COINS-1):
         price_oracle[k] = bitwise_and(packed_prices, PRICE_MASK)  # * PRICE_PRECISION_MUL
         packed_prices = shift(packed_prices, -PRICE_SIZE)
 
     last_prices_timestamp: uint256 = self.last_prices_timestamp
-    last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
     packed_prices = self.last_prices_packed
     for k in range(N_COINS-1):
         last_prices[k] = bitwise_and(packed_prices, PRICE_MASK)   # * PRICE_PRECISION_MUL
@@ -453,7 +469,6 @@ def tweak_price(A: uint256, gamma: uint256,
         # We will need this a few times (35k gas)
         D_unadjusted = Math(math).newton_D(A, gamma, _xp)
     packed_prices = self.price_scale_packed
-    price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
     for k in range(N_COINS-1):
         price_scale[k] = bitwise_and(packed_prices, PRICE_MASK)  # * PRICE_PRECISION_MUL
         packed_prices = shift(packed_prices, -PRICE_SIZE)
@@ -496,7 +511,6 @@ def tweak_price(A: uint256, gamma: uint256,
         norm += ratio**2
 
     # Update profit numbers without price adjustment first
-    xp: uint256[N_COINS] = empty(uint256[N_COINS])
     xp[0] = D_unadjusted / N_COINS
     for k in range(N_COINS-1):
         xp[k+1] = D_unadjusted * 10**18 / (N_COINS * price_scale[k])
@@ -523,7 +537,6 @@ def tweak_price(A: uint256, gamma: uint256,
         norm = Math(math).sqrt_int(norm / 10**18)  # Need to convert to 1e18 units!
         adjustment_step: uint256 = self.adjustment_step
 
-        p_new: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
         for k in range(N_COINS-1):
             p_new[k] = (price_scale[k] * (norm - adjustment_step) + adjustment_step * price_oracle[k]) / norm
 
@@ -563,72 +576,91 @@ def tweak_price(A: uint256, gamma: uint256,
     self.virtual_price = virtual_price
 
 
+
+@payable
 @external
 @nonreentrant('lock')
-def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
+def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool = False):
     assert not self.is_killed  # dev: the pool is killed
-    assert i != j and i < N_COINS and j < N_COINS  # dev: coin index out of range
+    assert i != j  # dev: coin index out of range
+    assert i < N_COINS  # dev: coin index out of range
+    assert j < N_COINS  # dev: coin index out of range
     assert dx > 0  # dev: do not exchange 0 coins
 
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
+    xp: uint256[N_COINS] = self.balances
+    ix: uint256 = j
+    p: uint256 = 0
+    dy: uint256 = 0
 
-    _coins: address[N_COINS] = coins
+    if True:  # scope to reduce size of memory when making internal calls later
+        _coins: address[N_COINS] = coins
+        if i == 2 and use_eth:
+            assert msg.value == dx
+            WETH(coins[2]).deposit(value=msg.value)
+        else:
+            assert msg.value == 0
 
-    # assert might be needed for some tokens - removed one to save bytespace
-    ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
+        # assert might be needed for some tokens - removed one to save bytespace
+        ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
+        y: uint256 = xp[j]
+        xp[i] += dx
+        self.balances[i] = xp[i]
+        prec_i: uint256 = 0
+        prec_j: uint256 = 0
 
-    price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
-    if True:  # scope to clear packed_prices
+        price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
         packed_prices: uint256 = self.price_scale_packed
         for k in range(N_COINS-1):
             price_scale[k] = bitwise_and(packed_prices, PRICE_MASK)  # * PRICE_PRECISION_MUL
             packed_prices = shift(packed_prices, -PRICE_SIZE)
 
-    xp: uint256[N_COINS] = self.balances
-    y: uint256 = xp[j]
-    xp[i] += dx
-    self.balances[i] = xp[i]
-    precisions: uint256[N_COINS] = PRECISIONS
-    xp[0] *= precisions[0]
-    for k in range(1, N_COINS):
-        xp[k] = xp[k] * price_scale[k-1] * precisions[k] / PRECISION
+        precisions: uint256[N_COINS] = PRECISIONS
+        xp[0] *= PRECISIONS[0]
+        for k in range(1, N_COINS):
+            xp[k] = xp[k] * price_scale[k-1] * precisions[k] / PRECISION
+        prec_i = precisions[i]
+        prec_j = precisions[j]
 
-    dy: uint256 = xp[j] - Math(math).newton_y(A, gamma, xp, self.D, j)
-    # Not defining new "y" here to have less variables / make subsequent calls cheaper
-    xp[j] -= dy
-    dy -= 1
+        dy = xp[j] - Math(math).newton_y(A, gamma, xp, self.D, j)
+        # Not defining new "y" here to have less variables / make subsequent calls cheaper
+        xp[j] -= dy
+        dy -= 1
 
-    if j > 0:
-        dy = dy * PRECISION / price_scale[j-1]
-    dy /= precisions[j]
-    dy -= self._fee(xp) * dy / 10**10
-    assert dy >= min_dy, "Slippage"
-    y -= dy
+        if j > 0:
+            dy = dy * PRECISION / price_scale[j-1]
+        dy /= prec_j
 
-    self.balances[j] = y
-    # assert might be needed for some tokens - removed one to save bytespace
-    ERC20(_coins[j]).transfer(msg.sender, dy)
+        dy -= self._fee(xp) * dy / 10**10
+        assert dy >= min_dy, "Slippage"
+        y -= dy
 
-    xp[j] = y * precisions[j]
-    if j > 0:
-        xp[j] = xp[j] * price_scale[j-1] / PRECISION
+        self.balances[j] = y
+        # assert might be needed for some tokens - removed one to save bytespace
+        if j == 2 and use_eth:
+            WETH(coins[2]).withdraw(dy)
+            raw_call(msg.sender, b"", value=dy)
+        else:
+            ERC20(_coins[j]).transfer(msg.sender, dy)
 
-    # Calculate price
-    p: uint256 = 0
-    ix: uint256 = j
-    if dx > 10**5 and dy > 10**5:
-        if i != 0 and j != 0:
-            p = bitwise_and(
-                shift(self.last_prices_packed, -PRICE_SIZE * convert(i-1, int128)),
-                PRICE_MASK
-            ) * (dx * precisions[i]) / (dy * precisions[j])  # * PRICE_PRECISION_MUL
-        elif i == 0:
-            p = (dx * precisions[i]) * 10**18 / (dy * precisions[j])
-        else:  # j == 0
-            p = (dy * precisions[j]) * 10**18 / (dx * precisions[i])
-            ix = i
+        xp[j] = y * prec_j
+        if j > 0:
+            xp[j] = xp[j] * price_scale[j-1] / PRECISION
+
+        # Calculate price
+        if dx > 10**5 and dy > 10**5:
+            if i != 0 and j != 0:
+                p = bitwise_and(
+                    shift(self.last_prices_packed, -PRICE_SIZE * convert(i-1, int128)),
+                    PRICE_MASK
+                ) * (dx * prec_i) / (dy * prec_j)  # * PRICE_PRECISION_MUL
+            elif i == 0:
+                p = (dx * prec_i) * 10**18 / (dy * prec_j)
+            else:  # j == 0
+                p = (dy * prec_j) * 10**18 / (dx * prec_i)
+                ix = i
 
     self.tweak_price(A, gamma, xp, ix, p)
 
@@ -697,7 +729,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
 
         precisions: uint256[N_COINS] = PRECISIONS
         packed_prices: uint256 = self.price_scale_packed
-        xp[0] *= precisions[0]
+        xp[0] *= PRECISIONS[0]
         for i in range(1, N_COINS):
             price_scale: uint256 = bitwise_and(packed_prices, PRICE_MASK) * precisions[i]  # * PRICE_PRECISION_MUL
             xp[i] = xp[i] * price_scale / PRECISION
@@ -745,7 +777,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
                 for i in range(N_COINS):
                     if i != ix:
                         if i == 0:
-                            S += xx[0] * precisions[0]
+                            S += xx[0] * PRECISIONS[0]
                         else:
                             S += xx[i] * last_prices[i-1] * precisions[i] / PRECISION
                 S = S * d_token / token_supply
@@ -809,7 +841,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     xx: uint256[N_COINS] = self.balances
     xp: uint256[N_COINS] = PRECISIONS
 
-    price_scale_i: uint256 = PRECISION * xp[0]
+    price_scale_i: uint256 = PRECISION * PRECISIONS[0]
     if True:  # To remove packed_prices from memory
         packed_prices: uint256 = self.price_scale_packed
         xp[0] *= xx[0]
@@ -843,7 +875,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
         for k in range(N_COINS):
             if k != i:
                 if k == 0:
-                    S += xx[0] * precisions[0]
+                    S += xx[0] * PRECISIONS[0]
                 else:
                     S += xx[k] * last_prices[k-1] * precisions[k] / PRECISION
         S = S * dD / D0
@@ -879,12 +911,11 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
     self.balances[i] -= dy
     assert CurveToken(token).burnFrom(msg.sender, token_amount)
-    if True:  # Remove _coins from the scope
-        _coins: address[N_COINS] = coins
-        # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(_coins[i]).transfer(msg.sender, dy)
-
     self.tweak_price(A, gamma, xp, i, p, D)
+
+    _coins: address[N_COINS] = coins
+    # assert might be needed for some tokens - removed one to save bytespace
+    ERC20(_coins[i]).transfer(msg.sender, dy)
 
     log RemoveLiquidityOne(msg.sender, token_amount, i, dy)
 
@@ -910,8 +941,10 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
 
     future_A_p: uint256 = future_A * A_MULTIPLIER
 
-    assert future_A > 0 and future_A < MAX_A
-    assert future_gamma > MIN_GAMMA-1 and future_gamma < MAX_GAMMA+1
+    assert future_A > 0
+    assert future_A < MAX_A
+    assert future_gamma > MIN_GAMMA-1
+    assert future_gamma < MAX_GAMMA+1
     if future_A_p < initial_A:
         assert future_A_p * MAX_A_CHANGE >= initial_A
     else:
@@ -969,7 +1002,8 @@ def commit_new_parameters(
 
     # Fees
     if new_out_fee != MAX_UINT256:
-        assert new_out_fee < MAX_FEE+1  and new_out_fee > MIN_FEE-1  # dev: fee is out of range
+        assert new_out_fee < MAX_FEE+1  # dev: fee is out of range
+        assert new_out_fee > MIN_FEE-1  # dev: fee is out of range
     else:
         new_out_fee = self.out_fee
     if new_mid_fee == MAX_UINT256:
@@ -982,7 +1016,8 @@ def commit_new_parameters(
 
     # AMM parameters
     if new_fee_gamma != MAX_UINT256:
-        assert new_fee_gamma > 0 and new_fee_gamma < 2**100  # dev: fee_gamma out of range [1 .. 2**100]
+        assert new_fee_gamma > 0  # dev: fee_gamma out of range [1 .. 2**100]
+        assert new_fee_gamma < 2**100  # dev: fee_gamma out of range [1 .. 2**100]
     else:
         new_fee_gamma = self.fee_gamma
     if new_price_threshold != MAX_UINT256:
@@ -995,7 +1030,8 @@ def commit_new_parameters(
 
     # MA
     if new_ma_half_time != MAX_UINT256:
-        assert new_ma_half_time > 0 and new_ma_half_time < 7*86400  # dev: MA time should be shorter than 1 week
+        assert new_ma_half_time > 0  # dev: MA time should be shorter than 1 week
+        assert new_ma_half_time < 7*86400  # dev: MA time should be shorter than 1 week
     else:
         new_ma_half_time = self.ma_half_time
 
