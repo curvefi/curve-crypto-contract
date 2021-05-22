@@ -9,10 +9,15 @@ def crypto_math(CurveCryptoMath3, accounts):
     yield CurveCryptoMath3.deploy({'from': accounts[0]})
 
 
+@pytest.fixture(scope="module")
+def weth(WETH, accounts):
+    yield WETH.deploy({'from': accounts[-1], 'value': accounts[-1].balance()})
+
+
 @pytest.fixture(scope="module", autouse=True)
-def coins(ERC20Mock, accounts):
+def coins(ERC20Mock, weth, accounts):
     yield [ERC20Mock.deploy(name, name, 18, {"from": accounts[0]})
-           for name in ['USD', 'BTC', 'ETH']]
+           for name in ['USD', 'BTC']] + [weth]
 
 
 def _crypto_views(CurveCryptoViews3, crypto_math, accounts, coins):

@@ -598,13 +598,13 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
     if True:  # scope to reduce size of memory when making internal calls later
         _coins: address[N_COINS] = coins
         if i == 2 and use_eth:
-            assert msg.value == dx
+            assert msg.value == dx  # dev: incorrect eth amount
             WETH(coins[2]).deposit(value=msg.value)
         else:
-            assert msg.value == 0
+            assert msg.value == 0  # dev: nonzero eth amount
+            # assert might be needed for some tokens - removed one to save bytespace
+            ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
 
-        # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
         y: uint256 = xp[j]
         xp[i] += dx
         self.balances[i] = xp[i]
