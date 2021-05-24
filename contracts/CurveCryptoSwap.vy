@@ -249,7 +249,7 @@ def __default__():
 def _packed_view(k: uint256, p: uint256) -> uint256:
     assert k < N_COINS-1
     return bitwise_and(
-        shift(p, -PRICE_SIZE * convert(k, int128)),
+        shift(p, -PRICE_SIZE * convert(k, int256)),
         PRICE_MASK
     )  # * PRICE_PRECISION_MUL
 
@@ -435,7 +435,7 @@ def tweak_price(A: uint256, gamma: uint256,
     price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     p_new: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
-
+    norm: uint256 = 0
 
     # Update MA if needed
     packed_prices: uint256 = self.price_oracle_packed
@@ -498,7 +498,6 @@ def tweak_price(A: uint256, gamma: uint256,
         packed_prices = bitwise_or(p, packed_prices)
     self.last_prices_packed = packed_prices
 
-    norm: uint256 = 0
     total_supply: uint256 = CurveToken(token).totalSupply()
     old_xcp_profit: uint256 = self.xcp_profit
     old_virtual_price: uint256 = self.virtual_price
@@ -653,7 +652,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
         if dx > 10**5 and dy > 10**5:
             if i != 0 and j != 0:
                 p = bitwise_and(
-                    shift(self.last_prices_packed, -PRICE_SIZE * convert(i-1, int128)),
+                    shift(self.last_prices_packed, -PRICE_SIZE * convert(i-1, int256)),
                     PRICE_MASK
                 ) * (dx * prec_i) / (dy * prec_j)  # * PRICE_PRECISION_MUL
             elif i == 0:
@@ -711,6 +710,8 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     xp: uint256[N_COINS] = self.balances
     amountsp: uint256[N_COINS] = amounts
     xx: uint256[N_COINS] = empty(uint256[N_COINS])
+    d_token: uint256 = 0
+    d_token_fee: uint256 = 0
 
     if True:  # Scope to avoid having extra variables in memory later
         n_coins_added: uint256 = 0
@@ -740,14 +741,12 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
 
     token_supply: uint256 = CurveToken(token).totalSupply()
     old_D: uint256 = self.D
-    d_token: uint256 = 0
     if old_D > 0:
         d_token = token_supply * D / old_D - token_supply
     else:
         d_token = self.get_xcp(D)  # making initial virtual price equal to 1
     assert d_token > 0  # dev: nothing minted
 
-    d_token_fee: uint256 = 0
     if old_D > 0:
         d_token_fee = self._calc_token_fee(amountsp, xp) * d_token / 10**10 + 1
         d_token -= d_token_fee
