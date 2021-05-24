@@ -850,8 +850,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     dD: uint256 = token_amount * D / token_supply
     D -= (dD - (fee * dD / (2 * 10**10) + 1))
     y: uint256 = Math(math).newton_y(A, gamma, xp, D, i)
-    dy: uint256 = y * PRECISION / price_scale_i
-    dy = xx[i] - dy
+    dy: uint256 = (xp[i] - y) * PRECISION / price_scale_i
     xp[i] = y
 
     # Price calc
