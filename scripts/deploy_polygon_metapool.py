@@ -6,6 +6,7 @@ from brownie import (
     CurveCryptoViews3,
     CurveCryptoSwapMatic,
     ERC20Mock,
+    ZapAave,
     compile_source,
 )
 from brownie import interface
@@ -22,9 +23,10 @@ SWAP = "0x445FE580eF8d70FF569aB36e80c647af338db351"
 def main():
     p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
     INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
+    txparams = {"from": accounts[0], 'required_confs': 5}
 
-    crypto_math = CurveCryptoMath3.deploy({"from": accounts[0]})
-    token = CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", {"from": accounts[0]})
+    crypto_math = CurveCryptoMath3.deploy(txparams)
+    token = CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", txparams)
 
     if COINS:
         coins = [interface.ERC20(addr) for addr in COINS]
@@ -32,7 +34,7 @@ def main():
         INITIAL_PRICES = [p * 10**18 // vprice for p in INITIAL_PRICES]
     else:
         coins = [
-            ERC20Mock.deploy(name, name, 18, {"from": accounts[0]}) for name in ["USD", "BTC", "ETH"]
+            ERC20Mock.deploy(name, name, 18, txparams) for name in ["USD", "BTC", "ETH"]
         ]
 
     source = CurveCryptoViews3._build["source"]
@@ -40,7 +42,7 @@ def main():
     source = source.replace("1,#1", str(10 ** (18 - coins[1].decimals())) + ',')
     source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
     deployer = compile_source(source, vyper_version="0.2.12").Vyper
-    crypto_views = deployer.deploy(crypto_math, {"from": accounts[0]})
+    crypto_views = deployer.deploy(crypto_math, txparams)
 
     source = CurveCryptoSwapMatic._build["source"]
     source = source.replace("0x0000000000000000000000000000000000000000", crypto_math.address)
@@ -66,8 +68,14 @@ def main():
         0,  # admin_fee
         600,  # ma_half_time
         INITIAL_PRICES,
-        {"from": accounts[0]},
+        txparams,
     )
-    token.set_minter(swap, {"from": accounts[0]})
+    token.set_minter(swap, txparams)
 
-    return swap, token
+    zap = ZapAave.deploy(swap.address, SWAP, txparams)
+
+    print("Swap address:", swap.address)
+    print("Token address:", token.address)
+    print("Zap address:", zap.address)
+
+    return swap, token, zap
