@@ -10,6 +10,7 @@ from brownie import (
     compile_source,
 )
 from brownie import interface
+import json
 
 # Addresses are taken for Matic
 COINS = [
@@ -77,5 +78,14 @@ def main():
     print("Swap address:", swap.address)
     print("Token address:", token.address)
     print("Zap address:", zap.address)
+
+    with open("swap.json", "w") as f:
+        json.dump(swap.abi, f)
+
+    with open("token.json", "w") as f:
+        json.dump(token.abi, f)
+
+    with open("zap.json", "w") as f:
+        json.dump(zap.abi, f)
 
     return swap, token, zap
