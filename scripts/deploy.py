@@ -26,9 +26,10 @@ COINS = [
 def main():
     p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
     INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
+    txparams = {"from": accounts[0], 'required_confs': 5}
 
-    crypto_math = CurveCryptoMath3.deploy({"from": accounts[0]})
-    token = CurveTokenV4.deploy("Curve.fi USD-BTC-ETH", "crvUSDBTCETH", {"from": accounts[0]})
+    crypto_math = CurveCryptoMath3.deploy(txparams)
+    token = CurveTokenV4.deploy("Curve.fi USD-BTC-ETH", "crvTricrypto", txparams)
 
     if COINS:
         coins = [interface.ERC20(addr) for addr in COINS]
@@ -42,7 +43,7 @@ def main():
     source = source.replace("1,#1", str(10 ** (18 - coins[1].decimals())) + ',')
     source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
     deployer = compile_source(source, vyper_version="0.2.12").Vyper
-    crypto_views = deployer.deploy(crypto_math, {"from": accounts[0]})
+    crypto_views = deployer.deploy(crypto_math, txparams)
 
     source = CurveCryptoSwap._build["source"]
     source = source.replace("0x0000000000000000000000000000000000000000", crypto_math.address)
@@ -68,9 +69,9 @@ def main():
         0,  # admin_fee
         600,  # ma_half_time
         INITIAL_PRICES,
-        {"from": accounts[0]},
+        txparams,
     )
-    token.set_minter(swap, {"from": accounts[0]})
+    token.set_minter(swap, txparams)
 
     print("Deployed at:")
     print("Swap:", swap.address)
