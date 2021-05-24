@@ -22,11 +22,16 @@ COINS = [
     "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"   # WETH
 ]
 
+TEST = True
+
 
 def main():
     p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
     INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
-    txparams = {"from": accounts[0], 'required_confs': 5}
+    if TEST:
+        txparams = {"from": accounts[0]}
+    else:
+        txparams = {"from": accounts[0], 'required_confs': 5}
 
     crypto_math = CurveCryptoMath3.deploy(txparams)
     token = CurveTokenV4.deploy("Curve.fi USD-BTC-ETH", "crvTricrypto", txparams)
