@@ -11,27 +11,28 @@ from brownie import (
 )
 from brownie import interface, network
 
-try:
-    network.gas_price(GasNowScalingStrategy("slow", "fast"))
-except ConnectionError:
-    pass
 
 COINS = [
-    "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",  # USDC
+    "0xdAC17F958D2ee523a2206206994597C13D831ec7",  # USDT
     "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",  # WBTC
     "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"   # WETH
 ]
 
-TEST = True
+if network.show_active() == 'mainnet':
+    txparams = {"from": accounts[0], 'required_confs': 5}
+    try:
+        network.gas_price(GasNowScalingStrategy("slow", "fast"))
+    except ConnectionError:
+        pass
+
+else:
+    txparams = {"from": accounts[0]}
 
 
 def main():
     p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
     INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
-    if TEST:
-        txparams = {"from": accounts[0]}
-    else:
-        txparams = {"from": accounts[0], 'required_confs': 5}
+
 
     crypto_math = CurveCryptoMath3.deploy(txparams)
     token = CurveTokenV4.deploy("Curve.fi USD-BTC-ETH", "crvTricrypto", txparams)
