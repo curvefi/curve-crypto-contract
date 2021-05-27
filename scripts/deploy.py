@@ -24,6 +24,7 @@ if network.show_active() == 'mainnet':
         network.gas_price(GasNowScalingStrategy("slow", "fast"))
     except ConnectionError:
         pass
+    accounts.load('babe')
 
 else:
     txparams = {"from": accounts[0]}
