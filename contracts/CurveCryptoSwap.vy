@@ -1,7 +1,11 @@
 # @version 0.2.12
 # (c) Curve.Fi, 2020
 # Pool for 3Crv(USD)/BTC/ETH or similar
-from vyper.interfaces import ERC20
+
+interface ERC20:  # Custom ERC20 which works for USDT, WETH and WBTC
+    def transfer(_to: address, _amount: uint256): nonpayable
+    def transferFrom(_from: address, _to: address, _amount: uint256): nonpayable
+    def balanceOf(_user: address) -> uint256: view
 
 interface CurveToken:
     def totalSupply() -> uint256: view
