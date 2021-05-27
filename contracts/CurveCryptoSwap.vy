@@ -175,7 +175,7 @@ NOISE_FEE: constant(uint256) = 10**5  # 0.1 bps
 PRICE_SIZE: constant(int128) = 256 / (N_COINS-1)
 PRICE_MASK: constant(uint256) = 2**PRICE_SIZE - 1
 
-ALLOWED_EXTRA_PROFIT = 10**13  # 0.1 bps above the baseline
+ALLOWED_EXTRA_PROFIT: constant(uint256) = 10**13  # 0.1 bps above the baseline
 
 # This must be changed for different N_COINS
 # For example:
