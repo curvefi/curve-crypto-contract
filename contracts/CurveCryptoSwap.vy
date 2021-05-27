@@ -175,6 +175,8 @@ NOISE_FEE: constant(uint256) = 10**5  # 0.1 bps
 PRICE_SIZE: constant(int128) = 256 / (N_COINS-1)
 PRICE_MASK: constant(uint256) = 2**PRICE_SIZE - 1
 
+ALLOWED_EXTRA_PROFIT = 10**13  # 0.1 bps above the baseline
+
 # This must be changed for different N_COINS
 # For example:
 # N_COINS = 3 -> 1  (10**18 -> 10**18)
@@ -527,7 +529,7 @@ def tweak_price(A: uint256, gamma: uint256,
     self.xcp_profit = xcp_profit
 
     needs_adjustment: bool = self.not_adjusted
-    if not needs_adjustment and (virtual_price-10**18 > (xcp_profit-10**18)/2 + 10**13):  # 0.1 bps above the baseline
+    if not needs_adjustment and (virtual_price-10**18 > (xcp_profit-10**18)/2 + ALLOWED_EXTRA_PROFIT):
         needs_adjustment = True
         self.not_adjusted = True
 
