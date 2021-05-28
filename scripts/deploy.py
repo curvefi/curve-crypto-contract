@@ -19,12 +19,13 @@ COINS = [
 ]
 
 if network.show_active() == 'mainnet':
+    print('Deploying on mainnet')
+    accounts.load('babe')
     txparams = {"from": accounts[0], 'required_confs': 5}
     try:
         network.gas_price(GasNowScalingStrategy("slow", "fast"))
     except ConnectionError:
         pass
-    accounts.load('babe')
 
 else:
     txparams = {"from": accounts[0]}
