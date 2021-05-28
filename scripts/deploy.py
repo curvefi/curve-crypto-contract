@@ -10,6 +10,7 @@ from brownie import (
     compile_source,
 )
 from brownie import interface, network
+import json
 
 
 COINS = [
@@ -84,5 +85,11 @@ def main():
     print("Deployed at:")
     print("Swap:", swap.address)
     print("Token:", token.address)
+
+    with open("swap.json", "w") as f:
+        json.dump(swap.abi, f)
+
+    with open("token.json", "w") as f:
+        json.dump(token.abi, f)
 
     return swap, token
