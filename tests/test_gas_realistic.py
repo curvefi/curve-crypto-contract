@@ -2,8 +2,8 @@ import pytest
 from .stateful_base import StatefulBase
 from brownie.test import strategy
 
-MAX_SAMPLES = 40
-STEP_COUNT = 50
+MAX_SAMPLES = 60
+STEP_COUNT = 100
 
 
 class StatefulGas(StatefulBase):
