@@ -30,6 +30,13 @@ coins: public(address[N_COINS])
 
 
 @payable
+@nonreentrant('lock')
+@external
+def __default__():
+    assert msg.sender == WETH
+
+
+@payable
 @external
 def __init__(_pool: address):
     """
@@ -41,7 +48,17 @@ def __init__(_pool: address):
 
     for i in range(N_COINS):
         coin: address = CurveCryptoSwap(_pool).coins(i)
-        ERC20(coin).approve(_pool, MAX_UINT256)
+        response: Bytes[32] = raw_call(
+            coin,
+            concat(
+                method_id("approve(address,uint256)"),
+                convert(_pool, bytes32),
+                convert(MAX_UINT256, bytes32)
+            ),
+            max_outsize=32
+        )
+        if len(response) > 0:
+            assert convert(response, bool)  # dev: bad response
         self.coins[i] = coin
 
     assert self.coins[WETH_IDX] == WETH
@@ -67,12 +84,33 @@ def add_liquidity(
     wETH(WETH).deposit(value=msg.value)
 
     for i in range(N_COINS-1):
-        ERC20(self.coins[i]).transferFrom(msg.sender, self, _amounts[i])
+        response: Bytes[32] = raw_call(
+            self.coins[i],
+            concat(
+                method_id("transferFrom(address,address,uint256)"),
+                convert(msg.sender, bytes32),
+                convert(self, bytes32),
+                convert(_amounts[i], bytes32)
+            ),
+            max_outsize=32
+        )
+        if len(response) > 0:
+            assert convert(response, bool)  # dev: bad response
 
     CurveCryptoSwap(self.pool).add_liquidity(_amounts, _min_mint_amount)
     token: address = self.token
     amount: uint256 = ERC20(token).balanceOf(self)
-    ERC20(token).transfer(_receiver, amount)
+    response: Bytes[32] = raw_call(
+        token,
+        concat(
+            method_id("transfer(address,uint256)"),
+            convert(_receiver, bytes32),
+            convert(amount, bytes32)
+        ),
+        max_outsize=32
+    )
+    if len(response) > 0:
+        assert convert(response, bool)  # dev: bad response
 
     return amount
 
@@ -99,7 +137,17 @@ def remove_liquidity(
     for i in range(N_COINS-1):
         coin: address = self.coins[i]
         amounts[i] = ERC20(coin).balanceOf(self)
-        ERC20(coin).transfer(_receiver, amounts[i])
+        response: Bytes[32] = raw_call(
+            coin,
+            concat(
+                method_id("transfer(address,uint256)"),
+                convert(_receiver, bytes32),
+                convert(amounts[i], bytes32)
+            ),
+            max_outsize=32
+        )
+        if len(response) > 0:
+            assert convert(response, bool)  # dev: bad response
 
     amounts[WETH_IDX] = ERC20(WETH).balanceOf(self)
     wETH(WETH).withdraw(amounts[WETH_IDX])
@@ -133,6 +181,15 @@ def remove_liquidity_one_coin(
         wETH(WETH).withdraw(amount)
         raw_call(_receiver, b"", value=self.balance)
     else:
-        ERC20(coin).transfer(_receiver, amount)
-
+        response: Bytes[32] = raw_call(
+            coin,
+            concat(
+                method_id("transfer(address,uint256)"),
+                convert(_receiver, bytes32),
+                convert(amount, bytes32)
+            ),
+            max_outsize=32
+        )
+        if len(response) > 0:
+            assert convert(response, bool)  # dev: bad response
     return amount
