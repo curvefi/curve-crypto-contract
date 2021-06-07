@@ -50,5 +50,5 @@ def crypto_lp_token(CurveTokenV4):
 def pre_mining(alice, crypto_zap, coins, decimals):
     """Mint a bunch of test tokens"""
     for coin, decimal in zip(coins, decimals):
-        coin._mint_for_testing(alice, 1_000 * 10 ** decimal)
+        coin._mint_for_testing(alice, 100_000 * 10 ** decimal)
         coin.approve(crypto_zap, 2 ** 256 - 1, {"from": alice})
