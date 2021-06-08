@@ -36,7 +36,6 @@ def __default__():
     assert msg.sender == WETH
 
 
-@payable
 @external
 def __init__(_pool: address):
     """
