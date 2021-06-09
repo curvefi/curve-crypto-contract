@@ -50,7 +50,6 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     for k in range(N_COINS):
         xp[k] = Curve(msg.sender).balances(k)
-    y0: uint256 = xp[j]
     xp[i] += dx
     xp[0] *= precisions[0]
     for k in range(N_COINS-1):
