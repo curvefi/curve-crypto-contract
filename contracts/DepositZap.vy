@@ -30,7 +30,6 @@ coins: public(address[N_COINS])
 
 
 @payable
-@nonreentrant('lock')
 @external
 def __default__():
     assert msg.sender == WETH
@@ -65,7 +64,6 @@ def __init__(_pool: address):
 
 @payable
 @external
-@nonreentrant('lock')
 def add_liquidity(
     _amounts: uint256[N_COINS],
     _min_mint_amount: uint256,
@@ -83,18 +81,19 @@ def add_liquidity(
     wETH(WETH).deposit(value=msg.value)
 
     for i in range(N_COINS-1):
-        response: Bytes[32] = raw_call(
-            self.coins[i],
-            concat(
-                method_id("transferFrom(address,address,uint256)"),
-                convert(msg.sender, bytes32),
-                convert(self, bytes32),
-                convert(_amounts[i], bytes32)
-            ),
-            max_outsize=32
-        )
-        if len(response) > 0:
-            assert convert(response, bool)  # dev: bad response
+        if _amounts[i] > 0:
+            response: Bytes[32] = raw_call(
+                self.coins[i],
+                concat(
+                    method_id("transferFrom(address,address,uint256)"),
+                    convert(msg.sender, bytes32),
+                    convert(self, bytes32),
+                    convert(_amounts[i], bytes32)
+                ),
+                max_outsize=32
+            )
+            if len(response) > 0:
+                assert convert(response, bool)  # dev: bad response
 
     CurveCryptoSwap(self.pool).add_liquidity(_amounts, _min_mint_amount)
     token: address = self.token
@@ -115,7 +114,6 @@ def add_liquidity(
 
 
 @external
-@nonreentrant('lock')
 def remove_liquidity(
     _amount: uint256,
     _min_amounts: uint256[N_COINS],
@@ -156,7 +154,6 @@ def remove_liquidity(
 
 
 @external
-@nonreentrant('lock')
 def remove_liquidity_one_coin(
     _token_amount: uint256,
     i: uint256,
