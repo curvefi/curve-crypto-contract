@@ -30,7 +30,6 @@ coins: public(address[N_COINS])
 
 
 @payable
-@nonreentrant('lock')
 @external
 def __default__():
     assert msg.sender == WETH
@@ -65,7 +64,6 @@ def __init__(_pool: address):
 
 @payable
 @external
-@nonreentrant('lock')
 def add_liquidity(
     _amounts: uint256[N_COINS],
     _min_mint_amount: uint256,
@@ -115,7 +113,6 @@ def add_liquidity(
 
 
 @external
-@nonreentrant('lock')
 def remove_liquidity(
     _amount: uint256,
     _min_amounts: uint256[N_COINS],
@@ -156,7 +153,6 @@ def remove_liquidity(
 
 
 @external
-@nonreentrant('lock')
 def remove_liquidity_one_coin(
     _token_amount: uint256,
     i: uint256,
