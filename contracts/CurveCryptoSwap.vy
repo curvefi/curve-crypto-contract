@@ -87,6 +87,8 @@ event NewParameters:
 event RampAgamma:
     initial_A: uint256
     future_A: uint256
+    initial_gamma: uint256
+    future_gamma: uint256
     initial_time: uint256
     future_time: uint256
 
@@ -101,7 +103,6 @@ event ClaimAdminFee:
 
 
 N_COINS: constant(int128) = 3  # <- change
-FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
 A_MULTIPLIER: constant(uint256) = 100
 
@@ -127,7 +128,7 @@ initial_A_gamma_time: public(uint256)
 future_A_gamma_time: public(uint256)
 
 price_threshold: public(uint256)
-future_price_threshoold: public(uint256)
+future_price_threshold: public(uint256)
 
 fee_gamma: public(uint256)
 future_fee_gamma: public(uint256)
@@ -946,7 +947,7 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
     future_A_p: uint256 = future_A * A_MULTIPLIER
 
     assert future_A > 0
-    assert future_A < MAX_A
+    assert future_A < MAX_A+1
     assert future_gamma > MIN_GAMMA-1
     assert future_gamma < MAX_GAMMA+1
     if future_A_p < initial_A:
@@ -962,7 +963,7 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
     self.future_A_gamma_time = future_time
     self.future_A_gamma = future_A_gamma
 
-    log RampAgamma(initial_A, future_A_p, block.timestamp, future_time)
+    log RampAgamma(initial_A, future_A_p, initial_gamma, future_gamma, block.timestamp, future_time)
 
 
 @external
@@ -1024,10 +1025,9 @@ def commit_new_parameters(
         assert new_fee_gamma < 2**100  # dev: fee_gamma out of range [1 .. 2**100]
     else:
         new_fee_gamma = self.fee_gamma
-    if new_price_threshold != MAX_UINT256:
-        assert new_price_threshold > new_mid_fee  # dev: price threshold should be higher than the fee
-    else:
+    if new_price_threshold == MAX_UINT256:
         new_price_threshold = self.price_threshold
+    assert new_price_threshold > new_mid_fee  # dev: price threshold should be higher than the fee
     if new_adjustment_step == MAX_UINT256:
         new_adjustment_step = self.adjustment_step
     assert new_adjustment_step <= new_price_threshold  # dev: adjustment step should be smaller than price threshold
@@ -1046,7 +1046,7 @@ def commit_new_parameters(
     self.future_mid_fee = new_mid_fee
     self.future_out_fee = new_out_fee
     self.future_fee_gamma = new_fee_gamma
-    self.future_price_threshoold = new_price_threshold
+    self.future_price_threshold = new_price_threshold
     self.future_adjustment_step = new_adjustment_step
     self.future_ma_half_time = new_ma_half_time
 
@@ -1076,7 +1076,7 @@ def apply_new_parameters():
     self.out_fee = out_fee
     fee_gamma: uint256 = self.future_fee_gamma
     self.fee_gamma = fee_gamma
-    price_threshold: uint256 = self.future_price_threshoold
+    price_threshold: uint256 = self.future_price_threshold
     self.price_threshold = price_threshold
     adjustment_step: uint256 = self.future_adjustment_step
     self.adjustment_step = adjustment_step
