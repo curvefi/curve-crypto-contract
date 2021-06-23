@@ -405,8 +405,6 @@ def _claim_admin_fees():
     fees: uint256 = (xcp_profit - self.xcp_profit_a) * self.admin_fee / (2 * 10**10)
 
     if fees > 0:
-        # Would be nice to recalc D, but we have no bytespace left
-
         frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
         claimed: uint256 = CurveToken(token).mint_relative(receiver, frac)
         total_supply: uint256 = CurveToken(token).totalSupply()
@@ -427,10 +425,11 @@ def _claim_admin_fees():
         self.virtual_price = new_vprice
 
         xcp_profit = new_vprice + xcp_profit - vprice
-        self.xcp_profit_a = xcp_profit
         self.xcp_profit = xcp_profit
 
         log ClaimAdminFee(receiver, claimed)
+
+    self.xcp_profit_a = xcp_profit
 
 
 @internal
@@ -528,8 +527,11 @@ def tweak_price(A: uint256, gamma: uint256,
         virtual_price = 10**18 * xcp / total_supply
         xcp_profit = old_xcp_profit * virtual_price / old_virtual_price
 
-        if virtual_price < old_virtual_price:
+        t: uint256 = self.future_A_gamma_time
+        if virtual_price < old_virtual_price and t == 0:
             raise "Loss"
+        if t == 1:
+            self.future_A_gamma_time = 0
 
     self.xcp_profit = xcp_profit
 
@@ -614,8 +616,6 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
         y: uint256 = xp[j]
         xp[i] += dx
         self.balances[i] = xp[i]
-        prec_i: uint256 = 0
-        prec_j: uint256 = 0
 
         price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
         packed_prices: uint256 = self.price_scale_packed
@@ -627,8 +627,17 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
         xp[0] *= PRECISIONS[0]
         for k in range(1, N_COINS):
             xp[k] = xp[k] * price_scale[k-1] * precisions[k] / PRECISION
-        prec_i = precisions[i]
-        prec_j = precisions[j]
+
+        # In case ramp is happening
+        if True:
+            t: uint256 = self.future_A_gamma_time
+            if t > 0:
+                self.D = Math(math).newton_D(A, gamma, xp)
+                if block.timestamp >= t:
+                    self.future_A_gamma_time = 1
+
+        prec_i: uint256 = precisions[i]
+        prec_j: uint256 = precisions[j]
 
         dy = xp[j] - Math(math).newton_y(A, gamma, xp, self.D, j)
         # Not defining new "y" here to have less variables / make subsequent calls cheaper
@@ -715,19 +724,22 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     _coins: address[N_COINS] = coins
 
     xp: uint256[N_COINS] = self.balances
-    amountsp: uint256[N_COINS] = amounts
+    amountsp: uint256[N_COINS] = empty(uint256[N_COINS])
     xx: uint256[N_COINS] = empty(uint256[N_COINS])
     d_token: uint256 = 0
     d_token_fee: uint256 = 0
+    old_D: uint256 = 0
 
     if True:  # Scope to avoid having extra variables in memory later
-        n_coins_added: uint256 = 0
+        n_coins_added: uint256 = 0  # XXX can remove the n_coins logic
         for i in range(N_COINS):
             if amounts[i] > 0:
                 # assert might be needed for some tokens - removed one to save bytespace
                 ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
                 n_coins_added += 1
         assert n_coins_added > 0  # dev: no coins to add
+
+        xp_old: uint256[N_COINS] = xp
 
         for i in range(N_COINS):
             bal: uint256 = xp[i] + amounts[i]
@@ -738,16 +750,26 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
         precisions: uint256[N_COINS] = PRECISIONS
         packed_prices: uint256 = self.price_scale_packed
         xp[0] *= PRECISIONS[0]
+        xp_old[0] *= PRECISIONS[0]
+        amountsp[0] = PRECISIONS[0] * amounts[0]
         for i in range(1, N_COINS):
             price_scale: uint256 = bitwise_and(packed_prices, PRICE_MASK) * precisions[i]  # * PRICE_PRECISION_MUL
             xp[i] = xp[i] * price_scale / PRECISION
-            amountsp[i] = amountsp[i] * price_scale / PRECISION
+            xp_old[i] = xp_old[i] * price_scale / PRECISION
+            amountsp[i] = amounts[i] * price_scale / PRECISION
             packed_prices = shift(packed_prices, -PRICE_SIZE)
+
+        t: uint256 = self.future_A_gamma_time
+        if t > 0:
+            old_D = Math(math).newton_D(A, gamma, xp_old)
+            if block.timestamp >= t:
+                self.future_A_gamma_time = 1
+        else:
+            old_D = self.D
 
     D: uint256 = Math(math).newton_D(A, gamma, xp)
 
     token_supply: uint256 = CurveToken(token).totalSupply()
-    old_D: uint256 = self.D
     if old_D > 0:
         d_token = token_supply * D / old_D - token_supply
     else:
@@ -795,7 +817,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
         self.D = D
         self.virtual_price = 10**18
         self.xcp_profit = 10**18
-        assert CurveToken(token).mint(msg.sender, d_token)
+        CurveToken(token).mint(msg.sender, d_token)
 
     assert d_token >= min_mint_amount, "Slippage"
 
@@ -810,7 +832,7 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
     """
     _coins: address[N_COINS] = coins
     total_supply: uint256 = CurveToken(token).totalSupply()
-    assert CurveToken(token).burnFrom(msg.sender, _amount)
+    CurveToken(token).burnFrom(msg.sender, _amount)
     balances: uint256[N_COINS] = self.balances
     amount: uint256 = _amount - 1  # Make rounding errors favoring other LPs a tiny bit
 
@@ -836,16 +858,15 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
 
 @internal
 @view
-def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i: uint256,
+def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i: uint256, update_D: bool,
                             calc_price: bool) -> (uint256, uint256, uint256, uint256[N_COINS]):
-    D: uint256 = self.D
-    D0: uint256 = D
     token_supply: uint256 = CurveToken(token).totalSupply()
     assert token_amount <= token_supply  # dev: token amount more than supply
     assert i < N_COINS  # dev: coin out of range
 
     xx: uint256[N_COINS] = self.balances
     xp: uint256[N_COINS] = PRECISIONS
+    D0: uint256 = 0
 
     price_scale_i: uint256 = PRECISION * PRECISIONS[0]
     if True:  # To remove packed_prices from memory
@@ -857,6 +878,13 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
                 price_scale_i = p * xp[i]
             xp[k] = xp[k] * xx[k] * p / PRECISION
             packed_prices = shift(packed_prices, -PRICE_SIZE)
+
+    if update_D:
+        D0 = Math(math).newton_D(A, gamma, xp)
+    else:
+        D0 = self.D
+
+    D: uint256 = D0
 
     # Charge the fee on D, not on y, e.g. reducing invariant LESS than charging the user
     fee: uint256 = self._fee(xp)
@@ -895,7 +923,7 @@ def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
     A: uint256 = 0
     gamma: uint256 = 0
     A, gamma = self._A_gamma()
-    return self._calc_withdraw_one_coin(A, gamma, token_amount, i, False)[0]
+    return self._calc_withdraw_one_coin(A, gamma, token_amount, i, True, False)[0]
 
 
 @external
@@ -911,11 +939,15 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     D: uint256 = 0
     p: uint256 = 0
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
-    dy, p, D, xp = self._calc_withdraw_one_coin(A, gamma, token_amount, i, True)
+    future_A_gamma_time: uint256 = self.future_A_gamma_time
+    dy, p, D, xp = self._calc_withdraw_one_coin(A, gamma, token_amount, i, (future_A_gamma_time > 0), True)
     assert dy >= min_amount, "Slippage"
 
+    if block.timestamp >= future_A_gamma_time:
+        self.future_A_gamma_time = 1
+
     self.balances[i] -= dy
-    assert CurveToken(token).burnFrom(msg.sender, token_amount)
+    CurveToken(token).burnFrom(msg.sender, token_amount)
     self.tweak_price(A, gamma, xp, i, p, D)
 
     _coins: address[N_COINS] = coins
