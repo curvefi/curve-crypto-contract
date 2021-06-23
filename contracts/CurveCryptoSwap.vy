@@ -398,13 +398,17 @@ def get_virtual_price() -> uint256:
 
 @internal
 def _claim_admin_fees():
-    receiver: address = self.admin_fee_receiver
+    A: uint256 = 0
+    gamma: uint256 = 0
+    A, gamma = self._A_gamma()
 
     xcp_profit: uint256 = self.xcp_profit
-    vprice: uint256 = self.virtual_price
     fees: uint256 = (xcp_profit - self.xcp_profit_a) * self.admin_fee / (2 * 10**10)
 
     if fees > 0:
+        receiver: address = self.admin_fee_receiver
+        vprice: uint256 = self.virtual_price
+
         frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
         claimed: uint256 = CurveToken(token).mint_relative(receiver, frac)
         total_supply: uint256 = CurveToken(token).totalSupply()
@@ -415,11 +419,7 @@ def _claim_admin_fees():
             self.balances[i] = ERC20(_coins[i]).balanceOf(self)
 
         # Recalculate D b/c we gulped
-        A: uint256 = 0
-        gamma: uint256 = 0
-        A, gamma = self._A_gamma()
-        xp: uint256[N_COINS] = self.xp()
-        D: uint256 = Math(math).newton_D(A, gamma, xp)
+        D: uint256 = Math(math).newton_D(A, gamma, self.xp())
 
         new_vprice: uint256 = 10**18 * self.get_xcp(D) / total_supply
         self.virtual_price = new_vprice
