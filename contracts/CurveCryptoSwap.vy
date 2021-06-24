@@ -311,7 +311,7 @@ def xp() -> uint256[N_COINS]:
 
 @view
 @internal
-def _A_gamma() -> (uint256, uint256):
+def _A_gamma() -> uint256[2]:
     t1: uint256 = self.future_A_gamma_time
 
     A_gamma_1: uint256 = self.future_A_gamma
@@ -335,7 +335,7 @@ def _A_gamma() -> (uint256, uint256):
         A1 = (shift(A_gamma_0, -128) * (t1 - t0) + A1 * t0) / t1
         gamma1 = (bitwise_and(A_gamma_0, 2**128-1) * (t1 - t0) + gamma1 * t0) / t1
 
-    return A1, gamma1
+    return [A1, gamma1]
 
 
 @view
@@ -398,9 +398,7 @@ def get_virtual_price() -> uint256:
 
 @internal
 def _claim_admin_fees():
-    A: uint256 = 0
-    gamma: uint256 = 0
-    A, gamma = self._A_gamma()
+    A_gamma: uint256[2] = self._A_gamma()
 
     xcp_profit: uint256 = self.xcp_profit
     fees: uint256 = (xcp_profit - self.xcp_profit_a) * self.admin_fee / (2 * 10**10)
@@ -419,7 +417,7 @@ def _claim_admin_fees():
             self.balances[i] = ERC20(_coins[i]).balanceOf(self)
 
         # Recalculate D b/c we gulped
-        D: uint256 = Math(math).newton_D(A, gamma, self.xp())
+        D: uint256 = Math(math).newton_D(A_gamma[0], A_gamma[1], self.xp())
 
         new_vprice: uint256 = 10**18 * self.get_xcp(D) / total_supply
         self.virtual_price = new_vprice
@@ -433,7 +431,7 @@ def _claim_admin_fees():
 
 
 @internal
-def tweak_price(A: uint256, gamma: uint256,
+def tweak_price(A_gamma: uint256[2],
                 _xp: uint256[N_COINS], i: uint256, p_i: uint256,
                 new_D: uint256 = 0):
     price_oracle: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
@@ -473,7 +471,7 @@ def tweak_price(A: uint256, gamma: uint256,
     D_unadjusted: uint256 = new_D  # Withdrawal methods know new D already
     if new_D == 0:
         # We will need this a few times (35k gas)
-        D_unadjusted = Math(math).newton_D(A, gamma, _xp)
+        D_unadjusted = Math(math).newton_D(A_gamma[0], A_gamma[1], _xp)
     packed_prices = self.price_scale_packed
     for k in range(N_COINS-1):
         price_scale[k] = bitwise_and(packed_prices, PRICE_MASK)  # * PRICE_PRECISION_MUL
@@ -494,7 +492,7 @@ def tweak_price(A: uint256, gamma: uint256,
         dx_price: uint256 = __xp[0] / 10**6
         __xp[0] += dx_price
         for k in range(N_COINS-1):
-            last_prices[k] = price_scale[k] * dx_price / (_xp[k+1] - Math(math).newton_y(A, gamma, __xp, D_unadjusted, k+1))
+            last_prices[k] = price_scale[k] * dx_price / (_xp[k+1] - Math(math).newton_y(A_gamma[0], A_gamma[1], __xp, D_unadjusted, k+1))
 
     packed_prices = 0
     for k in range(N_COINS-1):
@@ -554,7 +552,7 @@ def tweak_price(A: uint256, gamma: uint256,
             xp[k+1] = _xp[k+1] * p_new[k] / price_scale[k]
 
         # Calculate "extended constant product" invariant xCP and virtual price
-        D: uint256 = Math(math).newton_D(A, gamma, xp)
+        D: uint256 = Math(math).newton_D(A_gamma[0], A_gamma[1], xp)
         xp[0] = D / N_COINS
         for k in range(N_COINS-1):
             xp[k+1] = D * 10**18 / (N_COINS * p_new[k])
@@ -595,9 +593,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
     assert j < N_COINS  # dev: coin index out of range
     assert dx > 0  # dev: do not exchange 0 coins
 
-    A: uint256 = 0
-    gamma: uint256 = 0
-    A, gamma = self._A_gamma()
+    A_gamma: uint256[2] = self._A_gamma()
     xp: uint256[N_COINS] = self.balances
     ix: uint256 = j
     p: uint256 = 0
@@ -632,14 +628,14 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
         if True:
             t: uint256 = self.future_A_gamma_time
             if t > 0:
-                self.D = Math(math).newton_D(A, gamma, xp)
+                self.D = Math(math).newton_D(A_gamma[0], A_gamma[1], xp)
                 if block.timestamp >= t:
                     self.future_A_gamma_time = 1
 
         prec_i: uint256 = precisions[i]
         prec_j: uint256 = precisions[j]
 
-        dy = xp[j] - Math(math).newton_y(A, gamma, xp, self.D, j)
+        dy = xp[j] - Math(math).newton_y(A_gamma[0], A_gamma[1], xp, self.D, j)
         # Not defining new "y" here to have less variables / make subsequent calls cheaper
         xp[j] -= dy
         dy -= 1
@@ -677,7 +673,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
                 p = (dy * prec_j) * 10**18 / (dx * prec_i)
                 ix = i
 
-    self.tweak_price(A, gamma, xp, ix, p)
+    self.tweak_price(A_gamma, xp, ix, p)
 
     log TokenExchange(msg.sender, i, dx, j, dy)
 
@@ -717,9 +713,7 @@ def calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
 def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     assert not self.is_killed  # dev: the pool is killed
 
-    A: uint256 = 0
-    gamma: uint256 = 0
-    A, gamma = self._A_gamma()
+    A_gamma: uint256[2] = self._A_gamma()
 
     _coins: address[N_COINS] = coins
 
@@ -761,13 +755,13 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
 
         t: uint256 = self.future_A_gamma_time
         if t > 0:
-            old_D = Math(math).newton_D(A, gamma, xp_old)
+            old_D = Math(math).newton_D(A_gamma[0], A_gamma[1], xp_old)
             if block.timestamp >= t:
                 self.future_A_gamma_time = 1
         else:
             old_D = self.D
 
-    D: uint256 = Math(math).newton_D(A, gamma, xp)
+    D: uint256 = Math(math).newton_D(A_gamma[0], A_gamma[1], xp)
 
     token_supply: uint256 = CurveToken(token).totalSupply()
     if old_D > 0:
@@ -811,7 +805,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
                 S = S * d_token / token_supply
                 p = S * PRECISION / (amounts[ix] * precisions[ix] - d_token * xx[ix] * precisions[ix] / token_supply)
 
-        self.tweak_price(A, gamma, xp, ix, p, D)
+        self.tweak_price(A_gamma, xp, ix, p, D)
 
     else:
         self.D = D
@@ -858,7 +852,7 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
 
 @internal
 @view
-def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i: uint256, update_D: bool,
+def _calc_withdraw_one_coin(A_gamma: uint256[2], token_amount: uint256, i: uint256, update_D: bool,
                             calc_price: bool) -> (uint256, uint256, uint256, uint256[N_COINS]):
     token_supply: uint256 = CurveToken(token).totalSupply()
     assert token_amount <= token_supply  # dev: token amount more than supply
@@ -880,7 +874,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
             packed_prices = shift(packed_prices, -PRICE_SIZE)
 
     if update_D:
-        D0 = Math(math).newton_D(A, gamma, xp)
+        D0 = Math(math).newton_D(A_gamma[0], A_gamma[1], xp)
     else:
         D0 = self.D
 
@@ -890,7 +884,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
     fee: uint256 = self._fee(xp)
     dD: uint256 = token_amount * D / token_supply
     D -= (dD - (fee * dD / (2 * 10**10) + 1))
-    y: uint256 = Math(math).newton_y(A, gamma, xp, D, i)
+    y: uint256 = Math(math).newton_y(A_gamma[0], A_gamma[1], xp, D, i)
     dy: uint256 = (xp[i] - y) * PRECISION / price_scale_i
     xp[i] = y
 
@@ -920,10 +914,7 @@ def _calc_withdraw_one_coin(A: uint256, gamma: uint256, token_amount: uint256, i
 @view
 @external
 def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
-    A: uint256 = 0
-    gamma: uint256 = 0
-    A, gamma = self._A_gamma()
-    return self._calc_withdraw_one_coin(A, gamma, token_amount, i, True, False)[0]
+    return self._calc_withdraw_one_coin(self._A_gamma(), token_amount, i, True, False)[0]
 
 
 @external
@@ -931,16 +922,14 @@ def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
 def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256):
     assert not self.is_killed  # dev: the pool is killed
 
-    A: uint256 = 0
-    gamma: uint256 = 0
-    A, gamma = self._A_gamma()
+    A_gamma: uint256[2] = self._A_gamma()
 
     dy: uint256 = 0
     D: uint256 = 0
     p: uint256 = 0
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     future_A_gamma_time: uint256 = self.future_A_gamma_time
-    dy, p, D, xp = self._calc_withdraw_one_coin(A, gamma, token_amount, i, (future_A_gamma_time > 0), True)
+    dy, p, D, xp = self._calc_withdraw_one_coin(A_gamma, token_amount, i, (future_A_gamma_time > 0), True)
     assert dy >= min_amount, "Slippage"
 
     if block.timestamp >= future_A_gamma_time:
@@ -948,7 +937,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
     self.balances[i] -= dy
     CurveToken(token).burnFrom(msg.sender, token_amount)
-    self.tweak_price(A, gamma, xp, i, p, D)
+    self.tweak_price(A_gamma, xp, i, p, D)
 
     _coins: address[N_COINS] = coins
     # assert might be needed for some tokens - removed one to save bytespace
@@ -970,11 +959,9 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
     assert block.timestamp > self.initial_A_gamma_time + (MIN_RAMP_TIME-1)
     assert future_time > block.timestamp + (MIN_RAMP_TIME-1)  # dev: insufficient time
 
-    initial_A: uint256 = 0
-    initial_gamma: uint256 = 0
-    initial_A, initial_gamma = self._A_gamma()
-    initial_A_gamma: uint256 = shift(initial_A, 128)
-    initial_A_gamma = bitwise_or(initial_A_gamma, initial_gamma)
+    A_gamma: uint256[2] = self._A_gamma()
+    initial_A_gamma: uint256 = shift(A_gamma[0], 128)
+    initial_A_gamma = bitwise_or(initial_A_gamma, A_gamma[1])
 
     future_A_p: uint256 = future_A * A_MULTIPLIER
 
@@ -982,10 +969,10 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
     assert future_A < MAX_A+1
     assert future_gamma > MIN_GAMMA-1
     assert future_gamma < MAX_GAMMA+1
-    if future_A_p < initial_A:
-        assert future_A_p * MAX_A_CHANGE >= initial_A
+    if future_A_p < A_gamma[0]:
+        assert future_A_p * MAX_A_CHANGE >= A_gamma[0]
     else:
-        assert future_A_p <= initial_A * MAX_A_CHANGE
+        assert future_A_p <= A_gamma[0] * MAX_A_CHANGE
 
     self.initial_A_gamma = initial_A_gamma
     self.initial_A_gamma_time = block.timestamp
@@ -995,25 +982,23 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
     self.future_A_gamma_time = future_time
     self.future_A_gamma = future_A_gamma
 
-    log RampAgamma(initial_A, future_A_p, initial_gamma, future_gamma, block.timestamp, future_time)
+    log RampAgamma(A_gamma[0], future_A_p, A_gamma[1], future_gamma, block.timestamp, future_time)
 
 
 @external
 def stop_ramp_A_gamma():
     assert msg.sender == self.owner  # dev: only owner
 
-    current_A: uint256 = 0
-    current_gamma: uint256 = 0
-    current_A, current_gamma = self._A_gamma()
-    current_A_gamma: uint256 = shift(current_A, 128)
-    current_A_gamma = bitwise_or(current_A_gamma, current_gamma)
+    A_gamma: uint256[2] = self._A_gamma()
+    current_A_gamma: uint256 = shift(A_gamma[0], 128)
+    current_A_gamma = bitwise_or(current_A_gamma, A_gamma[1])
     self.initial_A_gamma = current_A_gamma
     self.future_A_gamma = current_A_gamma
     self.initial_A_gamma_time = block.timestamp
     self.future_A_gamma_time = block.timestamp
     # now (block.timestamp < t1) is always False, so we return saved A
 
-    log StopRampA(current_A, current_gamma, block.timestamp)
+    log StopRampA(A_gamma[0], A_gamma[1], block.timestamp)
 
 
 @external
