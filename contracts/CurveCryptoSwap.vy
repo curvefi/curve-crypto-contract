@@ -433,7 +433,7 @@ def _claim_admin_fees():
 @internal
 def tweak_price(A_gamma: uint256[2],
                 _xp: uint256[N_COINS], i: uint256, p_i: uint256,
-                new_D: uint256 = 0):
+                new_D: uint256):
     price_oracle: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
     last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
     price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
@@ -673,7 +673,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
                 p = (dy * prec_j) * 10**18 / (dx * prec_i)
                 ix = i
 
-    self.tweak_price(A_gamma, xp, ix, p)
+    self.tweak_price(A_gamma, xp, ix, p, 0)
 
     log TokenExchange(msg.sender, i, dx, j, dy)
 
