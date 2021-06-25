@@ -331,9 +331,10 @@ def _A_gamma() -> uint256[2]:
 
         t1 -= t0
         t0 = block.timestamp - t0
+        t2: uint256 = t1 - t0
 
-        A1 = (shift(A_gamma_0, -128) * (t1 - t0) + A1 * t0) / t1
-        gamma1 = (bitwise_and(A_gamma_0, 2**128-1) * (t1 - t0) + gamma1 * t0) / t1
+        A1 = (shift(A_gamma_0, -128) * t2 + A1 * t0) / t1
+        gamma1 = (bitwise_and(A_gamma_0, 2**128-1) * t2 + gamma1 * t0) / t1
 
     return [A1, gamma1]
 
@@ -403,6 +404,11 @@ def _claim_admin_fees():
     xcp_profit: uint256 = self.xcp_profit
     fees: uint256 = (xcp_profit - self.xcp_profit_a) * self.admin_fee / (2 * 10**10)
 
+    # Gulp here
+    _coins: address[N_COINS] = coins
+    for i in range(N_COINS):
+        self.balances[i] = ERC20(_coins[i]).balanceOf(self)
+
     if fees > 0:
         receiver: address = self.admin_fee_receiver
         vprice: uint256 = self.virtual_price
@@ -410,11 +416,6 @@ def _claim_admin_fees():
         frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
         claimed: uint256 = CurveToken(token).mint_relative(receiver, frac)
         total_supply: uint256 = CurveToken(token).totalSupply()
-
-        # Gulp here
-        _coins: address[N_COINS] = coins
-        for i in range(N_COINS):
-            self.balances[i] = ERC20(_coins[i]).balanceOf(self)
 
         # Recalculate D b/c we gulped
         D: uint256 = Math(math).newton_D(A_gamma[0], A_gamma[1], self.xp())
