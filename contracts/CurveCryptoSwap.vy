@@ -193,6 +193,8 @@ PRECISIONS: constant(uint256[N_COINS]) = [
     1,#2
 ]
 
+INF_COINS: constant(uint256) = 15
+
 
 @external
 def __init__(
@@ -730,6 +732,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     d_token: uint256 = 0
     d_token_fee: uint256 = 0
     old_D: uint256 = 0
+    ix: uint256 = 15
 
     if True:  # Scope to avoid having extra variables in memory later
         xp_old: uint256[N_COINS] = xp
@@ -750,14 +753,16 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
             xp_old[i] = xp_old[i] * price_scale / PRECISION
             packed_prices = shift(packed_prices, -PRICE_SIZE)
 
-        coins_added: bool = False
         for i in range(N_COINS):
             if amounts[i] > 0:
                 # assert might be needed for some tokens - removed one to save bytespace
                 ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
                 amountsp[i] = xp[i] - xp_old[i]
-                coins_added = True
-        assert coins_added  # dev: no coins to add
+                if ix == INF_COINS:
+                    ix = i
+                else:
+                    ix = INF_COINS-1
+        assert ix != INF_COINS  # dev: no coins to add
 
         t: uint256 = self.future_A_gamma_time
         if t > 0:
@@ -786,15 +791,8 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
         # p_i * (dx_i - dtoken / token_supply * xx_i) = sum{k!=i}(p_k * (dtoken / token_supply * xx_k - dx_k))
         # Only ix is nonzero
         p: uint256 = 0
-        ix: uint256 = 0
         if d_token > 10**5:
-            n_zeros: uint256 = 0
-            for i in range(N_COINS):
-                if amounts[i] == 0:
-                    n_zeros += 1
-                else:
-                    ix = i
-            if n_zeros == N_COINS-1:
+            if ix < N_COINS:
                 S: uint256 = 0
                 last_prices: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
                 packed_prices: uint256 = self.last_prices_packed
