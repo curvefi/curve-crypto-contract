@@ -666,15 +666,17 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
 
         # Calculate price
         if dx > 10**5 and dy > 10**5:
+            _dx: uint256 = dx * prec_i
+            _dy: uint256 = dy * prec_j
             if i != 0 and j != 0:
                 p = bitwise_and(
                     shift(self.last_prices_packed, -PRICE_SIZE * convert(i-1, int256)),
                     PRICE_MASK
-                ) * (dx * prec_i) / (dy * prec_j)  # * PRICE_PRECISION_MUL
+                ) * _dx / _dy  # * PRICE_PRECISION_MUL
             elif i == 0:
-                p = (dx * prec_i) * 10**18 / (dy * prec_j)
+                p = _dx * 10**18 / _dy
             else:  # j == 0
-                p = (dy * prec_j) * 10**18 / (dx * prec_i)
+                p = _dy * 10**18 / _dx
                 ix = i
 
     self.tweak_price(A_gamma, xp, ix, p, 0)
