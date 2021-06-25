@@ -660,9 +660,10 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
         else:
             ERC20(_coins[j]).transfer(msg.sender, dy)
 
-        xp[j] = y * prec_j
+        y *= prec_j
         if j > 0:
-            xp[j] = xp[j] * price_scale[j-1] / PRECISION
+            y = y * price_scale[j-1] / PRECISION
+        xp[j] = y
 
         # Calculate price
         if dx > 10**5 and dy > 10**5:
