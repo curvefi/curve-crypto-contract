@@ -563,7 +563,8 @@ def tweak_price(A_gamma: uint256[2],
         old_virtual_price = 10**18 * Math(math).geometric_mean(xp) / total_supply
 
         # Proceed if we've got enough profit
-        if (old_virtual_price > 10**18) and (2 * (old_virtual_price - 10**18) > xcp_profit - 10**18):
+        # if (old_virtual_price > 10**18) and (2 * (old_virtual_price - 10**18) > xcp_profit - 10**18):
+        if (old_virtual_price > 10**18) and (2 * old_virtual_price - 10**18 > xcp_profit):
             packed_prices = 0
             for k in range(N_COINS-1):
                 packed_prices = shift(packed_prices, PRICE_SIZE)
