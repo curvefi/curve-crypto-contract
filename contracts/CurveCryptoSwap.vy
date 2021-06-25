@@ -1027,36 +1027,31 @@ def commit_new_parameters(
     new_ma_half_time: uint256 = _new_ma_half_time
 
     # Fees
-    if new_out_fee != MAX_UINT256:
-        assert new_out_fee < MAX_FEE+1  # dev: fee is out of range
+    if new_out_fee < MAX_FEE+1:
         assert new_out_fee > MIN_FEE-1  # dev: fee is out of range
     else:
         new_out_fee = self.out_fee
-    if new_mid_fee == MAX_UINT256:
+    if new_mid_fee > MAX_FEE:
         new_mid_fee = self.mid_fee
     assert new_mid_fee <= new_out_fee  # dev: mid-fee is too high
-    if new_admin_fee != MAX_UINT256:
-        assert new_admin_fee < MAX_ADMIN_FEE+1  # dev: admin fee exceeds maximum
-    else:
+    if new_admin_fee > MAX_ADMIN_FEE:
         new_admin_fee = self.admin_fee
 
     # AMM parameters
-    if new_fee_gamma != MAX_UINT256:
+    if new_fee_gamma < 2**100:
         assert new_fee_gamma > 0  # dev: fee_gamma out of range [1 .. 2**100]
-        assert new_fee_gamma < 2**100  # dev: fee_gamma out of range [1 .. 2**100]
     else:
         new_fee_gamma = self.fee_gamma
-    if new_price_threshold == MAX_UINT256:
+    if new_price_threshold > 10**18:
         new_price_threshold = self.price_threshold
     assert new_price_threshold > new_mid_fee  # dev: price threshold should be higher than the fee
-    if new_adjustment_step == MAX_UINT256:
+    if new_adjustment_step > 10**18:
         new_adjustment_step = self.adjustment_step
     assert new_adjustment_step <= new_price_threshold  # dev: adjustment step should be smaller than price threshold
 
     # MA
-    if new_ma_half_time != MAX_UINT256:
-        assert new_ma_half_time > 0  # dev: MA time should be shorter than 1 week
-        assert new_ma_half_time < 7*86400  # dev: MA time should be shorter than 1 week
+    if new_ma_half_time < 7*86400:
+        assert new_ma_half_time > 0  # dev: MA time should be longer than 1 second
     else:
         new_ma_half_time = self.ma_half_time
 
