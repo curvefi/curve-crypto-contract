@@ -732,14 +732,6 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     old_D: uint256 = 0
 
     if True:  # Scope to avoid having extra variables in memory later
-        coins_added: bool = False
-        for i in range(N_COINS):
-            if amounts[i] > 0:
-                # assert might be needed for some tokens - removed one to save bytespace
-                ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
-                coins_added = True
-        assert coins_added  # dev: no coins to add
-
         xp_old: uint256[N_COINS] = xp
 
         for i in range(N_COINS):
@@ -752,13 +744,20 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
         packed_prices: uint256 = self.price_scale_packed
         xp[0] *= PRECISIONS[0]
         xp_old[0] *= PRECISIONS[0]
-        amountsp[0] = PRECISIONS[0] * amounts[0]
         for i in range(1, N_COINS):
             price_scale: uint256 = bitwise_and(packed_prices, PRICE_MASK) * precisions[i]  # * PRICE_PRECISION_MUL
             xp[i] = xp[i] * price_scale / PRECISION
             xp_old[i] = xp_old[i] * price_scale / PRECISION
-            amountsp[i] = amounts[i] * price_scale / PRECISION
             packed_prices = shift(packed_prices, -PRICE_SIZE)
+
+        coins_added: bool = False
+        for i in range(N_COINS):
+            if amounts[i] > 0:
+                # assert might be needed for some tokens - removed one to save bytespace
+                ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
+                amountsp[i] = xp[i] - xp_old[i]
+                coins_added = True
+        assert coins_added  # dev: no coins to add
 
         t: uint256 = self.future_A_gamma_time
         if t > 0:
