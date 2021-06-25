@@ -732,13 +732,13 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     old_D: uint256 = 0
 
     if True:  # Scope to avoid having extra variables in memory later
-        n_coins_added: uint256 = 0  # XXX can remove the n_coins logic
+        coins_added: bool = False
         for i in range(N_COINS):
             if amounts[i] > 0:
                 # assert might be needed for some tokens - removed one to save bytespace
                 ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
-                n_coins_added += 1
-        assert n_coins_added > 0  # dev: no coins to add
+                coins_added = True
+        assert coins_added  # dev: no coins to add
 
         xp_old: uint256[N_COINS] = xp
 
