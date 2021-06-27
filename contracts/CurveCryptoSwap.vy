@@ -542,7 +542,7 @@ def tweak_price(A_gamma: uint256[2],
     needs_adjustment: bool = self.not_adjusted
     # if not needs_adjustment and (virtual_price-10**18 > (xcp_profit-10**18)/2 + ALLOWED_EXTRA_PROFIT):
     # (re-arrange for gas efficiency)
-    if not needs_adjustment and (virtual_price-10**18 > (xcp_profit - (10**18 - 2*ALLOWED_EXTRA_PROFIT))/2):
+    if not needs_adjustment and (virtual_price * 2 - 10**18 > xcp_profit + 2*ALLOWED_EXTRA_PROFIT):
         needs_adjustment = True
         self.not_adjusted = True
 
