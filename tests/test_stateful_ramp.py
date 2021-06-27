@@ -4,6 +4,7 @@ from .test_stateful import NumbaGoUp
 MAX_SAMPLES = 20
 MAX_COUNT = 100
 MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
+ALLOWED_DIFFERENCE = 0.02
 
 
 class RampTest(NumbaGoUp):
@@ -18,12 +19,13 @@ class RampTest(NumbaGoUp):
     def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user, check_out_amount):
         if check_out_amount:
             self.swap.claim_admin_fees()
-        super().rule_exchange(exchange_amount_in, exchange_i, exchange_j, user, 0.02 if check_out_amount else False)
+        super().rule_exchange(exchange_amount_in, exchange_i, exchange_j, user,
+                              ALLOWED_DIFFERENCE if check_out_amount else False)
 
     def rule_remove_liquidity_one_coin(self, token_amount, exchange_i, user, check_out_amount):
         if check_out_amount:
             self.swap.claim_admin_fees()
-            super().rule_remove_liquidity_one_coin(token_amount, exchange_i, user, 0.02)
+            super().rule_remove_liquidity_one_coin(token_amount, exchange_i, user, ALLOWED_DIFFERENCE)
         else:
             super().rule_remove_liquidity_one_coin(token_amount, exchange_i, user, False)
 
