@@ -16,6 +16,7 @@ class NumbaGoUp(StatefulBase):
 
     deposit_amounts = strategy('uint256[3]', min_value=0, max_value=10**9 * 10**18)
     token_amount = strategy('uint256', max_value=10**12 * 10**18)
+    update_D = strategy('bool')
 
     def rule_deposit(self, deposit_amounts, user):
         if self.swap.D() > MAX_D:
@@ -67,7 +68,10 @@ class NumbaGoUp(StatefulBase):
             if self.total_supply == 0:
                 self.virtual_price = 10**18
 
-    def rule_remove_liquidity_one_coin(self, token_amount, exchange_i, user):
+    def rule_remove_liquidity_one_coin(self, token_amount, exchange_i, user, update_D):
+        if update_D:
+            self.swap.claim_admin_fees()
+
         try:
             calc_out_amount = self.swap.calc_withdraw_one_coin(token_amount, exchange_i)
         except Exception:
@@ -101,7 +105,8 @@ class NumbaGoUp(StatefulBase):
         d_balance = self.coins[exchange_i].balanceOf(user) - d_balance
         d_token = d_token - self.token.balanceOf(user)
 
-        assert calc_out_amount == d_balance
+        if update_D:
+            assert calc_out_amount == d_balance, f"{calc_out_amount} vs {d_balance} for {token_amount}"
 
         self.balances[exchange_i] -= d_balance
         self.total_supply -= d_token

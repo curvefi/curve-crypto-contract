@@ -11,6 +11,7 @@ class StatefulGas(StatefulBase):
     deposit_amount = strategy('uint256', min_value=10 * 10**18, max_value=100 * 10**18)
     token_fraction = strategy('uint256', min_value=10**14, max_value=5 * 10**16)
     sleep_time = strategy('uint256', max_value=100)
+    update_D = strategy('bool')
 
     def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user):
         if exchange_i > 0:
@@ -37,7 +38,10 @@ class StatefulGas(StatefulBase):
             if self.check_limits(amounts):
                 raise
 
-    def rule_remove_liquidity_one_coin(self, token_fraction, exchange_i, user):
+    def rule_remove_liquidity_one_coin(self, token_fraction, exchange_i, user, update_D):
+        if update_D:
+            self.swap.claim_admin_fees()
+
         token_amount = token_fraction * self.total_supply // 10**18
         d_token = self.token.balanceOf(user)
         if token_amount == 0 or token_amount > d_token:
@@ -64,7 +68,8 @@ class StatefulGas(StatefulBase):
         d_balance = self.coins[exchange_i].balanceOf(user) - d_balance
         d_token = d_token - self.token.balanceOf(user)
 
-        assert calc_out_amount == d_balance
+        if update_D:
+            assert calc_out_amount == d_balance, f"{calc_out_amount} vs {d_balance} for {token_amount}"
 
         self.balances[exchange_i] -= d_balance
         self.total_supply -= d_token

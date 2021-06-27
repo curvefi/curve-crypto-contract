@@ -137,8 +137,8 @@ class StatefulBase:
         assert virtual_price >= 10**18 - 10
         assert get_virtual_price >= 10**18 - 10
 
-        assert xcp_profit >= self.xcp_profit
-        assert (virtual_price - 10**18) * 2 >= xcp_profit - 10**18
+        assert xcp_profit - self.xcp_profit > -3, f"{xcp_profit} vs {self.xcp_profit}"
+        assert (virtual_price - 10**18) * 2 - (xcp_profit - 10**18) >= -5, f"vprice={virtual_price}, xcp_profit={xcp_profit}"
         assert abs(log(virtual_price / get_virtual_price)) < 1e-10
 
         self.xcp_profit = xcp_profit
