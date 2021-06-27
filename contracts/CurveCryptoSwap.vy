@@ -404,7 +404,7 @@ def _claim_admin_fees():
     A_gamma: uint256[2] = self._A_gamma()
 
     xcp_profit: uint256 = self.xcp_profit
-    fees: uint256 = (xcp_profit - self.xcp_profit_a) * self.admin_fee / (2 * 10**10)
+    xcp_profit_a: uint256 = self.xcp_profit_a
 
     # Gulp here
     _coins: address[N_COINS] = coins
@@ -413,11 +413,13 @@ def _claim_admin_fees():
 
     vprice: uint256 = self.virtual_price
 
-    if fees > 0:
-        receiver: address = self.admin_fee_receiver
-        frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
-        claimed: uint256 = CurveToken(token).mint_relative(receiver, frac)
-        log ClaimAdminFee(receiver, claimed)
+    if xcp_profit > xcp_profit_a:
+        fees: uint256 = (xcp_profit - xcp_profit_a) * self.admin_fee / (2 * 10**10)
+        if fees > 0:
+            receiver: address = self.admin_fee_receiver
+            frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
+            claimed: uint256 = CurveToken(token).mint_relative(receiver, frac)
+            log ClaimAdminFee(receiver, claimed)
 
     total_supply: uint256 = CurveToken(token).totalSupply()
 
@@ -430,7 +432,8 @@ def _claim_admin_fees():
 
     xcp_profit = new_vprice + xcp_profit - vprice
     self.xcp_profit = xcp_profit
-    self.xcp_profit_a = xcp_profit
+    if xcp_profit > xcp_profit_a:
+        self.xcp_profit_a = xcp_profit
 
 
 @internal
