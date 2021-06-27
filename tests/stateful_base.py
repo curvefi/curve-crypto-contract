@@ -74,7 +74,7 @@ class StatefulBase:
 
         return True
 
-    def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user):
+    def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user, check_out_amount=True):
         if exchange_i == exchange_j:
             return False
         try:
@@ -108,7 +108,11 @@ class StatefulBase:
         d_balance_j -= self.coins[exchange_j].balanceOf(user)
 
         assert d_balance_i == exchange_amount_in
-        assert -d_balance_j == calc_amount
+        if check_out_amount:
+            if check_out_amount is True:
+                assert -d_balance_j == calc_amount, f'{-d_balance_j} vs {calc_amount}'
+            else:
+                assert abs(d_balance_j + calc_amount) < max(check_out_amount*calc_amount, 3), f'{-d_balance_j} vs {calc_amount}'
 
         self.balances[exchange_i] += d_balance_i
         self.balances[exchange_j] += d_balance_j

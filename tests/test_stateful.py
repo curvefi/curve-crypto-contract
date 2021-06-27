@@ -106,7 +106,10 @@ class NumbaGoUp(StatefulBase):
         d_token = d_token - self.token.balanceOf(user)
 
         if update_D:
-            assert calc_out_amount == d_balance, f"{calc_out_amount} vs {d_balance} for {token_amount}"
+            if update_D is True:
+                assert calc_out_amount == d_balance, f"{calc_out_amount} vs {d_balance} for {token_amount}"
+            else:
+                assert abs(calc_out_amount - d_balance) < update_D * calc_out_amount, f"{calc_out_amount} vs {d_balance} for {token_amount}"
 
         self.balances[exchange_i] -= d_balance
         self.total_supply -= d_token
