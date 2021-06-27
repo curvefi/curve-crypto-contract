@@ -616,7 +616,8 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
             ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
 
         y: uint256 = xp[j]
-        xp[i] += dx
+        x0: uint256 = xp[i]
+        xp[i] = x0 + dx
         self.balances[i] = xp[i]
 
         price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
@@ -630,15 +631,22 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
         for k in range(1, N_COINS):
             xp[k] = xp[k] * price_scale[k-1] * precisions[k] / PRECISION
 
+        prec_i: uint256 = precisions[i]
+
         # In case ramp is happening
         if True:
             t: uint256 = self.future_A_gamma_time
             if t > 0:
+                x0 *= prec_i
+                if i > 0:
+                    x0 = x0 * price_scale[i-1] / PRECISION
+                x1: uint256 = xp[i]  # Back up old value in xp
+                xp[i] = x0
                 self.D = Math(math).newton_D(A_gamma[0], A_gamma[1], xp)
+                xp[i] = x1  # And restore
                 if block.timestamp >= t:
                     self.future_A_gamma_time = 1
 
-        prec_i: uint256 = precisions[i]
         prec_j: uint256 = precisions[j]
 
         dy = xp[j] - Math(math).newton_y(A_gamma[0], A_gamma[1], xp, self.D, j)
