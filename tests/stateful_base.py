@@ -74,7 +74,10 @@ class StatefulBase:
 
         return True
 
-    def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user, check_out_amount=True):
+    def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user):
+        return self._rule_exchange(exchange_amount_in, exchange_i, exchange_j, user)
+
+    def _rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user, check_out_amount=True):
         if exchange_i == exchange_j:
             return False
         try:

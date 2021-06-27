@@ -19,8 +19,8 @@ class RampTest(NumbaGoUp):
     def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user, check_out_amount):
         if check_out_amount:
             self.swap.claim_admin_fees()
-        super().rule_exchange(exchange_amount_in, exchange_i, exchange_j, user,
-                              ALLOWED_DIFFERENCE if check_out_amount else False)
+        super()._rule_exchange(exchange_amount_in, exchange_i, exchange_j, user,
+                               ALLOWED_DIFFERENCE if check_out_amount else False)
 
     def rule_remove_liquidity_one_coin(self, token_amount, exchange_i, user, check_out_amount):
         if check_out_amount:

@@ -15,7 +15,7 @@ class RampTest(NumbaGoUp):
         self.swap.ramp_A_gamma(future_A, future_gamma, self.chain.time() + 14*86400, {'from': self.accounts[0]})
 
     def rule_exchange(self, exchange_amount_in, exchange_i, exchange_j, user):
-        super().rule_exchange(exchange_amount_in, exchange_i, exchange_j, user, False)
+        super()._rule_exchange(exchange_amount_in, exchange_i, exchange_j, user, False)
 
     def rule_remove_liquidity_one_coin(self, token_amount, exchange_i, user):
         super().rule_remove_liquidity_one_coin(token_amount, exchange_i, user, False)
