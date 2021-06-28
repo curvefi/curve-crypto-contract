@@ -743,7 +743,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     d_token: uint256 = 0
     d_token_fee: uint256 = 0
     old_D: uint256 = 0
-    ix: uint256 = 15
+    ix: uint256 = INF_COINS
 
     if True:  # Scope to avoid having extra variables in memory later
         xp_old: uint256[N_COINS] = xp
