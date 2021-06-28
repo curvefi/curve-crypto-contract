@@ -984,10 +984,14 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
     assert future_A < MAX_A+1
     assert future_gamma > MIN_GAMMA-1
     assert future_gamma < MAX_GAMMA+1
-    if future_A_p < A_gamma[0]:
-        assert future_A_p * MAX_A_CHANGE >= A_gamma[0]
-    else:
-        assert future_A_p <= A_gamma[0] * MAX_A_CHANGE
+
+    ratio: uint256 = 10**18 * future_A_p / A_gamma[0]
+    assert ratio < 10**18 * MAX_A_CHANGE + 1
+    assert ratio > 10**18 / MAX_A_CHANGE - 1
+
+    ratio = 10**18 * future_gamma / A_gamma[1]
+    assert ratio < 10**18 * MAX_A_CHANGE + 1
+    assert ratio > 10**18 / MAX_A_CHANGE - 1
 
     self.initial_A_gamma = initial_A_gamma
     self.initial_A_gamma_time = block.timestamp
