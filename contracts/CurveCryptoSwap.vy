@@ -419,6 +419,8 @@ def _claim_admin_fees():
             receiver: address = self.admin_fee_receiver
             frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
             claimed: uint256 = CurveToken(token).mint_relative(receiver, frac)
+            xcp_profit -= fees*2
+            self.xcp_profit = xcp_profit
             log ClaimAdminFee(receiver, claimed)
 
     total_supply: uint256 = CurveToken(token).totalSupply()
@@ -427,11 +429,8 @@ def _claim_admin_fees():
     D: uint256 = Math(math).newton_D(A_gamma[0], A_gamma[1], self.xp())
     self.D = D
 
-    new_vprice: uint256 = 10**18 * self.get_xcp(D) / total_supply
-    self.virtual_price = new_vprice
+    self.virtual_price = 10**18 * self.get_xcp(D) / total_supply
 
-    xcp_profit = new_vprice + xcp_profit - vprice
-    self.xcp_profit = xcp_profit
     if xcp_profit > xcp_profit_a:
         self.xcp_profit_a = xcp_profit
 
