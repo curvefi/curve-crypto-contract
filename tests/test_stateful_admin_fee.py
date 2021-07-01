@@ -45,6 +45,7 @@ class StatefulAdmin(StatefulBase):
 
     def rule_claim_admin_fees(self):
         balance = self.token.balanceOf(self.accounts[0])
+
         self.swap.claim_admin_fees()
         admin_balance = self.token.balanceOf(self.accounts[0])
         balance = admin_balance - balance
@@ -53,7 +54,7 @@ class StatefulAdmin(StatefulBase):
         if balance > 0:
             self.xcp_profit = self.swap.xcp_profit()
             measured_profit = admin_balance / self.total_supply
-            assert approx(measured_profit, (self.xcp_profit / 1e18 - 1) / 3, 0.1)  # 1/4 vs 3/4
+            assert approx(measured_profit, log(self.xcp_profit / 1e18) / 2, 0.1)
 
 
 def test_admin(crypto_swap, token, chain, accounts, coins, state_machine):
