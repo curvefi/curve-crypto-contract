@@ -1,6 +1,6 @@
 # @version 0.2.12
-# (c) Curve.Fi, 2020
-# Pool for 3Crv(USD)/BTC/ETH or similar
+# (c) Curve.Fi, 2021
+# Pool for USDT/BTC/ETH or similar
 
 interface ERC20:  # Custom ERC20 which works for USDT, WETH and WBTC
     def transfer(_to: address, _amount: uint256): nonpayable
