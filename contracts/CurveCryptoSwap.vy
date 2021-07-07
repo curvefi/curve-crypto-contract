@@ -71,7 +71,7 @@ event CommitNewParameters:
     mid_fee: uint256
     out_fee: uint256
     fee_gamma: uint256
-    price_threshold: uint256
+    allowed_extra_profit: uint256
     adjustment_step: uint256
     ma_half_time: uint256
 
@@ -80,7 +80,7 @@ event NewParameters:
     mid_fee: uint256
     out_fee: uint256
     fee_gamma: uint256
-    price_threshold: uint256
+    allowed_extra_profit: uint256
     adjustment_step: uint256
     ma_half_time: uint256
 
@@ -127,8 +127,8 @@ future_A_gamma: public(uint256)
 initial_A_gamma_time: public(uint256)
 future_A_gamma_time: public(uint256)
 
-price_threshold: public(uint256)
-future_price_threshold: public(uint256)
+allowed_extra_profit: public(uint256)  # 2 * 10**12 - recommended value
+future_allowed_extra_profit: public(uint256)
 
 fee_gamma: public(uint256)
 future_fee_gamma: public(uint256)
@@ -180,9 +180,6 @@ NOISE_FEE: constant(uint256) = 10**5  # 0.1 bps
 PRICE_SIZE: constant(int128) = 256 / (N_COINS-1)
 PRICE_MASK: constant(uint256) = 2**PRICE_SIZE - 1
 
-ALLOWED_EXTRA_PROFIT: constant(uint256) = 2 * 10**12  # Extra profit at which we start adjusting
-# XXX we will change it to a variable parameter
-
 # This must be changed for different N_COINS
 # For example:
 # N_COINS = 3 -> 1  (10**18 -> 10**18)
@@ -204,7 +201,7 @@ def __init__(
     gamma: uint256,
     mid_fee: uint256,
     out_fee: uint256,
-    price_threshold: uint256,
+    allowed_extra_profit: uint256,
     fee_gamma: uint256,
     adjustment_step: uint256,
     admin_fee: uint256,
@@ -222,7 +219,7 @@ def __init__(
 
     self.mid_fee = mid_fee
     self.out_fee = out_fee
-    self.price_threshold = price_threshold
+    self.allowed_extra_profit = allowed_extra_profit
     self.fee_gamma = fee_gamma
     self.adjustment_step = adjustment_step
     self.admin_fee = admin_fee
@@ -445,7 +442,6 @@ def tweak_price(A_gamma: uint256[2],
     price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     p_new: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
-    norm: uint256 = 0
 
     # Update MA if needed
     packed_prices: uint256 = self.price_oracle_packed
@@ -511,13 +507,6 @@ def tweak_price(A_gamma: uint256[2],
     total_supply: uint256 = CurveToken(token).totalSupply()
     old_xcp_profit: uint256 = self.xcp_profit
     old_virtual_price: uint256 = self.virtual_price
-    for k in range(N_COINS-1):
-        ratio: uint256 = price_oracle[k] * 10**18 / price_scale[k]
-        if ratio > 10**18:
-            ratio -= 10**18
-        else:
-            ratio = 10**18 - ratio
-        norm += ratio**2
 
     # Update profit numbers without price adjustment first
     xp[0] = D_unadjusted / N_COINS
@@ -540,50 +529,60 @@ def tweak_price(A_gamma: uint256[2],
     self.xcp_profit = xcp_profit
 
     needs_adjustment: bool = self.not_adjusted
-    # if not needs_adjustment and (virtual_price-10**18 > (xcp_profit-10**18)/2 + ALLOWED_EXTRA_PROFIT):
+    # if not needs_adjustment and (virtual_price-10**18 > (xcp_profit-10**18)/2 + self.allowed_extra_profit):
     # (re-arrange for gas efficiency)
-    if not needs_adjustment and (virtual_price * 2 - 10**18 > xcp_profit + 2*ALLOWED_EXTRA_PROFIT):
+    if not needs_adjustment and (virtual_price * 2 - 10**18 > xcp_profit + 2*self.allowed_extra_profit):
         needs_adjustment = True
         self.not_adjusted = True
 
-    # self.price_threshold must be > self.adjustment_step
-    if needs_adjustment and norm > self.price_threshold ** 2 and old_virtual_price > 0:
-        norm = Math(math).sqrt_int(norm / 10**18)  # Need to convert to 1e18 units!
+    if needs_adjustment:
         adjustment_step: uint256 = self.adjustment_step
+        norm: uint256 = 0
 
         for k in range(N_COINS-1):
-            p_new[k] = (price_scale[k] * (norm - adjustment_step) + adjustment_step * price_oracle[k]) / norm
+            ratio: uint256 = price_oracle[k] * 10**18 / price_scale[k]
+            if ratio > 10**18:
+                ratio -= 10**18
+            else:
+                ratio = 10**18 - ratio
+            norm += ratio**2
 
-        # Calculate balances*prices
-        xp = _xp
-        for k in range(N_COINS-1):
-            xp[k+1] = _xp[k+1] * p_new[k] / price_scale[k]
+        if norm > adjustment_step ** 2 and old_virtual_price > 0:
+            norm = Math(math).sqrt_int(norm / 10**18)  # Need to convert to 1e18 units!
 
-        # Calculate "extended constant product" invariant xCP and virtual price
-        D: uint256 = Math(math).newton_D(A_gamma[0], A_gamma[1], xp)
-        xp[0] = D / N_COINS
-        for k in range(N_COINS-1):
-            xp[k+1] = D * 10**18 / (N_COINS * p_new[k])
-        # We reuse old_virtual_price here but it's not old anymore
-        old_virtual_price = 10**18 * Math(math).geometric_mean(xp) / total_supply
-
-        # Proceed if we've got enough profit
-        # if (old_virtual_price > 10**18) and (2 * (old_virtual_price - 10**18) > xcp_profit - 10**18):
-        if (old_virtual_price > 10**18) and (2 * old_virtual_price - 10**18 > xcp_profit):
-            packed_prices = 0
             for k in range(N_COINS-1):
-                packed_prices = shift(packed_prices, PRICE_SIZE)
-                p: uint256 = p_new[N_COINS-2 - k]  # / PRICE_PRECISION_MUL
-                assert p < PRICE_MASK
-                packed_prices = bitwise_or(p, packed_prices)
-            self.price_scale_packed = packed_prices
-            self.D = D
-            self.virtual_price = old_virtual_price
+                p_new[k] = (price_scale[k] * (norm - adjustment_step) + adjustment_step * price_oracle[k]) / norm
 
-            return
+            # Calculate balances*prices
+            xp = _xp
+            for k in range(N_COINS-1):
+                xp[k+1] = _xp[k+1] * p_new[k] / price_scale[k]
 
-        else:
-            self.not_adjusted = False
+            # Calculate "extended constant product" invariant xCP and virtual price
+            D: uint256 = Math(math).newton_D(A_gamma[0], A_gamma[1], xp)
+            xp[0] = D / N_COINS
+            for k in range(N_COINS-1):
+                xp[k+1] = D * 10**18 / (N_COINS * p_new[k])
+            # We reuse old_virtual_price here but it's not old anymore
+            old_virtual_price = 10**18 * Math(math).geometric_mean(xp) / total_supply
+
+            # Proceed if we've got enough profit
+            # if (old_virtual_price > 10**18) and (2 * (old_virtual_price - 10**18) > xcp_profit - 10**18):
+            if (old_virtual_price > 10**18) and (2 * old_virtual_price - 10**18 > xcp_profit):
+                packed_prices = 0
+                for k in range(N_COINS-1):
+                    packed_prices = shift(packed_prices, PRICE_SIZE)
+                    p: uint256 = p_new[N_COINS-2 - k]  # / PRICE_PRECISION_MUL
+                    assert p < PRICE_MASK
+                    packed_prices = bitwise_or(p, packed_prices)
+                self.price_scale_packed = packed_prices
+                self.D = D
+                self.virtual_price = old_virtual_price
+
+                return
+
+            else:
+                self.not_adjusted = False
 
     # If we are here, the price_scale adjustment did not happen
     # Still need to update the profit counter and D
@@ -1026,7 +1025,7 @@ def commit_new_parameters(
     _new_out_fee: uint256,
     _new_admin_fee: uint256,
     _new_fee_gamma: uint256,
-    _new_price_threshold: uint256,
+    _new_allowed_extra_profit: uint256,
     _new_adjustment_step: uint256,
     _new_ma_half_time: uint256,
     ):
@@ -1037,7 +1036,7 @@ def commit_new_parameters(
     new_out_fee: uint256 = _new_out_fee
     new_admin_fee: uint256 = _new_admin_fee
     new_fee_gamma: uint256 = _new_fee_gamma
-    new_price_threshold: uint256 = _new_price_threshold
+    new_allowed_extra_profit: uint256 = _new_allowed_extra_profit
     new_adjustment_step: uint256 = _new_adjustment_step
     new_ma_half_time: uint256 = _new_ma_half_time
 
@@ -1057,12 +1056,12 @@ def commit_new_parameters(
         assert new_fee_gamma > 0  # dev: fee_gamma out of range [1 .. 2**100]
     else:
         new_fee_gamma = self.fee_gamma
-    if new_price_threshold > 10**18:
-        new_price_threshold = self.price_threshold
-    assert new_price_threshold > new_mid_fee  # dev: price threshold should be higher than the fee
+    if new_allowed_extra_profit > 10**18:
+        new_allowed_extra_profit = self.allowed_extra_profit
+    assert new_allowed_extra_profit > new_mid_fee  # dev: price threshold should be higher than the fee
     if new_adjustment_step > 10**18:
         new_adjustment_step = self.adjustment_step
-    assert new_adjustment_step <= new_price_threshold  # dev: adjustment step should be smaller than price threshold
+    assert new_adjustment_step <= new_allowed_extra_profit  # dev: adjustment step should be smaller than price threshold
 
     # MA
     if new_ma_half_time < 7*86400:
@@ -1077,13 +1076,13 @@ def commit_new_parameters(
     self.future_mid_fee = new_mid_fee
     self.future_out_fee = new_out_fee
     self.future_fee_gamma = new_fee_gamma
-    self.future_price_threshold = new_price_threshold
+    self.future_allowed_extra_profit = new_allowed_extra_profit
     self.future_adjustment_step = new_adjustment_step
     self.future_ma_half_time = new_ma_half_time
 
     log CommitNewParameters(_deadline, new_admin_fee, new_mid_fee, new_out_fee,
                             new_fee_gamma,
-                            new_price_threshold, new_adjustment_step,
+                            new_allowed_extra_profit, new_adjustment_step,
                             new_ma_half_time)
 
 
@@ -1107,8 +1106,8 @@ def apply_new_parameters():
     self.out_fee = out_fee
     fee_gamma: uint256 = self.future_fee_gamma
     self.fee_gamma = fee_gamma
-    price_threshold: uint256 = self.future_price_threshold
-    self.price_threshold = price_threshold
+    allowed_extra_profit: uint256 = self.future_allowed_extra_profit
+    self.allowed_extra_profit = allowed_extra_profit
     adjustment_step: uint256 = self.future_adjustment_step
     self.adjustment_step = adjustment_step
     ma_half_time: uint256 = self.future_ma_half_time
@@ -1116,7 +1115,7 @@ def apply_new_parameters():
 
     log NewParameters(admin_fee, mid_fee, out_fee,
                       fee_gamma,
-                      price_threshold, adjustment_step,
+                      allowed_extra_profit, adjustment_step,
                       ma_half_time)
 
 

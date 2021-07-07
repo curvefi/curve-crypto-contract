@@ -73,7 +73,7 @@ def _crypto_swap(compiled_swap, token, accounts):
             int(7e-5 * 1e18),  # gamma
             int(4e-4 * 1e10),  # mid_fee
             int(4e-3 * 1e10),  # out_fee
-            int(0.0028 * 1e18),  # price_threshold
+            2 * 10**12,  # allowed_extra_profit
             int(0.01 * 1e18),  # fee_gamma
             int(0.0015 * 1e18),  # adjustment_step
             0,  # admin_fee
