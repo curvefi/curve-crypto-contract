@@ -170,7 +170,7 @@ MIN_RAMP_TIME: constant(uint256) = 86400
 
 MAX_ADMIN_FEE: constant(uint256) = 10 * 10 ** 9
 MIN_FEE: constant(uint256) = 5 * 10 ** 5  # 0.5 bps
-MAX_FEE: constant(uint256) = 5 * 10 ** 9
+MAX_FEE: constant(uint256) = 10 * 10 ** 9
 MAX_A: constant(uint256) = 10000 * A_MULTIPLIER
 MAX_A_CHANGE: constant(uint256) = 10
 MIN_GAMMA: constant(uint256) = 10**10
@@ -180,7 +180,8 @@ NOISE_FEE: constant(uint256) = 10**5  # 0.1 bps
 PRICE_SIZE: constant(int128) = 256 / (N_COINS-1)
 PRICE_MASK: constant(uint256) = 2**PRICE_SIZE - 1
 
-ALLOWED_EXTRA_PROFIT: constant(uint256) = 10**13  # 0.1 bps above the baseline
+ALLOWED_EXTRA_PROFIT: constant(uint256) = 2 * 10**12  # Extra profit at which we start adjusting
+# XXX we will change it to a variable parameter
 
 # This must be changed for different N_COINS
 # For example:
