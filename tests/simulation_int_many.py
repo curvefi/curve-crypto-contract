@@ -323,8 +323,9 @@ def get_all():
 
 
 class Trader:
-    def __init__(self, A, gamma, D, n, p0, mid_fee=1e-3, out_fee=3e-3, price_threshold=0.01, fee_gamma=None,
+    def __init__(self, A, gamma, D, n, p0, mid_fee=1e-3, out_fee=3e-3, allowed_extra_profit=2 * 10**13, fee_gamma=None,
                  adjustment_step=0.003, ma_half_time=500, log=True):
+        # allowed_extra_profit is actually not used
         self.p0 = p0[:]
         self.price_oracle = self.p0[:]
         self.last_price = self.p0[:]
@@ -337,7 +338,7 @@ class Trader:
         self.xcp_profit = 10**18
         self.xcp_profit_real = 10**18
         self.xcp = self.xcp_0
-        self.price_threshold = int(price_threshold * 10**18)
+        self.allowed_extra_profit = allowed_extra_profit
         self.adjustment_step = int(10**18 * adjustment_step)
         self.log = log
         self.fee_gamma = fee_gamma or gamma
@@ -449,7 +450,7 @@ class Trader:
             (p_real * 10**18 // p_target - 10**18) ** 2
             for p_real, p_target in zip(self.price_oracle, self.curve.p)
         ) ** 0.5)
-        if norm <= max(self.price_threshold, self.adjustment_step):
+        if norm <= self.adjustment_step:
             # Already close to the target price
             return norm
 
@@ -566,7 +567,7 @@ if __name__ == '__main__':
 
     trader = Trader(135, int(7e-5 * 1e18), 5_000_000 * 10**18, 3, get_price_vector(3, test_data),
                     mid_fee=4e-4, out_fee=4.0e-3,
-                    price_threshold=0.0028, fee_gamma=int(0.01 * 1e18),
+                    allowed_extra_profit=2 * 10**13, fee_gamma=int(0.01 * 1e18),
                     adjustment_step=0.0015, ma_half_time=600)
 
     trader.simulate(test_data)

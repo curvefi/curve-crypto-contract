@@ -1,4 +1,4 @@
-# @version 0.2.13
+# @version 0.2.12
 # (c) Curve.Fi, 2020
 # Math for crypto pools
 #

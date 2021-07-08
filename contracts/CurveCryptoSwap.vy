@@ -1,4 +1,4 @@
-# @version 0.2.13
+# @version 0.2.12
 # (c) Curve.Fi, 2021
 # Pool for USDT/BTC/ETH or similar
 
@@ -1058,10 +1058,8 @@ def commit_new_parameters(
         new_fee_gamma = self.fee_gamma
     if new_allowed_extra_profit > 10**18:
         new_allowed_extra_profit = self.allowed_extra_profit
-    assert new_allowed_extra_profit > new_mid_fee  # dev: price threshold should be higher than the fee
     if new_adjustment_step > 10**18:
         new_adjustment_step = self.adjustment_step
-    assert new_adjustment_step <= new_allowed_extra_profit  # dev: adjustment step should be smaller than price threshold
 
     # MA
     if new_ma_half_time < 7*86400:
