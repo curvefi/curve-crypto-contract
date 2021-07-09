@@ -36,7 +36,7 @@ def test_second_deposit(crypto_swap_with_deposit, token, coins, accounts, values
     xp = [10**6 * 10**18] * 3
     for i in range(3):
         xp[i] += values[i]
-    _A = crypto_swap_with_deposit.A_precise() // (3**3 * 100)
+    _A = crypto_swap_with_deposit.A() // (3**3 * 10000)
     _gamma = crypto_swap_with_deposit.gamma()
     _D = sim.solve_D(_A, _gamma, xp)
     safe = all(f >= 1.1e16 and f <= 0.9e20 for f in [_x * 10**18 // _D for _x in xp])
@@ -130,7 +130,7 @@ def test_immediate_withdraw_one(crypto_swap_with_deposit, token, coins, accounts
         # Test if we are safe
         xp = [10**6 * 10**18] * 3
         _supply = token.totalSupply()
-        _A = crypto_swap_with_deposit.A_precise() // (3**3 * 100)
+        _A = crypto_swap_with_deposit.A() // (3**3 * 10000)
         _gamma = crypto_swap_with_deposit.gamma()
         _D = crypto_swap_with_deposit.D() * (_supply - token_amount) // _supply
         xp[i] = sim.solve_x(_A, _gamma, xp, _D, i)

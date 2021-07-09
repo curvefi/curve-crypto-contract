@@ -9,7 +9,7 @@ ALLOWED_DIFFERENCE = 0.02
 
 class RampTest(NumbaGoUp):
     future_gamma = strategy('uint256', min_value=int(7e-5 * 1e18 / 9), max_value=int(7e-5 * 1e18 * 9))
-    future_A = strategy('uint256', min_value=135 * 3**3 // 9, max_value=135 * 3**3 * 9)
+    future_A = strategy('uint256', min_value=135 * 3**3 * 10000 // 9, max_value=135 * 3**3 * 10000 * 9)
 
     def initialize(self, future_A, future_gamma):
         self.swap.ramp_A_gamma(future_A, future_gamma, self.chain.time() + 14*86400, {'from': self.accounts[0]})

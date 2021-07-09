@@ -6,7 +6,7 @@
 # Swiss Stake GmbH are allowed to call this contract.
 
 N_COINS: constant(int128) = 3  # <- change
-A_MULTIPLIER: constant(uint256) = 100
+A_MULTIPLIER: constant(uint256) = 10000
 
 
 @internal

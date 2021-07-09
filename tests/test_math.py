@@ -85,7 +85,7 @@ def test_newton_D(crypto_math, A, x, yx, zx, perm, gamma):
     X = [X[i], X[j], X[k]]
     result_sim = sim.solve_D(A, gamma, X)
     if all(f >= 1.1e16 and f <= 0.9e20 for f in [_x * 10**18 / result_sim for _x in X]):
-        result_contract = crypto_math.newton_D(A * 3**3 * 100, gamma, X)
+        result_contract = crypto_math.newton_D(A * 3**3 * 10000, gamma, X)
         assert abs(result_sim - result_contract) <= max(1000, result_sim/1e15)  # 1000 is $1e-15
 
 
@@ -103,7 +103,7 @@ def test_newton_y(crypto_math, A, D, xD, yD, zD, gamma, j):
     X = [D * xD // 10**18, D * yD // 10**18, D * zD // 10**18]
     result_sim = sim.solve_x(A, gamma, X, D, j)
     try:
-        result_contract = crypto_math.newton_y(A * 3**3 * 100, gamma, X, D, j)
+        result_contract = crypto_math.newton_y(A * 3**3 * 10000, gamma, X, D, j)
     except Exception:
         # May revert is the state is unsafe for the next time
         safe = all(f >= 1.1e16 and f <= 0.9e20 for f in [_x * 10**18 // D for _x in X])

@@ -7,7 +7,7 @@
 from vyper.interfaces import ERC20
 
 interface Curve:
-    def A_precise() -> uint256: view
+    def A() -> uint256: view
     def gamma() -> uint256: view
     def price_scale(i: uint256) -> uint256: view
     def balances(i: uint256) -> uint256: view
@@ -55,7 +55,7 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
     for k in range(N_COINS-1):
         xp[k+1] = xp[k+1] * price_scale[k] * precisions[k+1] / PRECISION
 
-    A: uint256 = Curve(msg.sender).A_precise()
+    A: uint256 = Curve(msg.sender).A()
     gamma: uint256 = Curve(msg.sender).gamma()
 
     y: uint256 = Math(self.math).newton_y(A, gamma, xp, Curve(msg.sender).D(), j)
@@ -90,7 +90,7 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
         p: uint256 = Curve(msg.sender).price_scale(k) * precisions[k+1]
         xp[k+1] = xp[k+1] * p / PRECISION
         amountsp[k+1] = amountsp[k+1] * p / PRECISION
-    A: uint256 = Curve(msg.sender).A_precise()
+    A: uint256 = Curve(msg.sender).A()
     gamma: uint256 = Curve(msg.sender).gamma()
     D: uint256 = Math(self.math).newton_D(A, gamma, xp)
     d_token: uint256 = token_supply * D / Curve(msg.sender).D()

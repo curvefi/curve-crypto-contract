@@ -104,7 +104,7 @@ event ClaimAdminFee:
 
 N_COINS: constant(int128) = 3  # <- change
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
-A_MULTIPLIER: constant(uint256) = 100
+A_MULTIPLIER: constant(uint256) = 10000
 
 # These addresses are replaced by the deployer
 math: constant(address) = 0x0000000000000000000000000000000000000000
@@ -171,7 +171,7 @@ MIN_RAMP_TIME: constant(uint256) = 86400
 MAX_ADMIN_FEE: constant(uint256) = 10 * 10 ** 9
 MIN_FEE: constant(uint256) = 5 * 10 ** 5  # 0.5 bps
 MAX_FEE: constant(uint256) = 10 * 10 ** 9
-MAX_A: constant(uint256) = 10000 * A_MULTIPLIER
+MAX_A: constant(uint256) = 10000 * A_MULTIPLIER * N_COINS**N_COINS  # ?
 MAX_A_CHANGE: constant(uint256) = 10
 MIN_GAMMA: constant(uint256) = 10**10
 MAX_GAMMA: constant(uint256) = 10**16
@@ -212,7 +212,7 @@ def __init__(
 
     # Pack A and gamma:
     # shifted A + gamma
-    A_gamma: uint256 = shift(A * A_MULTIPLIER, 128)
+    A_gamma: uint256 = shift(A, 128)
     A_gamma = bitwise_or(A_gamma, gamma)
     self.initial_A_gamma = A_gamma
     self.future_A_gamma = A_gamma
@@ -342,19 +342,13 @@ def _A_gamma() -> uint256[2]:
 @view
 @external
 def A() -> uint256:
-    return self._A_gamma()[0] / A_MULTIPLIER
+    return self._A_gamma()[0]
 
 
 @view
 @external
 def gamma() -> uint256:
     return self._A_gamma()[1]
-
-
-@view
-@external
-def A_precise() -> uint256:
-    return self._A_gamma()[0]
 
 
 @internal
@@ -977,14 +971,12 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
     initial_A_gamma: uint256 = shift(A_gamma[0], 128)
     initial_A_gamma = bitwise_or(initial_A_gamma, A_gamma[1])
 
-    future_A_p: uint256 = future_A * A_MULTIPLIER
-
     assert future_A > 0
     assert future_A < MAX_A+1
     assert future_gamma > MIN_GAMMA-1
     assert future_gamma < MAX_GAMMA+1
 
-    ratio: uint256 = 10**18 * future_A_p / A_gamma[0]
+    ratio: uint256 = 10**18 * future_A / A_gamma[0]
     assert ratio < 10**18 * MAX_A_CHANGE + 1
     assert ratio > 10**18 / MAX_A_CHANGE - 1
 
@@ -995,12 +987,12 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
     self.initial_A_gamma = initial_A_gamma
     self.initial_A_gamma_time = block.timestamp
 
-    future_A_gamma: uint256 = shift(future_A_p, 128)
+    future_A_gamma: uint256 = shift(future_A, 128)
     future_A_gamma = bitwise_or(future_A_gamma, future_gamma)
     self.future_A_gamma_time = future_time
     self.future_A_gamma = future_A_gamma
 
-    log RampAgamma(A_gamma[0], future_A_p, A_gamma[1], future_gamma, block.timestamp, future_time)
+    log RampAgamma(A_gamma[0], future_A, A_gamma[1], future_gamma, block.timestamp, future_time)
 
 
 @external

@@ -28,7 +28,7 @@ class StatefulSimulation(StatefulBase):
         self.virtual_price = self.swap.get_virtual_price()
 
         self.trader = sim.Trader(
-            self.swap.A() // 3**3,
+            self.swap.A() // (3**3 * 10000),
             self.swap.gamma(),
             self.swap.D(),
             3,

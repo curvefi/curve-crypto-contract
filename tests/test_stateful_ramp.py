@@ -1,7 +1,7 @@
 from brownie.test import strategy
 from .test_stateful import NumbaGoUp
 
-MAX_SAMPLES = 20
+MAX_SAMPLES = 100
 MAX_COUNT = 100
 MAX_D = 10**12 * 10**18  # $1T is hopefully a reasonable cap for tests
 ALLOWED_DIFFERENCE = 0.02
