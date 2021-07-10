@@ -22,6 +22,13 @@ MAX_XD = 10**20
 
 A_MUL = 3**3 * 10000
 
+MIN_A = int(0.01 * A_MUL)
+MAX_A = 1000 * A_MUL
+
+# gamma from 1e-8 up to 0.05
+MIN_GAMMA = 10**10
+MAX_GAMMA = 5 * 10**16
+
 
 # Test with 3 coins for simplicity
 class TestCurve(unittest.TestCase):
@@ -54,12 +61,12 @@ class TestCurve(unittest.TestCase):
         assert abs(coeff/1e18 - K) <= 1e-7
 
     @given(
-           A=st.integers(1, 10000),
+           A=st.integers(MIN_A, MAX_A),
            x=st.integers(10**9, 10**15 * 10**18),  # 1e-9 USD to 1e15 USD
            yx=st.integers(10**11, 10**18),  # <- ratio 1e18 * y/x, typically 1e18 * 1
            zx=st.integers(10**11, 10**18),  # <- ratio 1e18 * z/x, typically 1e18 * 1
            perm=st.integers(0, 5),  # <- permutation mapping to values
-           gamma=st.integers(10**10, 10**16)  # gamma from 1e-8 up to 0.01
+           gamma=st.integers(MIN_GAMMA, MAX_GAMMA)
     )
     @settings(max_examples=MAX_EXAMPLES_D)
     def test_D_convergence(self, A, x, yx, zx, perm, gamma):
@@ -77,11 +84,11 @@ class TestCurve(unittest.TestCase):
         assert curve.D() > 0
 
     @given(
-           A=st.integers(A_MUL, 10000 * A_MUL),
+           A=st.integers(MIN_A, MAX_A),
            x=st.integers(10**17, 10**15 * 10**18),  # $0.1 .. $1e15
            yx=st.integers(10**15, 10**21),
            zx=st.integers(10**15, 10**21),
-           gamma=st.integers(10**10, 10**16),  # gamma from 1e-8 up to 0.01
+           gamma=st.integers(MIN_GAMMA, MAX_GAMMA),
            i=st.integers(0, 2),
            j=st.integers(0, 2),
            inx=st.integers(10**15, 10**21)
@@ -99,11 +106,11 @@ class TestCurve(unittest.TestCase):
         assert out_amount > 0
 
     @given(
-           A=st.integers(A_MUL, 10000 * A_MUL),
+           A=st.integers(MIN_A, MAX_A),
            x=st.integers(10**17, 10**15 * 10**18),  # 0.1 USD to 1e15 USD
            yx=st.integers(5 * 10**14, 20 * 10**20),
            zx=st.integers(5 * 10**14, 20 * 10**20),
-           gamma=st.integers(10**10, 10**16),  # gamma from 1e-8 up to 0.01
+           gamma=st.integers(MIN_GAMMA, MAX_GAMMA),
            i=st.integers(0, 2),
            j=st.integers(0, 2),
            inx=st.integers(3 * 10**15, 3 * 10**20)
@@ -134,12 +141,12 @@ class TestCurve(unittest.TestCase):
             assert 2 * (D1 - D2) / (D1 + D2) < MIN_FEE  # Only loss is prevented - gain is ok
 
     @given(
-           A=st.integers(A_MUL, 10000 * A_MUL),
+           A=st.integers(MIN_A, MAX_A),
            D=st.integers(10**17, 10**15 * 10**18),  # 0.1 USD to 1e15 USD
            xD=st.integers(MIN_XD, MAX_XD),
            yD=st.integers(MIN_XD, MAX_XD),
            zD=st.integers(MIN_XD, MAX_XD),
-           gamma=st.integers(10**10, 10**16),  # gamma from 1e-8 up to 0.01
+           gamma=st.integers(MIN_GAMMA, MAX_GAMMA),
            j=st.integers(0, 2),
     )
     @settings(max_examples=MAX_EXAMPLES_YD)
