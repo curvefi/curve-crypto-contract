@@ -80,12 +80,13 @@ def test_reduction_coefficient_sim(crypto_math, x0, x1, x2, gamma):
 )
 @settings(max_examples=MAX_SAMPLES)
 def test_newton_D(crypto_math, A, x, yx, zx, perm, gamma):
+    A = A * 3**3 * 10000
     i, j, k = list(permutations(range(3)))[perm]
     X = [x, x * yx // 10**18, x * zx // 10**18]
     X = [X[i], X[j], X[k]]
     result_sim = sim.solve_D(A, gamma, X)
     if all(f >= 1.1e16 and f <= 0.9e20 for f in [_x * 10**18 / result_sim for _x in X]):
-        result_contract = crypto_math.newton_D(A * 3**3 * 10000, gamma, X)
+        result_contract = crypto_math.newton_D(A, gamma, X)
         assert abs(result_sim - result_contract) <= max(1000, result_sim/1e15)  # 1000 is $1e-15
 
 
@@ -100,6 +101,7 @@ def test_newton_D(crypto_math, A, x, yx, zx, perm, gamma):
 )
 @settings(max_examples=MAX_SAMPLES)
 def test_newton_y(crypto_math, A, D, xD, yD, zD, gamma, j):
+    A = A * 3**3 * 10000
     X = [D * xD // 10**18, D * yD // 10**18, D * zD // 10**18]
     result_sim = sim.solve_x(A, gamma, X, D, j)
     try:

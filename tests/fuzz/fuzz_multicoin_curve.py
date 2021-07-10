@@ -20,13 +20,15 @@ MIN_FEE = 5e-5
 MIN_XD = 10**16
 MAX_XD = 10**20
 
+A_MUL = 3**3 * 10000
+
 
 # Test with 3 coins for simplicity
 class TestCurve(unittest.TestCase):
     @given(
-           st.integers(10**9, 10**15 * 10**18),
-           st.integers(10**9, 10**15 * 10**18),
-           st.integers(10**9, 10**15 * 10**18)
+           x=st.integers(10**9, 10**15 * 10**18),
+           y=st.integers(10**9, 10**15 * 10**18),
+           z=st.integers(10**9, 10**15 * 10**18)
     )
     @settings(max_examples=MAX_EXAMPLES_MEAN)
     def test_geometric_mean(self, x, y, z):
@@ -36,10 +38,10 @@ class TestCurve(unittest.TestCase):
         assert diff / val <= max(1e-10, 1/min([x, y, z]))
 
     @given(
-           st.integers(10**9, 10**15 * 10**18),
-           st.integers(10**9, 10**15 * 10**18),
-           st.integers(10**9, 10**15 * 10**18),
-           st.integers(10**10, 10**18)
+           x=st.integers(10**9, 10**15 * 10**18),
+           y=st.integers(10**9, 10**15 * 10**18),
+           z=st.integers(10**9, 10**15 * 10**18),
+           gamma=st.integers(10**10, 10**18)
     )
     @settings(max_examples=MAX_EXAMPLES_RED)
     def test_reduction_coefficient(self, x, y, z, gamma):
@@ -75,14 +77,14 @@ class TestCurve(unittest.TestCase):
         assert curve.D() > 0
 
     @given(
-           st.integers(1, 10000),
-           st.integers(10**17, 10**15 * 10**18),  # $0.1 .. $1e15
-           st.integers(10**15, 10**21),
-           st.integers(10**15, 10**21),
-           st.integers(10**10, 10**16),  # gamma from 1e-8 up to 0.01
-           st.integers(0, 2),
-           st.integers(0, 2),
-           st.integers(10**15, 10**21)
+           A=st.integers(A_MUL, 10000 * A_MUL),
+           x=st.integers(10**17, 10**15 * 10**18),  # $0.1 .. $1e15
+           yx=st.integers(10**15, 10**21),
+           zx=st.integers(10**15, 10**21),
+           gamma=st.integers(10**10, 10**16),  # gamma from 1e-8 up to 0.01
+           i=st.integers(0, 2),
+           j=st.integers(0, 2),
+           inx=st.integers(10**15, 10**21)
     )
     @settings(max_examples=MAX_EXAMPLES_Y)
     def test_y_convergence(self, A, x, yx, zx, gamma, i, j, inx):
@@ -97,14 +99,14 @@ class TestCurve(unittest.TestCase):
         assert out_amount > 0
 
     @given(
-           st.integers(1, 10000),
-           st.integers(10**17, 10**15 * 10**18),  # 0.1 USD to 1e15 USD
-           st.integers(5 * 10**14, 20 * 10**20),
-           st.integers(5 * 10**14, 20 * 10**20),
-           st.integers(10**10, 10**16),  # gamma from 1e-8 up to 0.01
-           st.integers(0, 2),
-           st.integers(0, 2),
-           st.integers(3 * 10**15, 3 * 10**20)
+           A=st.integers(A_MUL, 10000 * A_MUL),
+           x=st.integers(10**17, 10**15 * 10**18),  # 0.1 USD to 1e15 USD
+           yx=st.integers(5 * 10**14, 20 * 10**20),
+           zx=st.integers(5 * 10**14, 20 * 10**20),
+           gamma=st.integers(10**10, 10**16),  # gamma from 1e-8 up to 0.01
+           i=st.integers(0, 2),
+           j=st.integers(0, 2),
+           inx=st.integers(3 * 10**15, 3 * 10**20)
     )
     @settings(max_examples=MAX_EXAMPLES_NOLOSS)
     def test_y_noloss(self, A, x, yx, zx, gamma, i, j, inx):
@@ -132,13 +134,13 @@ class TestCurve(unittest.TestCase):
             assert 2 * (D1 - D2) / (D1 + D2) < MIN_FEE  # Only loss is prevented - gain is ok
 
     @given(
-           st.integers(1, 10000),
-           st.integers(10**17, 10**15 * 10**18),  # 0.1 USD to 1e15 USD
-           st.integers(MIN_XD, MAX_XD),
-           st.integers(MIN_XD, MAX_XD),
-           st.integers(MIN_XD, MAX_XD),
-           st.integers(10**10, 10**16),  # gamma from 1e-8 up to 0.01
-           st.integers(0, 2),
+           A=st.integers(A_MUL, 10000 * A_MUL),
+           D=st.integers(10**17, 10**15 * 10**18),  # 0.1 USD to 1e15 USD
+           xD=st.integers(MIN_XD, MAX_XD),
+           yD=st.integers(MIN_XD, MAX_XD),
+           zD=st.integers(MIN_XD, MAX_XD),
+           gamma=st.integers(10**10, 10**16),  # gamma from 1e-8 up to 0.01
+           j=st.integers(0, 2),
     )
     @settings(max_examples=MAX_EXAMPLES_YD)
     def test_y_from_D(self, A, D, xD, yD, zD, gamma, j):

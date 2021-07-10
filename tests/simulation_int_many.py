@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import json
 
+A_MULTIPLIER = 10000
+
 
 def geometric_mean(x):
     N = len(x)
@@ -32,146 +34,6 @@ def reduction_coefficient(x, gamma):
     return K
 
 
-def absnewton(f, fprime, x0, handle_x=False, handle_D=False):
-    x = x0
-    i = 0
-    while True:
-        x_prev = x
-        _f = f(x)
-        _fprime = fprime(x)
-        x -= _f * 10**18 // _fprime
-
-        # XXX vulnerable to edge-cases
-        # Need to take out of unstable equilibrium if ever gets there
-        # Might be an issue in smart contracts
-
-        # XXX TODO fuzz if we can remove
-        if handle_x:
-            if x < 0 or _fprime < 0:
-                x = x_prev // 2
-        elif handle_D:
-            if x < 0:
-                x = -x // 2
-
-        i += 1
-        # if i > 1000:  # XXX where do we stop?
-        #     print(i, (x - x_prev) / x_prev, x, x_prev)
-        if i > 1050:
-            raise ValueError("Did not converge")
-        if abs(x - x_prev) <= max(100, x // 10**14):
-            return x
-
-
-def inv_target(A, gamma, x, D):
-    N = len(x)
-    # Dimensions are USD**N
-    # So, we calc all numbers as z**N/(10**18)**(N-1)
-
-    x_prod = 10**18
-    K = 10**18
-    for x_i in x:
-        x_prod = x_prod * x_i // 10**18
-        K = K * x_i * N // D
-
-    # gamma is also base of 10**18
-    if gamma > 0:
-        # K = gamma**2 * K / (gamma + (1 - K))**2
-        _g1k = abs(gamma + 10**18 - K)
-        K = K * gamma // _g1k
-        K = K * gamma // _g1k
-    K *= A
-
-    # f = K * D**(N-1) * sum(x) + x_prod - (K * D**N + (D/N)**N)
-
-    DN = 10**18
-    for j in range(N):
-        DN = DN * D // 10**18
-    # DN = D**N / (1e18)**(N-1)
-    f = K * DN // D * sum(x) // 10**18 + x_prod - (K * DN // 10**18 + DN // N**N)
-
-    return f
-
-
-def inv_dfdD(A, gamma, x, D):
-    N = len(x)
-
-    x_prod = 10**18
-    K0 = 10**18
-    for x_i in x:
-        x_prod = x_prod * x_i // 10**18
-        K0 = K0 * x_i * N // D
-    K0deriv = -K0 * 10**18 * N // D  # - N/D * K0
-
-    if gamma > 0:
-        # K = gamma**2 * K0 / (gamma + (1 - K0))**2
-        _g1k0 = abs(gamma + 10**18 - K0)
-        K = K0 * gamma // _g1k0
-        K = K * gamma // _g1k0
-        # Kderiv = (2 * gamma**2 * K0 / (gamma + (1 - K0))**3 + gamma**2 / (gamma + (1 - K0))**2) * K0deriv
-        #        = (2 * K0 / (gamma + (1 - K0)) + 1) * K0deriv * gamma**2 / (gamma + (1 - K0))**2
-        Kderiv = K0deriv * gamma // _g1k0 * gamma // _g1k0
-        Kderiv += Kderiv * 2 * K0 // _g1k0
-    else:
-        K = K0
-        Kderiv = K0deriv
-    K *= A
-    Kderiv *= A
-
-    DN1 = 10**18
-    for j in range(N-1):
-        DN1 = DN1 * D // 10**18
-    # DN1 = D**(N-1) / (1e18)**(N-2)
-
-    KdD = Kderiv * D // 10**18
-
-    # return sum(x) * D**(N-2) * (Kderiv * D + K * (N-1))\
-    #     - D**(N-1) * (Kderiv * D + K * N)\
-    #     - (D/N) ** (N-1)
-
-    result = sum(x) * DN1//D * (KdD + K * (N-1)) // 10**18\
-        - DN1 * (KdD + K * N) // 10**18\
-        - DN1 // N**(N-1)
-    return result
-
-
-def inv_dfdxi(A, gamma, x, D, i):
-    N = len(x)
-    x_prod = 10**18
-    x_prod_i = 10**18
-    for j, x_i in enumerate(x):
-        x_prod = x_prod * x_i // 10**18
-        if j != i:
-            x_prod_i = x_prod_i * x_i // 10**18
-    # K0 = x_prod / (D/N)**N
-    # K0deriv = x_prod_i / (D/N)**N
-    K0 = x_prod
-    K0deriv = x_prod_i
-    for j in range(N):
-        K0 = K0 * N * 10**18 // D
-        K0deriv = K0deriv * N * 10**18 // D
-    if gamma:
-        # K = gamma**2 * K0 / (gamma + (1 - K0))**2
-        _g1k0 = abs(gamma + 10**18 - K0)
-        K = K0 * gamma // _g1k0
-        K = K * gamma // _g1k0
-        # Kderiv = (2 * gamma**2 * K0 / (gamma + (1 - K0))**3 + gamma**2 / (gamma + (1 - K0))**2) * K0deriv
-        #        = (2 * K0 / (gamma + (1 - K0)) + 1) * K0deriv * gamma**2 / (gamma + (1 - K0))**2
-        Kderiv = K0deriv * gamma // _g1k0 * gamma // _g1k0
-        Kderiv += Kderiv * 2 * K0 // _g1k0
-    else:
-        K = K0
-        Kderiv = K0deriv
-    K *= A
-    Kderiv *= A
-
-    DN1 = 10**18
-    for j in range(N-1):
-        DN1 = DN1 * D // 10**18
-
-    # return D ** (N - 1) * (K + sum(x) * Kderiv) + x_prod_i - D**N * Kderiv
-    return DN1 * (K + sum(x) * Kderiv // 10**18) // 10**18 + x_prod_i - DN1 * D // 10**18 * Kderiv // 10**18
-
-
 def newton_D(A, gamma, x, D0):
     D = D0
     i = 0
@@ -179,8 +41,6 @@ def newton_D(A, gamma, x, D0):
     S = sum(x)
     x = sorted(x, reverse=True)
     N = len(x)
-    for j in range(N):  # XXX or just set A to be A*N**N?
-        A = A * N
 
     for i in range(255):
         D_prev = D
@@ -192,7 +52,7 @@ def newton_D(A, gamma, x, D0):
         _g1k0 = abs(gamma + 10**18 - K0)
 
         # D / (A * N**N) * _g1k0**2 / gamma**2
-        mul1 = 10**18 * D // gamma * _g1k0 // gamma * _g1k0 // A
+        mul1 = 10**18 * D // gamma * _g1k0 // gamma * _g1k0 * A_MULTIPLIER // A
 
         # 2*N*K0 / _g1k0
         mul2 = (2 * 10**18) * N * K0 // _g1k0
@@ -225,9 +85,6 @@ def newton_y(A, gamma, x, D, i):
     for _x in x_sorted[::-1]:
         K0_i = K0_i * _x * N // D  # Large _x first
 
-    for j in range(N):  # XXX or just set A to be A*N**N?
-        A = A * N
-
     for j in range(255):
         y_prev = y
 
@@ -237,7 +94,7 @@ def newton_y(A, gamma, x, D, i):
         _g1k0 = abs(gamma + 10**18 - K0)
 
         # D / (A * N**N) * _g1k0**2 / gamma**2
-        mul1 = 10**18 * D // gamma * _g1k0 // gamma * _g1k0 // A
+        mul1 = 10**18 * D // gamma * _g1k0 // gamma * _g1k0 * A_MULTIPLIER // A
 
         # 2*K0 / _g1k0
         mul2 = 10**18 + (2 * 10**18) * K0 // _g1k0
@@ -565,7 +422,7 @@ def get_price_vector(n, data):
 if __name__ == '__main__':
     test_data = get_all()[-100000:]
 
-    trader = Trader(135, int(7e-5 * 1e18), 5_000_000 * 10**18, 3, get_price_vector(3, test_data),
+    trader = Trader(135 * 3**3 * 10000, int(7e-5 * 1e18), 5_000_000 * 10**18, 3, get_price_vector(3, test_data),
                     mid_fee=4e-4, out_fee=4.0e-3,
                     allowed_extra_profit=2 * 10**13, fee_gamma=int(0.01 * 1e18),
                     adjustment_step=0.0015, ma_half_time=600)

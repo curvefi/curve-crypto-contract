@@ -4,7 +4,7 @@ import pylab
 from simulation_int_many import newton_y
 
 
-A = 135
+A = 135 * 3**3 * 10000
 D = 3
 
 
