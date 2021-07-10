@@ -7,6 +7,14 @@ from hypothesis import settings
 N_COINS = 3
 MAX_SAMPLES = 50  # Increase for fuzzing
 
+A_MUL = 10000 * 3**3
+MIN_A = int(0.01 * A_MUL)
+MAX_A = 1000 * A_MUL
+
+# gamma from 1e-8 up to 0.05
+MIN_GAMMA = 10**10
+MAX_GAMMA = 5 * 10**16
+
 
 @pytest.fixture(scope="module")
 def test_math(TestMath, accounts):
@@ -71,16 +79,15 @@ def test_reduction_coefficient_sim(crypto_math, x0, x1, x2, gamma):
 
 
 @given(
-       A=strategy('uint256', min_value=1, max_value=10000),
+       A=strategy('uint256', min_value=MIN_A, max_value=MAX_A),
        x=strategy('uint256', min_value=10**9, max_value=10**14 * 10**18),  # 1e-9 USD to 100T USD
        yx=strategy('uint256', min_value=int(1.1e11), max_value=10**18),  # <- ratio 1e18 * y/x, typically 1e18 * 1
        zx=strategy('uint256', min_value=int(1.1e11), max_value=10**18),  # <- ratio 1e18 * z/x, typically 1e18 * 1
        perm=strategy('uint8', max_value=5),  # Permutation
-       gamma=strategy('uint256', min_value=10**10, max_value=10**16)  # gamma from 1e-8 up to 0.01
+       gamma=strategy('uint256', min_value=MIN_GAMMA, max_value=MAX_GAMMA)
 )
 @settings(max_examples=MAX_SAMPLES)
 def test_newton_D(crypto_math, A, x, yx, zx, perm, gamma):
-    A = A * 3**3 * 10000
     i, j, k = list(permutations(range(3)))[perm]
     X = [x, x * yx // 10**18, x * zx // 10**18]
     X = [X[i], X[j], X[k]]
@@ -91,17 +98,16 @@ def test_newton_D(crypto_math, A, x, yx, zx, perm, gamma):
 
 
 @given(
-       A=strategy('uint256', min_value=1, max_value=10000),
+       A=strategy('uint256', min_value=MIN_A, max_value=MAX_A),
        D=strategy('uint256', min_value=10**18, max_value=10**14 * 10**18),  # 1 USD to 100T USD
        xD=strategy('uint256', min_value=int(1.001e16), max_value=int(0.999e20)),  # <- ratio 1e18 * x/D, typically 1e18 * 1
        yD=strategy('uint256', min_value=int(1.001e16), max_value=int(0.999e20)),  # <- ratio 1e18 * y/D, typically 1e18 * 1
        zD=strategy('uint256', min_value=int(1.001e16), max_value=int(0.999e20)),  # <- ratio 1e18 * z/D, typically 1e18 * 1
-       gamma=strategy('uint256', min_value=10**10, max_value=10**16),  # gamma from 1e-8 up to 0.01
+       gamma=strategy('uint256', min_value=MIN_GAMMA, max_value=MAX_GAMMA),
        j=strategy('uint256', min_value=0, max_value=2),
 )
 @settings(max_examples=MAX_SAMPLES)
 def test_newton_y(crypto_math, A, D, xD, yD, zD, gamma, j):
-    A = A * 3**3 * 10000
     X = [D * xD // 10**18, D * yD // 10**18, D * zD // 10**18]
     result_sim = sim.solve_x(A, gamma, X, D, j)
     try:

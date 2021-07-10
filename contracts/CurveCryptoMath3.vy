@@ -8,6 +8,12 @@
 N_COINS: constant(int128) = 3  # <- change
 A_MULTIPLIER: constant(uint256) = 10000
 
+MIN_GAMMA: constant(uint256) = 10**10
+MAX_GAMMA: constant(uint256) = 5 * 10**16
+
+MIN_A: constant(uint256) = N_COINS**N_COINS * A_MULTIPLIER / 100
+MAX_A: constant(uint256) = N_COINS**N_COINS * A_MULTIPLIER * 1000
+
 
 @internal
 @pure
@@ -96,8 +102,8 @@ def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint
     Currently uses 60k gas
     """
     # Safety checks
-    assert ANN > N_COINS**N_COINS * A_MULTIPLIER - 1 and ANN < 10000 * N_COINS**N_COINS * A_MULTIPLIER + 1  # dev: unsafe values A
-    assert gamma > 10**10-1 and gamma < 10**16+1  # dev: unsafe values gamma
+    assert ANN > MIN_A - 1 and ANN < MAX_A + 1  # dev: unsafe values A
+    assert gamma > MIN_GAMMA - 1 and gamma < MAX_GAMMA + 1  # dev: unsafe values gamma
 
     # Initial value of invariant D is that for constant-product invariant
     x: uint256[N_COINS] = self.sort(x_unsorted)
@@ -169,8 +175,8 @@ def newton_y(ANN: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: u
     ANN = A * N**N
     """
     # Safety checks
-    assert ANN > N_COINS**N_COINS * A_MULTIPLIER - 1 and ANN < 10000 * N_COINS**N_COINS * A_MULTIPLIER + 1  # dev: unsafe values A
-    assert gamma > 10**10-1 and gamma < 10**16+1  # dev: unsafe values gamma
+    assert ANN > MIN_A - 1 and ANN < MAX_A + 1  # dev: unsafe values A
+    assert gamma > MIN_GAMMA - 1 and gamma < MAX_GAMMA + 1  # dev: unsafe values gamma
     assert D > 10**17 - 1 and D < 10**15 * 10**18 + 1 # dev: unsafe values D
     for k in range(3):
         if k != i:
