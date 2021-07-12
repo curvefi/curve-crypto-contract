@@ -36,7 +36,6 @@ def main():
     p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
     INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
 
-
     crypto_math = CurveCryptoMath3.deploy(txparams)
     token = CurveTokenV4.deploy("Curve.fi USD-BTC-ETH", "crvTricrypto", txparams)
 
@@ -68,13 +67,13 @@ def main():
 
     swap = deployer.deploy(
         accounts[0],
-        135 * 3 ** 3,  # A
-        int(7e-5 * 1e18),  # gamma
-        int(4e-4 * 1e10),  # mid_fee
-        int(4e-3 * 1e10),  # out_fee
-        int(0.0028 * 1e18),  # price_threshold
-        int(0.01 * 1e18),  # fee_gamma
-        int(0.0015 * 1e18),  # adjustment_step
+        int(0.6561 * 3 ** 3 * 10000),  # A
+        int(1.545e-4 * 1e18),  # gamma
+        int(1.2e-3 * 1e10),  # mid_fee
+        int(4.5e-3 * 1e10),  # out_fee
+        2 * 10**12,  # allowed_extra_profit
+        int(5e-4 * 1e18),  # fee_gamma
+        int(0.00049 * 1e18),  # adjustment_step
         0,  # admin_fee
         600,  # ma_half_time
         INITIAL_PRICES,
