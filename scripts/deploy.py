@@ -67,9 +67,9 @@ def main():
 
     swap = deployer.deploy(
         accounts[0],
-        int(0.6561 * 3 ** 3 * 10000),  # A
-        int(1.545e-4 * 1e18),  # gamma
-        int(1.2e-3 * 1e10),  # mid_fee
+        int(0.2 * 3 ** 3 * 10000),  # A
+        int(3.5e-3 * 1e18),  # gamma
+        int(1.1e-3 * 1e10),  # mid_fee
         int(4.5e-3 * 1e10),  # out_fee
         2 * 10**12,  # allowed_extra_profit
         int(5e-4 * 1e18),  # fee_gamma
