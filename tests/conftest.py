@@ -69,6 +69,7 @@ def compiled_swap(crypto_math, token, crypto_views, coins):
 def _crypto_swap(compiled_swap, token, accounts):
     swap = compiled_swap.deploy(
             accounts[0],
+            accounts[0],
             135 * 3**3 * 10000,  # A
             int(7e-5 * 1e18),  # gamma
             int(4e-4 * 1e10),  # mid_fee

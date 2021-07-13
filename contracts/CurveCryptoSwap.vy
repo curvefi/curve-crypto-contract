@@ -197,6 +197,7 @@ INF_COINS: constant(uint256) = 15
 @external
 def __init__(
     owner: address,
+    admin_fee_receiver: address,
     A: uint256,
     gamma: uint256,
     mid_fee: uint256,
@@ -242,7 +243,7 @@ def __init__(
 
     self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
 
-    self.admin_fee_receiver = owner
+    self.admin_fee_receiver = admin_fee_receiver
 
 
 @payable
@@ -1044,8 +1045,8 @@ def commit_new_parameters(
         new_admin_fee = self.admin_fee
 
     # AMM parameters
-    if new_fee_gamma < 2**100:
-        assert new_fee_gamma > 0  # dev: fee_gamma out of range [1 .. 2**100]
+    if new_fee_gamma < 10**18:
+        assert new_fee_gamma > 0  # dev: fee_gamma out of range [1 .. 10**18]
     else:
         new_fee_gamma = self.fee_gamma
     if new_allowed_extra_profit > 10**18:

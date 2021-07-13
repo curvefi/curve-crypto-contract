@@ -18,6 +18,7 @@ COINS = [
     "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",  # WBTC
     "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"   # WETH
 ]
+FEE_RECEIVER = "0xeCb456EA5365865EbAb8a2661B0c503410e9B347"
 
 if network.show_active() == 'mainnet':
     print('Deploying on mainnet')
@@ -67,6 +68,7 @@ def main():
 
     swap = deployer.deploy(
         accounts[0],
+        FEE_RECEIVER,
         int(0.2 * 3 ** 3 * 10000),  # A
         int(3.5e-3 * 1e18),  # gamma
         int(1.1e-3 * 1e10),  # mid_fee
@@ -74,7 +76,7 @@ def main():
         2 * 10**12,  # allowed_extra_profit
         int(5e-4 * 1e18),  # fee_gamma
         int(0.00049 * 1e18),  # adjustment_step
-        0,  # admin_fee
+        5 * 10**9,  # admin_fee
         600,  # ma_half_time
         INITIAL_PRICES,
         txparams,
