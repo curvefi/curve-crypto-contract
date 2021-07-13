@@ -37,7 +37,7 @@ def main():
     INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
 
     crypto_math = CurveCryptoMath3.deploy(txparams)
-    token = CurveTokenV4.deploy("Curve.fi USD-BTC-ETH", "crvTricrypto", txparams)
+    token = CurveTokenV4.deploy("Curve.fi USD-BTC-ETH", "crv3crypto", txparams)
 
     if COINS:
         coins = [interface.ERC20(addr) for addr in COINS]
