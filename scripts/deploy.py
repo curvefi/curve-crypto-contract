@@ -86,6 +86,8 @@ def main():
     print("Deployed at:")
     print("Swap:", swap.address)
     print("Token:", token.address)
+    print("Math:", crypto_math.address)
+    print("Views:", crypto_views.address)
 
     with open("swap.json", "w") as f:
         json.dump(swap.abi, f)
