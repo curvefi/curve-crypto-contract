@@ -1,5 +1,5 @@
 # @version 0.2.12
-# (c) Curve.Fi, 2020
+# (c) Curve.Fi, 2021
 
 # This contract contains view-only external methods which can be gas-inefficient
 # when called from smart contracts but ok to use from frontend

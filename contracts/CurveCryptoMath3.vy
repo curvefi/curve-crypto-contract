@@ -1,5 +1,5 @@
 # @version 0.2.12
-# (c) Curve.Fi, 2020
+# (c) Curve.Fi, 2021
 # Math for crypto pools
 #
 # Unless otherwise agreed on, only contracts owned by Curve DAO or
