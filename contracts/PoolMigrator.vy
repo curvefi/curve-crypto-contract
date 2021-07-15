@@ -101,12 +101,6 @@ def migrate_to_new_pool():
     if old_amount > 0:
         Swap(OLD_POOL).remove_liquidity(old_amount, empty(uint256[N_COINS]))
 
-    # XXX should we check for flash-loan manipulation during the zap?
-    # We could use price_scale or price_oracle to check
-
-    # Only deposit is vulnerable
-    # So we have to check that price_oracle * balances is close to 1/3 each
-
     # Deposit
     for i in range(N_COINS):
         bal = ERC20(coins[i]).balanceOf(self)
