@@ -22,6 +22,16 @@ COINS: constant(address[N_COINS]) = [
     0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
 ]
 
+
+# For flash loan protection
+PRECISIONS: constant(uint256[N_COINS]) = [
+    1000000000000,
+    10000000000,
+    1,
+]
+ALLOWED_DEVIATION: constant(uint256) = 10**16  # 1% * 1e18
+
+
 interface ERC20:
     def approve(_spender: address, _amount: uint256): nonpayable
     def transfer(_to: address, _amount: uint256): nonpayable
@@ -35,6 +45,8 @@ interface Gauge:
 interface Swap:
     def add_liquidity(_amounts: uint256[N_COINS], _min_mint_amount: uint256): nonpayable
     def remove_liquidity(_burn_amount: uint256, _min_amounts: uint256[N_COINS]): nonpayable
+    def balances(i: uint256) -> uint256: view
+    def price_oracle(i: uint256) -> uint256: view
 
 
 @external
@@ -44,12 +56,29 @@ def __init__():
     ERC20(NEW_TOKEN).approve(NEW_GAUGE, MAX_UINT256)
 
 
+@internal
+@view
+def is_safe():
+    balances: uint256[N_COINS] = PRECISIONS
+    S: uint256 = 0
+    for i in range(N_COINS):
+        balances[i] *= Swap(NEW_POOL).balances(i)
+        if i > 0:
+            balances[i] = balances[i] * Swap(NEW_POOL).price_oracle(i) / 10**18
+        S += balances[i]
+    for i in range(N_COINS):
+        ratio: uint256 = balances[i] * 10**18 / S
+        assert ratio > 10**18/N_COINS - ALLOWED_DEVIATION and ratio < 10**18/N_COINS + ALLOWED_DEVIATION, "Target pool might be under attack now - wait"
+
+
 @external
 def migrate_to_new_pool():
     """
     @notice Migrate liquidity between two pools
     Better to transfer 1 wei of old gauge and old LP to the zap
     """
+    self.is_safe()
+
     old_amount: uint256 = 0
     bal: uint256 = ERC20(OLD_GAUGE).balanceOf(msg.sender)
 
