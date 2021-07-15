@@ -64,7 +64,7 @@ def is_safe():
     for i in range(N_COINS):
         balances[i] *= Swap(NEW_POOL).balances(i)
         if i > 0:
-            balances[i] = balances[i] * Swap(NEW_POOL).price_oracle(i) / 10**18
+            balances[i] = balances[i] * Swap(NEW_POOL).price_oracle(i-1) / 10**18
         S += balances[i]
     for i in range(N_COINS):
         ratio: uint256 = balances[i] * 10**18 / S
