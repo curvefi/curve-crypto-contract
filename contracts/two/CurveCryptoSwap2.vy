@@ -13,10 +13,6 @@ interface CurveToken:
     def mint_relative(_to: address, frac: uint256) -> uint256: nonpayable
     def burnFrom(_to: address, _value: uint256) -> bool: nonpayable
 
-interface Views:
-    def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256: view
-    def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256: view
-
 
 # Events
 event TokenExchange:
@@ -93,7 +89,6 @@ A_MULTIPLIER: constant(uint256) = 10000
 
 # These addresses are replaced by the deployer
 token: constant(address) = 0x0000000000000000000000000000000000000001
-views: constant(address) = 0x0000000000000000000000000000000000000002
 coins: constant(address[N_COINS]) = [
     0x0000000000000000000000000000000000000010,
     0x0000000000000000000000000000000000000011]
@@ -527,12 +522,6 @@ def fee() -> uint256:
     return self._fee(self.xp())
 
 
-@external
-@view
-def fee_calc(xp: uint256[N_COINS]) -> uint256:
-    return self._fee(xp)
-
-
 @internal
 @view
 def get_xcp(D: uint256) -> uint256:
@@ -770,7 +759,29 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
 @external
 @view
 def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
-    return Views(views).get_dy(i, j, dx)
+    assert i != j  # dev: same input and output coin
+    assert i < N_COINS  # dev: coin index out of range
+    assert j < N_COINS  # dev: coin index out of range
+
+    price_scale: uint256 = self.price_scale * PRECISIONS[1]
+    xp: uint256[N_COINS] = self.balances
+    xp[i] += dx
+    xp = [xp[0] * PRECISIONS[0], xp[1] * price_scale / PRECISION]
+
+    A: uint256 = 0
+    gamma: uint256 = 0
+    A_gamma: uint256[2] = self._A_gamma()
+
+    y: uint256 = self.newton_y(A_gamma[0], A_gamma[1], xp, self.D, j)
+    dy: uint256 = xp[j] - y - 1
+    xp[j] = y
+    if j > 0:
+        dy = dy * PRECISION / price_scale
+    else:
+        dy /= PRECISIONS[0]
+    dy -= self._fee(xp) * dy / 10**10
+
+    return dy
 
 
 @view
@@ -789,12 +800,6 @@ def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
         else:
             Sdiff += avg - _x
     return fee * Sdiff / S + NOISE_FEE
-
-
-@external
-@view
-def calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
-    return self._calc_token_fee(amounts, xp)
 
 
 @external
@@ -822,7 +827,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
             self.balances[i] = bal
         xx = xp
 
-        price_scale: uint256 = self.price_scale
+        price_scale: uint256 = self.price_scale * PRECISIONS[1]
         xp = [xp[0] * PRECISIONS[0], xp[1] * price_scale / PRECISION]
         xp_old = [xp_old[0] * PRECISIONS[0], xp_old[1] * price_scale / PRECISION]
 
@@ -918,8 +923,20 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
 
 @view
 @external
-def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
-    return Views(views).calc_token_amount(amounts, deposit)
+def calc_token_amount(amounts: uint256[N_COINS]) -> uint256:
+    token_supply: uint256 = CurveToken(token).totalSupply()
+    price_scale: uint256 = self.price_scale * PRECISIONS[1]
+    xp: uint256[N_COINS] = [
+        (self.balances[0] + amounts[0]) * PRECISIONS[0],
+        (self.balances[1] + amounts[1]) * price_scale / PRECISION]
+    amountsp: uint256[N_COINS] = [
+        amounts[0] * PRECISIONS[0],
+        amounts[1] * price_scale / PRECISION]
+    A_gamma: uint256[2] = self._A_gamma()
+    D: uint256 = self.newton_D(A_gamma[0], A_gamma[1], xp)
+    d_token: uint256 = token_supply * D / self.D - token_supply
+    d_token -= self._calc_token_fee(amountsp, xp) * d_token / 10**10 + 1
+    return d_token
 
 
 @internal
