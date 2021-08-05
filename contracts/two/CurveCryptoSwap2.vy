@@ -2,10 +2,11 @@
 # (c) Curve.Fi, 2021
 # Pool for two crypto assets
 
-interface ERC20:  # Custom ERC20 which works for USDT, WETH and WBTC XXX needs replacing
-    def transfer(_to: address, _amount: uint256): nonpayable
-    def transferFrom(_from: address, _to: address, _amount: uint256): nonpayable
-    def balanceOf(_user: address) -> uint256: view
+from vyper.interfaces import ERC20
+# Expected coins:
+# eur*/3crv
+# crypto/tricrypto
+# All are proper ERC20s, so let's use a standard interface and save bytespace
 
 interface CurveToken:
     def totalSupply() -> uint256: view
@@ -688,8 +689,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
 
     if True:  # scope to reduce size of memory when making internal calls later
         _coins: address[N_COINS] = coins
-        # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
+        assert ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
 
         y: uint256 = xp[j]
         x0: uint256 = xp[i]
@@ -734,8 +734,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
         y -= dy
 
         self.balances[j] = y
-        # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(_coins[j]).transfer(msg.sender, dy)
+        assert ERC20(_coins[j]).transfer(msg.sender, dy)
 
         y *= prec_j
         if j > 0:
@@ -833,8 +832,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
 
         for i in range(N_COINS):
             if amounts[i] > 0:
-                # assert might be needed for some tokens - removed one to save bytespace
-                ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
+                assert ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
                 amountsp[i] = xp[i] - xp_old[i]
         assert amounts[0] > 0 or amounts[1] > 0  # dev: no coins to add
 
@@ -912,8 +910,7 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
         assert d_balance >= min_amounts[i]
         self.balances[i] = balances[i] - d_balance
         balances[i] = d_balance  # now it's the amounts going out
-        # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(_coins[i]).transfer(msg.sender, d_balance)
+        assert ERC20(_coins[i]).transfer(msg.sender, d_balance)
 
     D: uint256 = self.D
     self.D = D - D * amount / total_supply
@@ -1018,8 +1015,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     self.tweak_price(A_gamma, xp, p, D)
 
     _coins: address[N_COINS] = coins
-    # assert might be needed for some tokens - removed one to save bytespace
-    ERC20(_coins[i]).transfer(msg.sender, dy)
+    assert ERC20(_coins[i]).transfer(msg.sender, dy)
 
     log RemoveLiquidityOne(msg.sender, token_amount, i, dy)
 
