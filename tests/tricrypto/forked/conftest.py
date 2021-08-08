@@ -7,6 +7,8 @@ COINS = [
     "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",  # wbtc
     "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",  # weth
 ]
+SWAP = "0xD51a44d3FaE010294C616388b506AcdA1bfAAE46"
+TOKEN = "0xc4AD29ba4B3c580e6D59105FFf484999997675Ff"
 
 
 @pytest.fixture(scope="session")
@@ -35,15 +37,20 @@ def decimals():
 
 
 @pytest.fixture(scope="module")
+def crypto_swap(CurveCryptoSwap):
+    return CurveCryptoSwap.at(SWAP)
+
+
+@pytest.fixture(scope="module")
 def crypto_zap(alice, DepositZap):
     return DepositZap.deploy(
-        "0x80466c64868E1ab14a1Ddf27A676C3fcBE638Fe5", {"from": alice}
+        SWAP, {"from": alice}
     )
 
 
 @pytest.fixture(scope="module")
 def crypto_lp_token(CurveTokenV4):
-    return CurveTokenV4.at("0xcA3d75aC011BF5aD07a98d02f18225F9bD9A6BDF")
+    return CurveTokenV4.at(TOKEN)
 
 
 @pytest.fixture(scope="module", autouse=True)
