@@ -94,14 +94,12 @@ def test_ma(chain, crypto_swap_with_deposit, token, coins, accounts, amount, i, 
 # Sanity check for price scale
 @given(
     amount=strategy('uint256', min_value=10**6, max_value=2 * 10**6 * 10**18),  # Can be more than we have
-    i=strategy('uint8', min_value=0, max_value=2),
-    j=strategy('uint8', min_value=0, max_value=2),
+    i=strategy('uint8', min_value=0, max_value=1),
     t=strategy('uint256', max_value=10 * 86400))
 @settings(max_examples=MAX_SAMPLES)
-def test_price_scale_range(chain, crypto_swap_with_deposit, coins, accounts, amount, i, j, t):
+def test_price_scale_range(chain, crypto_swap_with_deposit, coins, accounts, amount, i, t):
     user = accounts[1]
-    if i == j:
-        return
+    j = 1 - i
 
     prices1 = [10**18] + INITIAL_PRICES
     amount = amount * 10**18 // prices1[i]
@@ -109,30 +107,28 @@ def test_price_scale_range(chain, crypto_swap_with_deposit, coins, accounts, amo
 
     crypto_swap_with_deposit.exchange(i, j, amount, 0, {'from': user})
 
-    prices2 = [crypto_swap_with_deposit.last_prices(k) for k in [0, 1]]
+    p2 = crypto_swap_with_deposit.last_prices()
 
     chain.sleep(t)
     crypto_swap_with_deposit.remove_liquidity_one_coin(10**15, 0, 0, {'from': user})
 
-    prices3 = [crypto_swap_with_deposit.price_scale(k) for k in [0, 1]]
+    p3 = crypto_swap_with_deposit.price_scale()
 
-    for p1, p2, p3 in zip(INITIAL_PRICES, prices2, prices3):
-        if p1 > p2:
-            assert p3 <= p1 and p3 >= p2
-        else:
-            assert p3 >= p1 and p3 <= p2
+    p1 = INITIAL_PRICES[0]
+    if p1 > p2:
+        assert p3 <= p1 and p3 >= p2
+    else:
+        assert p3 >= p1 and p3 <= p2
 
 
 @given(
-    i=strategy('uint8', min_value=0, max_value=2),
-    j=strategy('uint8', min_value=0, max_value=2))
-def test_price_scale_change(chain, crypto_swap_with_deposit, i, j, coins, accounts):
+    i=strategy('uint8', min_value=0, max_value=1))
+def test_price_scale_change(chain, crypto_swap_with_deposit, i, coins, accounts):
+    j = 1 - i
     amount = 10**5 * 10**18
     t = 86400
 
     user = accounts[1]
-    if i == j:
-        return
 
     prices1 = [10**18] + INITIAL_PRICES
     amount = amount * 10**18 // prices1[i]
@@ -142,27 +138,22 @@ def test_price_scale_change(chain, crypto_swap_with_deposit, i, j, coins, accoun
     crypto_swap_with_deposit.exchange(i, j, amount, 0, {'from': user})
     out = coins[j].balanceOf(user) - out
 
-    price_scale_1 = [crypto_swap_with_deposit.price_scale(i) for i in range(2)]
+    price_scale_1 = crypto_swap_with_deposit.price_scale()
 
-    prices2 = [crypto_swap_with_deposit.last_prices(k) for k in [0, 1]]
+    prices2 = crypto_swap_with_deposit.last_prices()
     if i == 0:
         out_price = amount * 10**18 // out
-        ix = j
-    elif j == 0:
-        out_price = out * 10**18 // amount
-        ix = i
     else:
-        ix = j
-        out_price = amount * prices1[i] // out
+        out_price = out * 10**18 // amount
 
-    assert approx(out_price, prices2[ix-1], 2e-10)
+    assert approx(out_price, prices2, 2e-10)
     chain.sleep(t)
 
     coins[0]._mint_for_testing(user, 10**18)
     crypto_swap_with_deposit.exchange(0, 1, 10**18, 0, {'from': user})
-    price_scale_2 = [crypto_swap_with_deposit.price_scale(i) for i in range(2)]
+    price_scale_2 = crypto_swap_with_deposit.price_scale()
 
-    price_diff = abs(log(price_scale_2[ix-1] / price_scale_1[ix-1]))
+    price_diff = abs(log(price_scale_2 / price_scale_1))
     assert abs(log(price_diff / (crypto_swap_with_deposit.adjustment_step() / 1e18))) < 1e-2
 
     assert approx(crypto_swap_with_deposit.virtual_price(), crypto_swap_with_deposit.get_virtual_price(), 1e-10)
