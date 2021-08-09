@@ -224,7 +224,7 @@ def geometric_mean(unsorted_x: uint256[N_COINS], sort: bool) -> uint256:
     """
     x: uint256[N_COINS] = unsorted_x
     if sort and x[0] < x[1]:
-        x = [x[1], x[0]]
+        x = [unsorted_x[1], unsorted_x[0]]
     D: uint256 = x[0]
     diff: uint256 = 0
     for i in range(255):
@@ -259,17 +259,13 @@ def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint
     # Initial value of invariant D is that for constant-product invariant
     x: uint256[N_COINS] = x_unsorted
     if x[0] < x[1]:
-        x = [x[1], x[0]]
+        x = [x_unsorted[1], x_unsorted[0]]
 
     assert x[0] > 10**9 - 1 and x[0] < 10**15 * 10**18 + 1  # dev: unsafe values x[0]
-    for i in range(1, N_COINS):
-        frac: uint256 = x[i] * 10**18 / x[0]
-        assert frac > 10**11-1  # dev: unsafe values x[i]
+    assert x[1] * 10**18 / x[0] > 10**11-1  # dev: unsafe values x[i]
 
     D: uint256 = N_COINS * self.geometric_mean(x, False)
-    S: uint256 = 0
-    for x_i in x:
-        S += x_i
+    S: uint256 = x[0] + x[1]
 
     for i in range(255):
         D_prev: uint256 = D
