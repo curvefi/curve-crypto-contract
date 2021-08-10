@@ -289,9 +289,10 @@ class Trader:
 
     def ma_recorder(self, t, price_vector):
         # XXX what if every block only has p_b being last
+        N = len(price_vector)
         if t > self.t:
             alpha = 0.5 ** ((t - self.t) / self.ma_half_time)
-            for k in [1, 2]:
+            for k in range(1, N):
                 self.price_oracle[k] = int(price_vector[k] * (1 - alpha) + self.price_oracle[k] * alpha)
             self.t = t
 
