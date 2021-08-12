@@ -59,7 +59,7 @@ class StatefulSimulation(StatefulBase):
 
     def invariant_simulator(self):
         if self.trader.xcp_profit / 1e18 - 1 > 1e-8:
-            assert abs(self.trader.xcp_profit - self.swap.xcp_profit()) / (self.trader.xcp_profit - 10**18) < 0.1
+            assert abs(self.trader.xcp_profit - self.swap.xcp_profit()) / (self.trader.xcp_profit - 10**18) < 0.05
         assert approx(self.trader.curve.p[1], self.swap.price_scale(), 1e-4)  # adjustment_step * 2
 
 
