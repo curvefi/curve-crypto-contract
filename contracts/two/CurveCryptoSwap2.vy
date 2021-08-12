@@ -507,8 +507,9 @@ def _fee(xp: uint256[N_COINS]) -> uint256:
     (all normalized to 1e18)
     """
     fee_gamma: uint256 = self.fee_gamma
-    f: uint256 = fee_gamma / (
-        fee_gamma + (1 - xp[0] * xp[1] / ((xp[0] + xp[1]) / N_COINS) ** N_COINS)
+    f: uint256 = xp[0] + xp[1]  # sum
+    f = fee_gamma * 10**18 / (
+        fee_gamma + 10**18 - (10**18 * N_COINS**N_COINS) * xp[0] / f * xp[1] / f
     )
     return (self.mid_fee * f + self.out_fee * (10**18 - f)) / 10**18
 
