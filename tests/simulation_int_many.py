@@ -188,8 +188,8 @@ class Trader:
         self.last_price = self.p0[:]
         self.curve = Curve(A, gamma, D, n, p=p0[:])
         self.dx = int(D * 1e-8)
-        self.mid_fee = int(mid_fee * 1e18)
-        self.out_fee = int(out_fee * 1e18)
+        self.mid_fee = int(mid_fee * 1e10)
+        self.out_fee = int(out_fee * 1e10)
         self.D0 = self.curve.D()
         self.xcp_0 = self.get_xcp()
         self.xcp_profit = 10**18
@@ -255,8 +255,8 @@ class Trader:
             self.curve.x[i] = x
             self.curve.x[j] = y
             fee = self.fee()
-            self.curve.x[j] += dy * fee // 10**18
-            dy = dy * (10**18 - fee) // 10**18
+            self.curve.x[j] += dy * fee // 10**10
+            dy = dy * (10**10 - fee) // 10**10
             if dx * 10**18 // dy > max_price or dy < 0:
                 self.curve.x = x_old
                 return False
@@ -277,8 +277,8 @@ class Trader:
             self.curve.x[i] = x
             self.curve.x[j] = y
             fee = self.fee()
-            self.curve.x[i] += dx * fee // 10**18
-            dx = dx * (10**18 - fee) // 10**18
+            self.curve.x[i] += dx * fee // 10**10
+            dx = dx * (10**10 - fee) // 10**10
             if dx  * 10**18 // dy < min_price or dx < 0:
                 self.curve.x = x_old
                 return False
@@ -406,7 +406,7 @@ class Trader:
                           (self.xcp_profit_real - 10**18)/(self.xcp_profit - 10**18),
                           self.xcp_profit_real / 1e18,
                           ((self.xcp_profit_real / 1e18) ** (86400 * 365 / (d['t'] - mdata[0]['t'] + 1)) - 1) * 100,
-                          self.fee() / 1e18 * 100))
+                          self.fee() / 1e10 * 100))
                 except Exception:
                     pass
 
