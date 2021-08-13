@@ -15,7 +15,12 @@ class RampTest(NumbaGoUp):
         self.swap.ramp_A_gamma(future_A, future_gamma, self.chain.time() + 14*86400, {'from': self.accounts[0]})
 
     def rule_exchange(self, exchange_amount_in, exchange_i, user):
-        super()._rule_exchange(exchange_amount_in, exchange_i, user, False)
+        try:
+            super()._rule_exchange(exchange_amount_in, exchange_i, user, False)
+        except Exception:
+            if exchange_amount_in > 10**9:
+                # Small swaps can fail at ramps
+                raise
 
     def rule_remove_liquidity_one_coin(self, token_amount, exchange_i, user):
         super().rule_remove_liquidity_one_coin(token_amount, exchange_i, user, False)

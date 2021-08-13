@@ -61,7 +61,7 @@ class StatefulBase:
 
         if D:
             for _xp in [xp_0, xp]:
-                if (min(_xp) * 10**18 // max(_xp) < 10**11) or\
+                if (min(_xp) * 10**18 // max(_xp) < 10**14) or\
                    (max(_xp) < 10**9 * 10**18) or (max(_xp) > 10**15 * 10**18):
                     return False
 
