@@ -23,7 +23,7 @@ MAX_XD = 10**20
 A_MUL = 2**2 * 10000
 
 MIN_A = int(0.01 * A_MUL)
-MAX_A = 1000 * A_MUL
+MAX_A = 10000 * A_MUL
 
 # gamma from 1e-8 up to 0.05
 MIN_GAMMA = 10**10
@@ -61,7 +61,7 @@ class TestCurve(unittest.TestCase):
     @given(
            A=st.integers(MIN_A, MAX_A),
            x=st.integers(10**9, 10**15 * 10**18),  # 1e-9 USD to 1e15 USD
-           yx=st.integers(5 * 10**12, 10**18),  # <- ratio 1e18 * y/x, typically 1e18 * 1
+           yx=st.integers(10**14, 10**18),  # <- ratio 1e18 * y/x, typically 1e18 * 1
            perm=st.integers(0, 1),  # <- permutation mapping to values
            gamma=st.integers(MIN_GAMMA, MAX_GAMMA)
     )
