@@ -1,4 +1,4 @@
-# @version 0.2.12
+# @version 0.2.15
 
 from vyper.interfaces import ERC20
 
