@@ -24,6 +24,8 @@ MATIC_RECEIVER = "0x19793B454D3AfC7b454F206Ffe95aDE26cA6912c"
 
 
 def main():
+    accounts.load('babe')
+
     p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
     INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
     txparams = {"from": accounts[0], 'required_confs': 5}
@@ -44,7 +46,9 @@ def main():
     source = source.replace("1,#0", str(10 ** (18 - coins[0].decimals())) + ',')
     source = source.replace("1,#1", str(10 ** (18 - coins[1].decimals())) + ',')
     source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
-    deployer = compile_source(source, vyper_version="0.2.12").Vyper
+    with open("CryptoViews.vy", "w") as f:
+        f.write(source)
+    deployer = compile_source(source, vyper_version="0.2.15").Vyper
     crypto_views = deployer.deploy(crypto_math, txparams)
 
     source = CurveCryptoSwapMatic._build["source"]
@@ -57,7 +61,9 @@ def main():
     source = source.replace("1,#0", str(10 ** (18 - coins[0].decimals())) + ',')
     source = source.replace("1,#1", str(10 ** (18 - coins[1].decimals())) + ',')
     source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
-    deployer = compile_source(source, vyper_version="0.2.12").Vyper
+    with open("CryptoSwap.vy", "w") as f:
+        f.write(source)
+    deployer = compile_source(source, vyper_version="0.2.15").Vyper
 
     swap = deployer.deploy(
         accounts[0],
@@ -78,6 +84,9 @@ def main():
     swap.set_reward_receiver(MATIC_RECEIVER, txparams)
 
     zap = ZapAave.deploy(swap.address, SWAP, txparams)
+
+    print("Math address:", crypto_math.address)
+    print("Views address:", crypto_views.address)
 
     print("Swap address:", swap.address)
     print("Token address:", token.address)
