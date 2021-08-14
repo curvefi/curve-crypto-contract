@@ -94,7 +94,6 @@ event ClaimAdminFee:
 
 
 N_COINS: constant(int128) = 3  # <- change
-FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
 A_MULTIPLIER: constant(uint256) = 10000
 

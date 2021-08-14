@@ -19,6 +19,8 @@ COINS = [
     "0x28424507fefb6f7f8E9D3860F56504E4e5f5f390"   # amWETH
 ]
 SWAP = "0x445FE580eF8d70FF569aB36e80c647af338db351"
+FEE_RECEIVER = "0xA237034249290De2B07988Ac64b96f22c0E76fE0"
+MATIC_RECEIVER = "0x19793B454D3AfC7b454F206Ffe95aDE26cA6912c"
 
 
 def main():
@@ -59,19 +61,21 @@ def main():
 
     swap = deployer.deploy(
         accounts[0],
-        135 * 3 ** 3,  # A
-        int(7e-5 * 1e18),  # gamma
-        int(4e-4 * 1e10),  # mid_fee
-        int(4e-3 * 1e10),  # out_fee
-        int(0.0028 * 1e18),  # price_threshold
-        int(0.01 * 1e18),  # fee_gamma
-        int(0.0015 * 1e18),  # adjustment_step
-        0,  # admin_fee
+        FEE_RECEIVER,
+        int(0.2 * 3 ** 3 * 10000),  # A
+        int(2.8e-4 * 1e18),  # gamma
+        int(1.1e-3 * 1e10),  # mid_fee
+        int(4.5e-3 * 1e10),  # out_fee
+        2 * 10**12,  # allowed_extra_profit
+        int(5e-4 * 1e18),  # fee_gamma
+        int(0.002 * 1e18),  # adjustment_step
+        5 * 10**9,  # admin_fee
         600,  # ma_half_time
         INITIAL_PRICES,
         txparams,
     )
     token.set_minter(swap, txparams)
+    swap.set_reward_receiver(MATIC_RECEIVER, txparams)
 
     zap = ZapAave.deploy(swap.address, SWAP, txparams)
 
