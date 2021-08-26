@@ -85,6 +85,41 @@ class TestCurve(unittest.TestCase):
 
     @given(
            A=st.integers(MIN_A, MAX_A),
+           x=st.integers(10**17, 10**15 * 10**18),  # 0.1 USD to 1e15 USD
+           yx=st.integers(5 * 10**14, 20 * 10**20),
+           zx=st.integers(5 * 10**14, 20 * 10**20),
+           perm=st.integers(0, 5),  # <- permutation mapping to values
+           gamma=st.integers(MIN_GAMMA, MAX_GAMMA),
+           dx=st.integers(0, 10**18),
+           dy=st.integers(0, 10**18),
+           dz=st.integers(0, 10**18)
+    )
+    @settings(max_examples=MAX_EXAMPLES_NOLOSS)
+    def test_D_noloss(self, A, x, yx, zx, perm, gamma, dx, dy, dz):
+        # Add a little bit and check that D didn't decrease
+        pmap = list(permutations(range(3)))
+
+        y = x * yx // 10**18
+        z = x * zx // 10**18
+        curve = Curve(A, gamma, 10**18, 3)
+        curve.x = [0] * 3
+        i, j, k = pmap[perm]
+        curve.x[i] = x
+        curve.x[j] = y
+        curve.x[k] = z
+
+        D0 = curve.D()
+
+        curve.x[i] += dx
+        curve.x[j] += dy
+        curve.x[j] += dz
+
+        D1 = curve.D()
+
+        assert D1 > D0 - D0//10**9
+
+    @given(
+           A=st.integers(MIN_A, MAX_A),
            x=st.integers(10**17, 10**15 * 10**18),  # $0.1 .. $1e15
            yx=st.integers(10**15, 10**21),
            zx=st.integers(10**15, 10**21),
