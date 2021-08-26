@@ -98,13 +98,13 @@ PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
 A_MULTIPLIER: constant(uint256) = 10000
 
 # These addresses are replaced by the deployer
-math: constant(address) = 0x0000000000000000000000000000000000000000
-token: constant(address) = 0x0000000000000000000000000000000000000001
-views: constant(address) = 0x0000000000000000000000000000000000000002
+math: constant(address) = 0xe59547896E5FC17Be96c885106dbafEE760AAdDE
+token: constant(address) = 0xdAD97F7713Ae9437fa9249920eC8507e5FbB23d3
+views: constant(address) = 0xb401e0482f02127543a9D4bb4d5be30C70437F35
 coins: constant(address[N_COINS]) = [
-    0x0000000000000000000000000000000000000010,
-    0x0000000000000000000000000000000000000011,
-    0x0000000000000000000000000000000000000012,
+    0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171,
+    0x5c2ed810328349100A66B82b78a1791B101C9D61,
+    0x28424507fefb6f7f8E9D3860F56504E4e5f5f390,
 ]
 
 price_scale_packed: uint256   # Internal price scale
@@ -178,9 +178,9 @@ PRICE_MASK: constant(uint256) = 2**PRICE_SIZE - 1
 # N_COINS = 4 -> 10**8  (10**18 -> 10**10)
 # PRICE_PRECISION_MUL: constant(uint256) = 1
 PRECISIONS: constant(uint256[N_COINS]) = [
-    1,#0
-    1,#1
-    1,#2
+    1,
+    10000000000,
+    1,
 ]
 
 INF_COINS: constant(uint256) = 15

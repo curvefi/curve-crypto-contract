@@ -1,13 +1,13 @@
 from brownie import accounts
-from brownie import PoolMigratorMatic
+from brownie import PoolMigratorMatic23 as PoolMigratorMatic
 from brownie import Contract
 
 
-OLD_TOKEN = "0x8096ac61db23291252574D49f036f0f9ed8ab390"
-OLD_GAUGE = "0xb0a366b987d77b5eD5803cBd95C80bB6DEaB48C0"
+OLD_TOKEN = "0xbece5d20A8a104c54183CC316C8286E3F00ffC71"
+OLD_GAUGE = "0x9bd996Db02b3f271c6533235D452a56bc2Cd195a"
 
-NEW_TOKEN = "0xbece5d20A8a104c54183CC316C8286E3F00ffC71"
-NEW_GAUGE = "0x9bd996Db02b3f271c6533235D452a56bc2Cd195a"
+NEW_TOKEN = "0xdAD97F7713Ae9437fa9249920eC8507e5FbB23d3"
+NEW_GAUGE = "0x3B6B158A76fd8ccc297538F454ce7B4787778c7C"
 
 
 def main():
