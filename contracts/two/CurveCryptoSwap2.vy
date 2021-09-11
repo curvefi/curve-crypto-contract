@@ -229,10 +229,12 @@ def geometric_mean(unsorted_x: uint256[N_COINS], sort: bool) -> uint256:
     diff: uint256 = 0
     for i in range(255):
         D_prev: uint256 = D
-        tmp: uint256 = 10**18
-        for _x in x:
-            tmp = tmp * _x / D
-        D = D * ((N_COINS - 1) * 10**18 + tmp) / (N_COINS * 10**18)
+        # tmp: uint256 = 10**18
+        # for _x in x:
+        #     tmp = tmp * _x / D
+        # D = D * ((N_COINS - 1) * 10**18 + tmp) / (N_COINS * 10**18)
+        # line below makes it for 2 coins
+        D = (D + x[0] * x[1] / D) / N_COINS
         if D > D_prev:
             diff = D - D_prev
         else:
@@ -270,9 +272,11 @@ def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint
     for i in range(255):
         D_prev: uint256 = D
 
-        K0: uint256 = 10**18
-        for _x in x:
-            K0 = K0 * _x * N_COINS / D
+        # K0: uint256 = 10**18
+        # for _x in x:
+        #     K0 = K0 * _x * N_COINS / D
+        # collapsed for 2 coins
+        K0: uint256 = (10**18 * N_COINS**2) * x[0] / D * x[1] / D
 
         _g1k0: uint256 = gamma + 10**18
         if _g1k0 > K0:
@@ -768,7 +772,10 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
     gamma: uint256 = 0
     A_gamma: uint256[2] = self._A_gamma()
 
-    y: uint256 = self.newton_y(A_gamma[0], A_gamma[1], xp, self.D, j)
+    D: uint256 = self.D
+    if self.future_A_gamma_time > 0:
+        D = self.newton_D(A_gamma[0], A_gamma[1], xp)
+    y: uint256 = self.newton_y(A_gamma[0], A_gamma[1], xp, D, j)
     dy: uint256 = xp[j] - y - 1
     xp[j] = y
     if j > 0:
@@ -920,15 +927,18 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
 def calc_token_amount(amounts: uint256[N_COINS]) -> uint256:
     token_supply: uint256 = CurveToken(token).totalSupply()
     price_scale: uint256 = self.price_scale * PRECISIONS[1]
-    xp: uint256[N_COINS] = [
-        (self.balances[0] + amounts[0]) * PRECISIONS[0],
-        (self.balances[1] + amounts[1]) * price_scale / PRECISION]
+    A_gamma: uint256[2] = self._A_gamma()
+    xp: uint256[N_COINS] = self.xp()
     amountsp: uint256[N_COINS] = [
         amounts[0] * PRECISIONS[0],
         amounts[1] * price_scale / PRECISION]
-    A_gamma: uint256[2] = self._A_gamma()
+    D0: uint256 = self.D
+    if self.future_A_gamma_time > 0:
+        D0 = self.newton_D(A_gamma[0], A_gamma[1], xp)
+    xp[0] += amountsp[0]
+    xp[1] += amountsp[1]
     D: uint256 = self.newton_D(A_gamma[0], A_gamma[1], xp)
-    d_token: uint256 = token_supply * D / self.D - token_supply
+    d_token: uint256 = token_supply * D / D0 - token_supply
     d_token -= self._calc_token_fee(amountsp, xp) * d_token / 10**10 + 1
     return d_token
 

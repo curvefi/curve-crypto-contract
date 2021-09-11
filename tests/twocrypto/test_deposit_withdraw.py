@@ -52,7 +52,7 @@ def test_second_deposit(crypto_swap_with_deposit, token, coins, accounts, values
         d_balances = [crypto_swap_with_deposit.balances(i) - d_balances[i] for i in range(2)]
         measured = token.balanceOf(user) - measured
 
-        assert calculated == measured
+        assert abs(calculated - measured) / measured < 1e-10
         assert tuple(amounts) == tuple(d_balances)
 
     except Exception:
@@ -81,7 +81,7 @@ def test_second_deposit_one(crypto_swap_with_deposit, token, coins, accounts, va
     d_balances = [crypto_swap_with_deposit.balances(i) - d_balances[i] for i in range(2)]
     measured = token.balanceOf(user) - measured
 
-    assert calculated == measured
+    assert abs(calculated - measured) / measured < 1e-10
     assert tuple(amounts) == tuple(d_balances)
 
 
