@@ -23,6 +23,8 @@ class NumbaGoUp(StatefulBase):
             return
 
         amounts = self.convert_amounts(deposit_amounts)
+        if sum(amounts) == 0:
+            return
         new_balances = [x + y for x, y in zip(self.balances, amounts)]
 
         for coin, q in zip(self.coins, amounts):
@@ -35,7 +37,12 @@ class NumbaGoUp(StatefulBase):
             self.total_supply += tokens
             self.balances = new_balances
         except Exception:
-            if self.check_limits(amounts):
+            try:
+                self.swap.calc_token_amount.transact(amounts, {'from': user})
+            except Exception:
+                if sum(amounts) > 10000:
+                    raise
+            if self.check_limits(amounts) and self.swap.calc_token_amount(amounts) > 0:
                 raise
             else:
                 return
