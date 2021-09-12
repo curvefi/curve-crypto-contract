@@ -38,12 +38,10 @@ class NumbaGoUp(StatefulBase):
             self.balances = new_balances
         except Exception:
             try:
-                self.swap.calc_token_amount.transact(amounts, {'from': user})
+                assert self.swap.calc_token_amount(amounts) == 0
             except Exception:
-                if sum(amounts) > 10000:
+                if sum(amounts) > 10000 and self.check_limits(amounts):
                     raise
-            if self.check_limits(amounts) and self.swap.calc_token_amount(amounts) > 0:
-                raise
             else:
                 return
 
@@ -52,7 +50,7 @@ class NumbaGoUp(StatefulBase):
         try:
             self.swap.get_dy(0, 1, 10**(self.decimals[0]-2))
         except Exception:
-            self.swap.get_dy(1, 0, 10**16 * 10**self.decimals[1] // self.swap.price_scale())
+            self.swap.get_dy.transact(1, 0, 10**16 * 10**self.decimals[1] // self.swap.price_scale())
 
     def rule_remove_liquidity(self, token_amount, user):
         if self.token.balanceOf(user) < token_amount or token_amount == 0:
@@ -78,7 +76,7 @@ class NumbaGoUp(StatefulBase):
         try:
             calc_out_amount = self.swap.calc_withdraw_one_coin(token_amount, exchange_i)
         except Exception:
-            if self.check_limits([0] * 2) and not (token_amount > self.total_supply):
+            if self.check_limits([0] * 2) and not (token_amount > self.total_supply) and token_amount > 10000:
                 raise
             return
 

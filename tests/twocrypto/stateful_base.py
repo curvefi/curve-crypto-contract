@@ -83,7 +83,7 @@ class StatefulBase:
         except Exception:
             _amounts = [0] * 2
             _amounts[exchange_i] = exchange_amount_in
-            if self.check_limits(_amounts):
+            if self.check_limits(_amounts) and exchange_amount_in > 10000:
                 raise
             return False
         self.coins[exchange_i]._mint_for_testing(user, exchange_amount_in)

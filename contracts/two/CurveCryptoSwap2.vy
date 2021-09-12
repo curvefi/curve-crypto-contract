@@ -765,16 +765,15 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
 
     price_scale: uint256 = self.price_scale * PRECISIONS[1]
     xp: uint256[N_COINS] = self.balances
+
+    A_gamma: uint256[2] = self._A_gamma()
+    D: uint256 = self.D
+    if self.future_A_gamma_time > 0:
+        D = self.newton_D(A_gamma[0], A_gamma[1], self.xp())
+
     xp[i] += dx
     xp = [xp[0] * PRECISIONS[0], xp[1] * price_scale / PRECISION]
 
-    A: uint256 = 0
-    gamma: uint256 = 0
-    A_gamma: uint256[2] = self._A_gamma()
-
-    D: uint256 = self.D
-    if self.future_A_gamma_time > 0:
-        D = self.newton_D(A_gamma[0], A_gamma[1], xp)
     y: uint256 = self.newton_y(A_gamma[0], A_gamma[1], xp, D, j)
     dy: uint256 = xp[j] - y - 1
     xp[j] = y
