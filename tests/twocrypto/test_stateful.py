@@ -77,7 +77,7 @@ class NumbaGoUp(StatefulBase):
             calc_out_amount = self.swap.calc_withdraw_one_coin(token_amount, exchange_i)
         except Exception:
             if self.check_limits([0] * 2) and not (token_amount > self.total_supply) and token_amount > 10000:
-                raise
+                self.swap.calc_withdraw_one_coin.transact(token_amount, exchange_i)
             return
 
         d_token = self.token.balanceOf(user)
