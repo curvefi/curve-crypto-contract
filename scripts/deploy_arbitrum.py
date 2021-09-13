@@ -24,7 +24,7 @@ FEE_RECEIVER = "0x0000000000000000000000000000000000000000"
 if network.show_active() == 'mainnet':
     print('Deploying on mainnet')
     accounts.load('babe')
-    txparams = {"from": accounts[0], 'required_confs': 5}
+    txparams = {"from": accounts[0], 'required_confs': 5, 'gasPrice': '1 gwei'}
     try:
         network.gas_price(GasNowScalingStrategy("slow", "fast"))
     except ConnectionError:
