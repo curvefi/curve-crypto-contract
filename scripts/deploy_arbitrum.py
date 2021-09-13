@@ -1,5 +1,4 @@
 import requests
-from brownie.network.gas.strategies import GasNowScalingStrategy
 from brownie import (
     accounts,
     CurveCryptoMath3,
@@ -21,14 +20,10 @@ COINS = [
 ]
 FEE_RECEIVER = "0x0000000000000000000000000000000000000000"
 
-if network.show_active() == 'mainnet':
+if network.show_active() == 'arbitrum':
     print('Deploying on mainnet')
     accounts.load('babe')
-    txparams = {"from": accounts[0], 'required_confs': 5, 'gasPrice': '1 gwei'}
-    try:
-        network.gas_price(GasNowScalingStrategy("slow", "fast"))
-    except ConnectionError:
-        pass
+    txparams = {"from": accounts[0], 'required_confs': 5, 'gasPrice': '1 gwei', 'gas': 200 * 10**6}
 
 else:
     txparams = {"from": accounts[0]}
@@ -54,7 +49,7 @@ def main():
     source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
     with open("CryptoViews.vy", "w") as f:
         f.write(source)
-    deployer = compile_source(source, vyper_version="0.2.12").Vyper
+    deployer = compile_source(source, vyper_version="0.2.15").Vyper
     crypto_views = deployer.deploy(crypto_math, txparams)
 
     source = CurveCryptoSwap._build["source"]
