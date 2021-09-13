@@ -15,6 +15,7 @@ interface Curve:
     def fee_calc(xp: uint256[N_COINS]) -> uint256: view
     def calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256: view
     def token() -> address: view
+    def future_A_gamma_time() -> uint256: view
 
 interface Math:
     def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint256: view
@@ -50,15 +51,23 @@ def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256:
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     for k in range(N_COINS):
         xp[k] = Curve(msg.sender).balances(k)
+
+    A: uint256 = Curve(msg.sender).A()
+    gamma: uint256 = Curve(msg.sender).gamma()
+    D: uint256 = Curve(msg.sender).D()
+    if Curve(msg.sender).future_A_gamma_time() > 0:
+        _xp: uint256[N_COINS] = xp
+        _xp[0] *= precisions[0]
+        for k in range(N_COINS-1):
+            _xp[k+1] = _xp[k+1] * price_scale[k] * precisions[k+1] / PRECISION
+        D = Math(self.math).newton_D(A, gamma, _xp)
+
     xp[i] += dx
     xp[0] *= precisions[0]
     for k in range(N_COINS-1):
         xp[k+1] = xp[k+1] * price_scale[k] * precisions[k+1] / PRECISION
 
-    A: uint256 = Curve(msg.sender).A()
-    gamma: uint256 = Curve(msg.sender).gamma()
-
-    y: uint256 = Math(self.math).newton_y(A, gamma, xp, Curve(msg.sender).D(), j)
+    y: uint256 = Math(self.math).newton_y(A, gamma, xp, D, j)
     dy: uint256 = xp[j] - y - 1
     xp[j] = y
     if j > 0:
@@ -77,6 +86,21 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
     for k in range(N_COINS):
         xp[k] = Curve(msg.sender).balances(k)
+
+    price_scale: uint256[N_COINS-1] = empty(uint256[N_COINS-1])
+    for k in range(N_COINS-1):
+        price_scale[k] = Curve(msg.sender).price_scale(k)
+
+    A: uint256 = Curve(msg.sender).A()
+    gamma: uint256 = Curve(msg.sender).gamma()
+    D0: uint256 = Curve(msg.sender).D()
+    if Curve(msg.sender).future_A_gamma_time() > 0:
+        _xp: uint256[N_COINS] = xp
+        _xp[0] *= precisions[0]
+        for k in range(N_COINS-1):
+            _xp[k+1] = _xp[k+1] * price_scale[k] * precisions[k+1] / PRECISION
+        D0 = Math(self.math).newton_D(A, gamma, _xp)
+
     amountsp: uint256[N_COINS] = amounts
     if deposit:
         for k in range(N_COINS):
@@ -87,13 +111,11 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
     xp[0] *= precisions[0]
     amountsp[0] *= precisions[0]
     for k in range(N_COINS-1):
-        p: uint256 = Curve(msg.sender).price_scale(k) * precisions[k+1]
+        p: uint256 = price_scale[k] * precisions[k+1]
         xp[k+1] = xp[k+1] * p / PRECISION
         amountsp[k+1] = amountsp[k+1] * p / PRECISION
-    A: uint256 = Curve(msg.sender).A()
-    gamma: uint256 = Curve(msg.sender).gamma()
     D: uint256 = Math(self.math).newton_D(A, gamma, xp)
-    d_token: uint256 = token_supply * D / Curve(msg.sender).D()
+    d_token: uint256 = token_supply * D / D0
     if deposit:
         d_token -= token_supply
     else:
