@@ -6,6 +6,7 @@ from brownie import (
     CurveTokenV4,
     CurveCryptoViews3,
     CurveCryptoSwap,
+    DepositZapArbitrum,
     ERC20Mock,
     compile_source,
 )
@@ -87,16 +88,22 @@ def main():
     )
     token.set_minter(swap, txparams)
 
+    zap = DepositZapArbitrum.deploy(swap, txparams)
+
     print("Deployed at:")
     print("Swap:", swap.address)
     print("Token:", token.address)
     print("Math:", crypto_math.address)
     print("Views:", crypto_views.address)
+    print("Zap:", zap.address)
 
     with open("swap.json", "w") as f:
         json.dump(swap.abi, f)
 
     with open("token.json", "w") as f:
         json.dump(token.abi, f)
+
+    with open("zap.json", "w") as f:
+        json.dump(zap.abi, f)
 
     return swap, token
