@@ -4,7 +4,7 @@ from brownie import (
     CurveCryptoMath3,
     CurveTokenV4,
     CurveCryptoViews3,
-    CurveCryptoSwap,
+    CurveCryptoSwapC,
     ERC20Mock,
     compile_source,
 )
@@ -51,7 +51,7 @@ def main():
     deployer = compile_source(source, vyper_version="0.2.15").Vyper
     crypto_views = deployer.deploy(crypto_math, txparams)
 
-    source = CurveCryptoSwap._build["source"]
+    source = CurveCryptoSwapC._build["source"]
     source = source.replace("0x0000000000000000000000000000000000000000", crypto_math.address)
     source = source.replace("0x0000000000000000000000000000000000000001", token.address)
     source = source.replace("0x0000000000000000000000000000000000000002", crypto_views.address)
