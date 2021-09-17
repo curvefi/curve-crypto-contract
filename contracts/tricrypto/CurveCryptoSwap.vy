@@ -590,7 +590,7 @@ def tweak_price(A_gamma: uint256[2],
 @payable
 @external
 @nonreentrant('lock')
-def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool = False):
+def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool = False) -> uint256:
     assert not self.is_killed  # dev: the pool is killed
     assert i != j  # dev: coin index out of range
     assert i < N_COINS  # dev: coin index out of range
@@ -691,6 +691,8 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool
     self.tweak_price(A_gamma, xp, ix, p, 0)
 
     log TokenExchange(msg.sender, i, dx, j, dy)
+
+    return dy
 
 
 @external
