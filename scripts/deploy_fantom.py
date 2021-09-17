@@ -19,7 +19,7 @@ COINS = [
 ]
 FEE_RECEIVER = "0x0000000000000000000000000000000000000000"
 
-if network.show_active() == 'arbitrum':
+if network.show_active() == 'ftm-main':
     print('Deploying on mainnet')
     accounts.load('babe')
     txparams = {"from": accounts[0], 'required_confs': 5}
