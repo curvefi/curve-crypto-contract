@@ -186,8 +186,8 @@ PRECISIONS: constant(uint256[N_COINS]) = [
 INF_COINS: constant(uint256) = 15
 
 # Avalanche extras. Not needed on Ethereum! XXX
-AVA_REWARDS: constant(address) = 0x357D51124f59836DeD84c8a1730D72B749d8BC23
-WAVAX: constant(address) = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270
+AVA_REWARDS: constant(address) = 0x01D83Fe6A10D2f2B7AF17034343746188272cAc9
+WAVAX: constant(address) = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7
 
 
 @external

@@ -33,7 +33,7 @@ interface aToken:
 N_COINS: constant(int128) = 3
 N_STABLECOINS: constant(int128) = 3
 N_UL_COINS: constant(int128) = N_COINS + N_STABLECOINS - 1
-AAVE_LENDING_POOL: constant(address) = 0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf
+AAVE_LENDING_POOL: constant(address) = 0x4F01AeD16D97E3aB5ab2B501154DC9bb0F1A5A2C
 
 aave_referral: uint256
 coins: public(address[N_COINS])
