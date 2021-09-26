@@ -163,10 +163,11 @@ MIN_RAMP_TIME: constant(uint256) = 86400
 MAX_ADMIN_FEE: constant(uint256) = 10 * 10 ** 9
 MIN_FEE: constant(uint256) = 5 * 10 ** 5  # 0.5 bps
 MAX_FEE: constant(uint256) = 10 * 10 ** 9
-MAX_A: constant(uint256) = 10000 * A_MULTIPLIER * N_COINS**N_COINS
+MIN_A: constant(uint256) = N_COINS**N_COINS * A_MULTIPLIER / 100
+MAX_A: constant(uint256) = 1000 * A_MULTIPLIER * N_COINS**N_COINS
 MAX_A_CHANGE: constant(uint256) = 10
 MIN_GAMMA: constant(uint256) = 10**10
-MAX_GAMMA: constant(uint256) = 10**16
+MAX_GAMMA: constant(uint256) = 5 * 10**16
 NOISE_FEE: constant(uint256) = 10**5  # 0.1 bps
 
 PRICE_SIZE: constant(int128) = 256 / (N_COINS-1)
@@ -977,7 +978,7 @@ def ramp_A_gamma(future_A: uint256, future_gamma: uint256, future_time: uint256)
     initial_A_gamma: uint256 = shift(A_gamma[0], 128)
     initial_A_gamma = bitwise_or(initial_A_gamma, A_gamma[1])
 
-    assert future_A > 0
+    assert future_A > MAX_A-1
     assert future_A < MAX_A+1
     assert future_gamma > MIN_GAMMA-1
     assert future_gamma < MAX_GAMMA+1
