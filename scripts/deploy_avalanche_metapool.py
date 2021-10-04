@@ -15,8 +15,8 @@ import json
 # Addresses are taken for Avalanche
 COINS = [
     "0x1337BedC9D22ecbe766dF105c9623922A27963EC",  # av3Crv
-    "",  # amWBTC
-    ""   # avWETH
+    "0x686bef2417b6dc32c50a3cbfbcc3bb60e1e9a15d",  # avWBTC
+    "0x53f7c5869a859f0aec3d334ee8b4cf01e3492f21"   # avWETH
 ]
 SWAP = "0x7f90122BF0700F9E7e1F688fe926940E8839F353"
 FEE_RECEIVER = "0x0000000000000000000000000000000000000000"
