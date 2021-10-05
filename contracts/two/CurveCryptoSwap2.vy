@@ -1018,10 +1018,11 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
     self.balances[i] -= dy
     CurveToken(token).burnFrom(msg.sender, token_amount)
-    self.tweak_price(A_gamma, xp, p, D)
 
     _coins: address[N_COINS] = coins
     assert ERC20(_coins[i]).transfer(msg.sender, dy)
+
+    self.tweak_price(A_gamma, xp, p, D)
 
     log RemoveLiquidityOne(msg.sender, token_amount, i, dy)
 
