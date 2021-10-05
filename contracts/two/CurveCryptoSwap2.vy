@@ -688,68 +688,66 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     p: uint256 = 0
     dy: uint256 = 0
 
-    if True:  # scope to reduce size of memory when making internal calls later
-        _coins: address[N_COINS] = coins
-        assert ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
+    _coins: address[N_COINS] = coins
+    assert ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
 
-        y: uint256 = xp[j]
-        x0: uint256 = xp[i]
-        xp[i] = x0 + dx
-        self.balances[i] = xp[i]
+    y: uint256 = xp[j]
+    x0: uint256 = xp[i]
+    xp[i] = x0 + dx
+    self.balances[i] = xp[i]
 
-        price_scale: uint256 = self.price_scale
+    price_scale: uint256 = self.price_scale
 
-        xp = [xp[0] * PRECISIONS[0], xp[1] * price_scale * PRECISIONS[1] / PRECISION]
+    xp = [xp[0] * PRECISIONS[0], xp[1] * price_scale * PRECISIONS[1] / PRECISION]
 
-        prec_i: uint256 = PRECISIONS[0]
-        prec_j: uint256 = PRECISIONS[1]
-        if i == 1:
-            prec_i = PRECISIONS[1]
-            prec_j = PRECISIONS[0]
+    prec_i: uint256 = PRECISIONS[0]
+    prec_j: uint256 = PRECISIONS[1]
+    if i == 1:
+        prec_i = PRECISIONS[1]
+        prec_j = PRECISIONS[0]
 
-        # In case ramp is happening
-        if True:
-            t: uint256 = self.future_A_gamma_time
-            if t > 0:
-                x0 *= prec_i
-                if i > 0:
-                    x0 = x0 * price_scale / PRECISION
-                x1: uint256 = xp[i]  # Back up old value in xp
-                xp[i] = x0
-                self.D = self.newton_D(A_gamma[0], A_gamma[1], xp)
-                xp[i] = x1  # And restore
-                if block.timestamp >= t:
-                    self.future_A_gamma_time = 1
+    # In case ramp is happening
+    t: uint256 = self.future_A_gamma_time
+    if t > 0:
+        x0 *= prec_i
+        if i > 0:
+            x0 = x0 * price_scale / PRECISION
+        x1: uint256 = xp[i]  # Back up old value in xp
+        xp[i] = x0
+        self.D = self.newton_D(A_gamma[0], A_gamma[1], xp)
+        xp[i] = x1  # And restore
+        if block.timestamp >= t:
+            self.future_A_gamma_time = 1
 
-        dy = xp[j] - self.newton_y(A_gamma[0], A_gamma[1], xp, self.D, j)
-        # Not defining new "y" here to have less variables / make subsequent calls cheaper
-        xp[j] -= dy
-        dy -= 1
+    dy = xp[j] - self.newton_y(A_gamma[0], A_gamma[1], xp, self.D, j)
+    # Not defining new "y" here to have less variables / make subsequent calls cheaper
+    xp[j] -= dy
+    dy -= 1
 
-        if j > 0:
-            dy = dy * PRECISION / price_scale
-        dy /= prec_j
+    if j > 0:
+        dy = dy * PRECISION / price_scale
+    dy /= prec_j
 
-        dy -= self._fee(xp) * dy / 10**10
-        assert dy >= min_dy, "Slippage"
-        y -= dy
+    dy -= self._fee(xp) * dy / 10**10
+    assert dy >= min_dy, "Slippage"
+    y -= dy
 
-        self.balances[j] = y
-        assert ERC20(_coins[j]).transfer(msg.sender, dy)
+    self.balances[j] = y
+    assert ERC20(_coins[j]).transfer(msg.sender, dy)
 
-        y *= prec_j
-        if j > 0:
-            y = y * price_scale / PRECISION
-        xp[j] = y
+    y *= prec_j
+    if j > 0:
+        y = y * price_scale / PRECISION
+    xp[j] = y
 
-        # Calculate price
-        if dx > 10**5 and dy > 10**5:
-            _dx: uint256 = dx * prec_i
-            _dy: uint256 = dy * prec_j
-            if i == 0:
-                p = _dx * 10**18 / _dy
-            else:  # j == 0
-                p = _dy * 10**18 / _dx
+    # Calculate price
+    if dx > 10**5 and dy > 10**5:
+        _dx: uint256 = dx * prec_i
+        _dy: uint256 = dy * prec_j
+        if i == 0:
+            p = _dx * 10**18 / _dy
+        else:  # j == 0
+            p = _dy * 10**18 / _dx
 
     self.tweak_price(A_gamma, xp, p, 0)
 
@@ -820,32 +818,31 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     d_token_fee: uint256 = 0
     old_D: uint256 = 0
 
-    if True:  # Scope to avoid having extra variables in memory later
-        xp_old: uint256[N_COINS] = xp
+    xp_old: uint256[N_COINS] = xp
 
-        for i in range(N_COINS):
-            bal: uint256 = xp[i] + amounts[i]
-            xp[i] = bal
-            self.balances[i] = bal
-        xx = xp
+    for i in range(N_COINS):
+        bal: uint256 = xp[i] + amounts[i]
+        xp[i] = bal
+        self.balances[i] = bal
+    xx = xp
 
-        price_scale: uint256 = self.price_scale * PRECISIONS[1]
-        xp = [xp[0] * PRECISIONS[0], xp[1] * price_scale / PRECISION]
-        xp_old = [xp_old[0] * PRECISIONS[0], xp_old[1] * price_scale / PRECISION]
+    price_scale: uint256 = self.price_scale * PRECISIONS[1]
+    xp = [xp[0] * PRECISIONS[0], xp[1] * price_scale / PRECISION]
+    xp_old = [xp_old[0] * PRECISIONS[0], xp_old[1] * price_scale / PRECISION]
 
-        for i in range(N_COINS):
-            if amounts[i] > 0:
-                assert ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
-                amountsp[i] = xp[i] - xp_old[i]
-        assert amounts[0] > 0 or amounts[1] > 0  # dev: no coins to add
+    for i in range(N_COINS):
+        if amounts[i] > 0:
+            assert ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
+            amountsp[i] = xp[i] - xp_old[i]
+    assert amounts[0] > 0 or amounts[1] > 0  # dev: no coins to add
 
-        t: uint256 = self.future_A_gamma_time
-        if t > 0:
-            old_D = self.newton_D(A_gamma[0], A_gamma[1], xp_old)
-            if block.timestamp >= t:
-                self.future_A_gamma_time = 1
-        else:
-            old_D = self.D
+    t: uint256 = self.future_A_gamma_time
+    if t > 0:
+        old_D = self.newton_D(A_gamma[0], A_gamma[1], xp_old)
+        if block.timestamp >= t:
+            self.future_A_gamma_time = 1
+    else:
+        old_D = self.D
 
     D: uint256 = self.newton_D(A_gamma[0], A_gamma[1], xp)
 
