@@ -684,7 +684,7 @@ def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: 
 
 @external
 @nonreentrant('lock')
-def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
+def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256) -> uint256:
     assert not self.is_killed  # dev: the pool is killed
     assert i != j  # dev: coin index out of range
     assert i < N_COINS  # dev: coin index out of range
@@ -760,6 +760,8 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256):
     self.tweak_price(A_gamma, xp, p, 0)
 
     log TokenExchange(msg.sender, i, dx, j, dy)
+
+    return dy
 
 
 @external
@@ -1005,7 +1007,7 @@ def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
 
 @external
 @nonreentrant('lock')
-def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256):
+def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256) -> uint256:
     assert not self.is_killed  # dev: the pool is killed
 
     A_gamma: uint256[2] = self._A_gamma()
@@ -1030,6 +1032,8 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     self.tweak_price(A_gamma, xp, p, D)
 
     log RemoveLiquidityOne(msg.sender, token_amount, i, dy)
+
+    return token_amount
 
 
 @external

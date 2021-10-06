@@ -3,7 +3,7 @@ from .stateful_base import StatefulBase
 from brownie.test import strategy
 
 MAX_SAMPLES = 60
-STEP_COUNT = 100
+STEP_COUNT = 30
 
 
 class StatefulGas(StatefulBase):
@@ -79,7 +79,7 @@ class StatefulGas(StatefulBase):
             self.virtual_price = 10**18
 
 
-@pytest.mark.skip()
+# @pytest.mark.skip()
 def test_gas(crypto_swap, token, chain, accounts, coins, state_machine):
     from hypothesis._settings import HealthCheck
 
