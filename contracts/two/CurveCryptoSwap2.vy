@@ -668,6 +668,13 @@ def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: 
             else:
                 self.not_adjusted = False
 
+                # Can instead do another flag variable if we want to save bytespace
+                self.D = D_unadjusted
+                self.virtual_price = virtual_price
+                self._claim_admin_fees()
+
+                return
+
     # If we are here, the price_scale adjustment did not happen
     # Still need to update the profit counter and D
     self.D = D_unadjusted
