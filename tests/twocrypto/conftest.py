@@ -1,6 +1,7 @@
 import pytest
 from brownie import compile_source
 
+VYPER_VERSION = "0.3.0"  # Forced version, use None when brownie supports the new version
 INITIAL_PRICES = [int(1.2 * 10**18)]  # eur
 
 
@@ -27,7 +28,7 @@ def _compiled_swap(token, coins, CurveCryptoSwap2):
         source = source.replace("1,#0", str(10 ** (18 - coins[0].decimals())) + ',')
         source = source.replace("1,#1", str(10 ** (18 - coins[1].decimals())) + ',')
 
-    return compile_source(source, vyper_version="0.3.0").Vyper
+    return compile_source(source, vyper_version=VYPER_VERSION).Vyper
 
 
 @pytest.fixture(scope="module", autouse=True)

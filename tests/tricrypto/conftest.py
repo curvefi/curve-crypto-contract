@@ -1,6 +1,7 @@
 import pytest
 from brownie import compile_source
 
+VYPER_VERSION = "0.3.0"  # Forced version, use None when brownie supports the new version
 INITIAL_PRICES = [47500 * 10**18, 1500 * 10**18]
 
 
@@ -27,7 +28,7 @@ def _crypto_views(CurveCryptoViews3, crypto_math, accounts, coins):
         source = source.replace("1,#0", str(10 ** (18 - coins[0].decimals())) + ',')
         source = source.replace("1,#1", str(10 ** (18 - coins[1].decimals())) + ',')
         source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
-    contract = compile_source(source).Vyper
+    contract = compile_source(source, vyper_version=VYPER_VERSION).Vyper
     return contract.deploy(crypto_math, {'from': accounts[0]})
 
 
@@ -58,7 +59,7 @@ def _compiled_swap(crypto_math, token, crypto_views, coins):
         source = source.replace("1,#1", str(10 ** (18 - coins[1].decimals())) + ',')
         source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
 
-    return compile_source(source).Vyper
+    return compile_source(source, vyper_version=VYPER_VERSION).Vyper
 
 
 @pytest.fixture(scope="module", autouse=True)
