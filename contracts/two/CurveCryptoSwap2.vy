@@ -1,4 +1,4 @@
-# @version 0.2.15
+# @version 0.3.0
 # (c) Curve.Fi, 2021
 # Pool for two crypto assets
 
