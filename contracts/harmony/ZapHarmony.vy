@@ -23,10 +23,6 @@ interface StableSwap:
     def remove_liquidity(amount: uint256, min_amounts: uint256[N_COINS], use_underlying: bool) -> uint256[N_COINS]: nonpayable
 
 
-interface LendingPool:
-    def withdraw(underlying_asset: address, amount: uint256, receiver: address): nonpayable
-
-
 N_COINS: constant(int128) = 3
 N_STABLECOINS: constant(int128) = 3
 N_UL_COINS: constant(int128) = N_COINS + N_STABLECOINS - 1
