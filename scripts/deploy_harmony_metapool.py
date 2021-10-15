@@ -4,14 +4,13 @@ from brownie import (
     CurveCryptoMath3,
     CurveTokenV4,
     CurveCryptoViews3,
-    CurveCryptoSwapAvalanche,
-    ZapAaveAvalanche,
+    CurveCryptoSwapHarmony,
+    ZapHarmony,
     compile_source,
 )
 from brownie import interface
 import json
 
-# Addresses are taken for Avalanche
 COINS = [
     "0xC5cfaDA84E902aD92DD40194f0883ad49639b023",  # h3Crv
     "0x3095c7557bcb296ccc6e363de01b760ba031f2d9",  # hWBTC
@@ -44,7 +43,7 @@ def main():
     deployer = compile_source(source, vyper_version="0.2.15").Vyper
     crypto_views = deployer.deploy(crypto_math, txparams)
 
-    source = CurveCryptoSwapAvalanche._build["source"]
+    source = CurveCryptoSwapHarmony._build["source"]
     source = source.replace("0x0000000000000000000000000000000000000000", crypto_math.address)
     source = source.replace("0x0000000000000000000000000000000000000001", token.address)
     source = source.replace("0x0000000000000000000000000000000000000002", crypto_views.address)
@@ -75,7 +74,7 @@ def main():
     )
     token.set_minter(swap, txparams)
 
-    zap = ZapAaveAvalanche.deploy(swap.address, SWAP, txparams)
+    zap = ZapHarmony.deploy(swap.address, SWAP, txparams)
 
     print("Math address:", crypto_math.address)
     print("Views address:", crypto_views.address)
