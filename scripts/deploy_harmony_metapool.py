@@ -40,7 +40,7 @@ def main():
     source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
     with open("CryptoViews.vy", "w") as f:
         f.write(source)
-    deployer = compile_source(source, vyper_version="0.2.15").Vyper
+    deployer = compile_source(source, vyper_version="0.3.0").Vyper
     crypto_views = deployer.deploy(crypto_math, txparams)
 
     source = CurveCryptoSwapHarmony._build["source"]
@@ -55,7 +55,7 @@ def main():
     source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
     with open("CryptoSwap.vy", "w") as f:
         f.write(source)
-    deployer = compile_source(source, vyper_version="0.2.15").Vyper
+    deployer = compile_source(source, vyper_version="0.3.0").Vyper
 
     swap = deployer.deploy(
         accounts[0],
