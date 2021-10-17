@@ -17,7 +17,7 @@ COINS = [
     "0x6983d1e6def3690c4d616b13597a09e6193ea013"   # hWETH
 ]
 SWAP = "0xC5cfaDA84E902aD92DD40194f0883ad49639b023"
-FEE_RECEIVER = "0x00000000000000000000000000000000000000"
+FEE_RECEIVER = "0x0000000000000000000000000000000000000000"
 
 
 def main():
@@ -25,7 +25,7 @@ def main():
 
     p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
     INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
-    txparams = {"from": accounts[0], 'required_confs': 5}
+    txparams = {"from": accounts[0], 'required_confs': 25}
 
     crypto_math = CurveCryptoMath3.deploy(txparams)
     token = CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", txparams)
