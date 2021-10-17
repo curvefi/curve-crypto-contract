@@ -25,7 +25,7 @@ def main():
 
     p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
     INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
-    txparams = {"from": accounts[0], 'required_confs': 25}
+    txparams = {"from": accounts[0], 'required_confs': 10}
 
     crypto_math = CurveCryptoMath3.deploy(txparams)
     token = CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", txparams)
