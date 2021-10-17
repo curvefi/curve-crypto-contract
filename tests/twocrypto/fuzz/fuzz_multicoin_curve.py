@@ -60,7 +60,7 @@ class TestCurve(unittest.TestCase):
 
     @given(
            A=st.integers(MIN_A, MAX_A),
-           x=st.integers(10**9, 10**15 * 10**18),  # 1e-9 USD to 1e15 USD
+           x=st.integers(10**18, 10**15 * 10**18),  # 1 USD to 1e15 USD
            yx=st.integers(10**14, 10**18),  # <- ratio 1e18 * y/x, typically 1e18 * 1
            perm=st.integers(0, 1),  # <- permutation mapping to values
            gamma=st.integers(MIN_GAMMA, MAX_GAMMA)
@@ -129,7 +129,7 @@ class TestCurve(unittest.TestCase):
 
     @given(
            A=st.integers(MIN_A, MAX_A),
-           D=st.integers(10**17, 10**15 * 10**18),  # 0.1 USD to 1e15 USD
+           D=st.integers(10**18, 10**15 * 10**18),  # 1 USD to 1e15 USD
            xD=st.integers(MIN_XD, MAX_XD),
            yD=st.integers(MIN_XD, MAX_XD),
            gamma=st.integers(MIN_GAMMA, MAX_GAMMA),
