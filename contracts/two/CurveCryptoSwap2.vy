@@ -153,10 +153,10 @@ MAX_A_CHANGE: constant(uint256) = 10
 NOISE_FEE: constant(uint256) = 10**5  # 0.1 bps
 
 MIN_GAMMA: constant(uint256) = 10**10
-MAX_GAMMA: constant(uint256) = 5 * 10**16
+MAX_GAMMA: constant(uint256) = 2 * 10**16
 
-MIN_A: constant(uint256) = N_COINS**N_COINS * A_MULTIPLIER / 100
-MAX_A: constant(uint256) = N_COINS**N_COINS * A_MULTIPLIER * 10000
+MIN_A: constant(uint256) = N_COINS**N_COINS * A_MULTIPLIER / 10
+MAX_A: constant(uint256) = N_COINS**N_COINS * A_MULTIPLIER * 100000
 
 # This must be changed for different N_COINS
 # For example:
