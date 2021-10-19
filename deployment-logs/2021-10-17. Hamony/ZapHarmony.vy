@@ -60,6 +60,8 @@ def __init__(_pool: address, _base_pool: address):
     for i in range(N_COINS):
         coin: address = CurveCryptoSwap(_pool).coins(i)
         self.coins[i] = coin
+        if i > 0:
+            self.underlying_coins[N_COINS - 1 + i] = coin
         # approve transfer of coin to main pool
         response: Bytes[32] = raw_call(
             coin,
