@@ -161,8 +161,8 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
         assert convert(response, bool)
 
     dx: uint256 = _dx
-    base_i: uint256 = min(i, N_COINS - 1)
-    base_j: uint256 = min(j, N_COINS - 1)
+    outer_i: uint256 = min(i, N_COINS - 1)
+    outer_j: uint256 = min(j, N_COINS - 1)
 
     if i >= N_COINS - 1:
         # if `i` is in the base pool, deposit to get LP tokens
@@ -171,12 +171,12 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
         dx = StableSwap(self.base_pool).add_liquidity(base_deposit_amounts, 0)
 
     # perform the exchange
-    if base_i != base_j:
-        CurveCryptoSwap(self.pool).exchange(base_i, base_j, dx, 0)
-    amount: uint256 = ERC20(self.coins[base_j]).balanceOf(self)
+    if outer_i != outer_j:
+        CurveCryptoSwap(self.pool).exchange(outer_i, outer_j, dx, 0)
+    amount: uint256 = ERC20(self.coins[outer_j]).balanceOf(self)
     # XXX check - maybe can do returns
 
-    if base_j == N_COINS - 1:
+    if outer_j == N_COINS - 1:
         # if `j` is in the base pool, withdraw the desired underlying asset and transfer to caller
         amount = StableSwap(self.base_pool).remove_liquidity_one_coin(amount, convert(j - (N_COINS - 1), int128), _min_dy)
     else:
@@ -202,12 +202,12 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
 def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _receiver: address = msg.sender):
     # transfer LP token from caller and remove liquidity
     ERC20(self.token).transferFrom(msg.sender, self, _amount)
-    min_amounts: uint256[N_COINS] = [0, _min_amounts[3], _min_amounts[4]]
+    min_amounts: uint256[N_COINS] = [_min_amounts[0], 0]
     CurveCryptoSwap(self.pool).remove_liquidity(_amount, min_amounts)
 
     # withdraw from base pool and transfer underlying assets to receiver
-    value: uint256 = ERC20(self.coins[0]).balanceOf(self)
-    base_min_amounts: uint256[N_STABLECOINS] = [_min_amounts[0], _min_amounts[1], _min_amounts[2]]
+    value: uint256 = ERC20(self.coins[1]).balanceOf(self)
+    base_min_amounts: uint256[N_STABLECOINS] = [_min_amounts[1], _min_amounts[2], _min_amounts[3]]
     StableSwap(self.base_pool).remove_liquidity(value, base_min_amounts)
     for i in range(N_UL_COINS):
         value = ERC20(self.underlying_coins[i]).balanceOf(self)
