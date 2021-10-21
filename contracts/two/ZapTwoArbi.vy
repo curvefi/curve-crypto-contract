@@ -284,8 +284,8 @@ def calc_token_amount(_amounts: uint256[N_UL_COINS], _is_deposit: bool) -> uint2
 @view
 @external
 def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
-    if i >= N_STABLECOINS:
-        return CurveCryptoSwap(self.pool).calc_withdraw_one_coin(token_amount, i - (N_STABLECOINS - 1))
+    if i < N_COINS-1:
+        return CurveCryptoSwap(self.pool).calc_withdraw_one_coin(token_amount, i)
 
-    base_amount: uint256 = CurveCryptoSwap(self.pool).calc_withdraw_one_coin(token_amount, 0)
-    return StableSwap(self.base_pool).calc_withdraw_one_coin(base_amount, convert(i, int128))
+    base_amount: uint256 = CurveCryptoSwap(self.pool).calc_withdraw_one_coin(token_amount, N_COINS-1)
+    return StableSwap(self.base_pool).calc_withdraw_one_coin(base_amount, convert(i - (N_COINS-1), int128))
