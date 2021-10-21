@@ -94,7 +94,7 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
     is_base_deposit: bool = False
 
     # transfer base pool coins from caller and deposit to get LP tokens
-    for i in range(N_STABLECOINS):
+    for i in range(N_UL_COINS - N_STABLECOINS, N_UL_COINS):
         amount: uint256 = _amounts[i]
         if amount != 0:
             coin: address = self.underlying_coins[i]
@@ -111,14 +111,14 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
             )
             if len(_response) != 0:
                 assert convert(_response, bool)
-            base_deposit_amounts[i] = ERC20(coin).balanceOf(self)
+            base_deposit_amounts[i - (N_COINS - 1)] = ERC20(coin).balanceOf(self)
             is_base_deposit = True
 
     if is_base_deposit:
-        deposit_amounts[0] = StableSwap(self.base_pool).add_liquidity(base_deposit_amounts, 0)
+        deposit_amounts[N_COINS - 1] = StableSwap(self.base_pool).add_liquidity(base_deposit_amounts, 0)
 
     # transfer remaining underlying coins
-    for i in range(N_STABLECOINS, N_UL_COINS):
+    for i in range(N_COINS - 1):
         amount: uint256 = _amounts[i]
         if amount != 0:
             coin: address = self.underlying_coins[i]
@@ -136,7 +136,7 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
             if len(_response) != 0:
                 assert convert(_response, bool)
 
-            deposit_amounts[i-(N_STABLECOINS-1)] = amount
+            deposit_amounts[i] = amount
 
     CurveCryptoSwap(self.pool).add_liquidity(deposit_amounts, _min_mint_amount)
     token: address = self.token
