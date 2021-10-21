@@ -273,9 +273,11 @@ def get_dy_underlying(i: uint256, j: uint256, _dx: uint256) -> uint256:
 @view
 @external
 def calc_token_amount(_amounts: uint256[N_UL_COINS], _is_deposit: bool) -> uint256:
-    base_amounts: uint256[N_COINS] = [_amounts[0], _amounts[1], _amounts[2]]
-    base_lp: uint256 = StableSwap(self.base_pool).calc_token_amount(base_amounts, _is_deposit)
-    amounts: uint256[N_COINS] = [base_lp, _amounts[3], _amounts[4]]
+    base_amounts: uint256[N_COINS] = [_amounts[1], _amounts[2], _amounts[3]]
+    base_lp: uint256 = 0
+    if sum(base_amounts) > 0:
+        base_lp = StableSwap(self.base_pool).calc_token_amount(base_amounts, _is_deposit)
+    amounts: uint256[N_COINS] = [amounts[0], base_lp]
     return CurveCryptoSwap(self.pool).calc_token_amount(amounts, _is_deposit)
 
 
