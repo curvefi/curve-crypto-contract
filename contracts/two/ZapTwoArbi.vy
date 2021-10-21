@@ -18,11 +18,11 @@ interface CurveCryptoSwap:
 interface StableSwap:
     def coins(i: uint256) -> address: view
     def get_dy(i: int128, j: int128, dx: uint256) -> uint256: view
-    def calc_token_amount(amounts: uint256[N_COINS], is_deposit: bool) -> uint256: view
+    def calc_token_amount(amounts: uint256[N_STABLECOINS], is_deposit: bool) -> uint256: view
     def calc_withdraw_one_coin(token_amount: uint256, i: int128) -> uint256: view
-    def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256) -> uint256: nonpayable
+    def add_liquidity(amounts: uint256[N_STABLECOINS], min_mint_amount: uint256) -> uint256: nonpayable
     def remove_liquidity_one_coin(token_amount: uint256, i: int128, min_amount: uint256) -> uint256: nonpayable
-    def remove_liquidity(amount: uint256, min_amounts: uint256[N_COINS]) -> uint256[N_COINS]: nonpayable
+    def remove_liquidity(amount: uint256, min_amounts: uint256[N_STABLECOINS]) -> uint256[N_STABLECOINS]: nonpayable
     def get_virtual_price() -> uint256: view
 
 
@@ -273,11 +273,11 @@ def get_dy_underlying(i: uint256, j: uint256, _dx: uint256) -> uint256:
 @view
 @external
 def calc_token_amount(_amounts: uint256[N_UL_COINS], _is_deposit: bool) -> uint256:
-    base_amounts: uint256[N_COINS] = [_amounts[1], _amounts[2], _amounts[3]]
+    base_amounts: uint256[N_STABLECOINS] = [_amounts[1], _amounts[2], _amounts[3]]
     base_lp: uint256 = 0
-    if sum(base_amounts) > 0:
+    if _amounts[1] + _amounts[2] + _amounts[3] > 0:
         base_lp = StableSwap(self.base_pool).calc_token_amount(base_amounts, _is_deposit)
-    amounts: uint256[N_COINS] = [amounts[0], base_lp]
+    amounts: uint256[N_COINS] = [_amounts[0], base_lp]
     return CurveCryptoSwap(self.pool).calc_token_amount(amounts, _is_deposit)
 
 
