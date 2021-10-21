@@ -251,25 +251,21 @@ def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: u
 @view
 @external
 def get_dy_underlying(i: uint256, j: uint256, _dx: uint256) -> uint256:
-    if max(i, j) < N_STABLECOINS:
-        return StableSwap(self.base_pool).get_dy(convert(i, int128), convert(j, int128), _dx)
+    if min(i, j) >= N_COINS - 1:
+        return StableSwap(self.base_pool).get_dy(convert(i - (N_COINS-1), int128), convert(j - (N_COINS-1), int128), _dx)
 
     dx: uint256 = _dx
-    base_i: uint256 = 0
-    base_j: uint256 = 0
-    if j >= N_STABLECOINS:
-        base_j = j - (N_STABLECOINS - 1)
+    outer_i: uint256 = min(i, N_COINS - 1)
+    outer_j: uint256 = min(j, N_COINS - 1)
 
-    if i < N_STABLECOINS:
+    if outer_i == N_COINS-1:
         amounts: uint256[N_STABLECOINS] = empty(uint256[N_STABLECOINS])
-        amounts[i] = dx
+        amounts[i - (N_COINS-1)] = dx
         dx = StableSwap(self.base_pool).calc_token_amount(amounts, True)
-    else:
-        base_i = i - (N_STABLECOINS - 1)
 
-    dy: uint256 = CurveCryptoSwap(self.pool).get_dy(base_i, base_j, dx)
-    if base_j == 0:
-        return StableSwap(self.base_pool).calc_withdraw_one_coin(dy, convert(j, int128))
+    dy: uint256 = CurveCryptoSwap(self.pool).get_dy(outer_i, outer_j, dx)
+    if outer_j == N_COINS-1:
+        return StableSwap(self.base_pool).calc_withdraw_one_coin(dy, convert(j - (N_COINS-1), int128))
     else:
         return dy
 
