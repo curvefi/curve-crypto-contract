@@ -227,14 +227,12 @@ def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _recei
 @external
 def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: uint256, _receiver: address = msg.sender):
     ERC20(self.token).transferFrom(msg.sender, self, _token_amount)
-    base_i: uint256 = 0
-    if i >= N_STABLECOINS:
-        base_i = i - (N_STABLECOINS-1)
-    CurveCryptoSwap(self.pool).remove_liquidity_one_coin(_token_amount, base_i, 0)
+    outer_i: uint256 = min(i, N_COINS - 1)
+    CurveCryptoSwap(self.pool).remove_liquidity_one_coin(_token_amount, outer_i, 0)
 
-    value: uint256 = ERC20(self.coins[base_i]).balanceOf(self)
-    if base_i == 0:
-        value = StableSwap(self.base_pool).remove_liquidity_one_coin(value, convert(i, int128), _min_amount)
+    value: uint256 = ERC20(self.coins[outer_i]).balanceOf(self)
+    if outer_i == N_COINS - 1:
+        value = StableSwap(self.base_pool).remove_liquidity_one_coin(value, convert(i - (N_COINS - 1), int128), _min_amount)
     else:
         assert value >= _min_amount
     response: Bytes[32] = raw_call(
