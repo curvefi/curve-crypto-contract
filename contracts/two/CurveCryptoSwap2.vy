@@ -814,7 +814,7 @@ def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
 
 @external
 @nonreentrant('lock')
-def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
+def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):  # XXX return
     assert not self.is_killed  # dev: the pool is killed
 
     A_gamma: uint256[2] = self._A_gamma()

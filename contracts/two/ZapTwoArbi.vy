@@ -145,7 +145,7 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
 
 
 @external
-def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, _receiver: address = msg.sender):
+def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, _receiver: address = msg.sender) -> uint256:
     # transfer `i` from caller into the zap
     response: Bytes[32] = raw_call(
         self.underlying_coins[i],
@@ -161,31 +161,28 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
         assert convert(response, bool)
 
     dx: uint256 = _dx
-    base_i: uint256 = 0
-    base_j: uint256 = 0
-    if j >= N_STABLECOINS:
-        base_j = j - (N_STABLECOINS - 1)
+    base_i: uint256 = min(i, N_COINS - 1)
+    base_j: uint256 = min(j, N_COINS - 1)
 
-    if i < N_STABLECOINS:
+    if i >= N_COINS - 1:
         # if `i` is in the base pool, deposit to get LP tokens
         base_deposit_amounts: uint256[N_STABLECOINS] = empty(uint256[N_STABLECOINS])
-        base_deposit_amounts[i] = dx
+        base_deposit_amounts[i - (N_COINS - 1)] = dx
         dx = StableSwap(self.base_pool).add_liquidity(base_deposit_amounts, 0)
-    else:
-        # if `i` is an aToken, deposit to the aave lending pool
-        base_i = i - (N_STABLECOINS - 1)
 
     # perform the exchange
-    if max(base_i, base_j) > 0:
+    if base_i != base_j:
         CurveCryptoSwap(self.pool).exchange(base_i, base_j, dx, 0)
     amount: uint256 = ERC20(self.coins[base_j]).balanceOf(self)
+    # XXX check - maybe can do returns
 
-    if base_j == 0:
+    if base_j == N_COINS - 1:
         # if `j` is in the base pool, withdraw the desired underlying asset and transfer to caller
-        amount = StableSwap(self.base_pool).remove_liquidity_one_coin(amount, convert(j, int128), _min_dy)
+        amount = StableSwap(self.base_pool).remove_liquidity_one_coin(amount, convert(j - (N_COINS - 1), int128), _min_dy)
     else:
         # withdraw `j` underlying from lending pool and transfer to caller
         assert amount >= _min_dy
+
     response = raw_call(
         self.underlying_coins[j],
         concat(
@@ -197,6 +194,8 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
     )
     if len(response) != 0:
         assert convert(response, bool)
+
+    return amount
 
 
 @external
