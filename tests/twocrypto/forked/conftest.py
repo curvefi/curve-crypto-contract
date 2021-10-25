@@ -12,7 +12,6 @@ COINS = [
     "",  # EUR
     ""   # 3crv*
 ]
-BASE_SWAP = ""
 SWAP = ""
 TOKEN = ""
 
@@ -58,9 +57,9 @@ def crypto_swap(CurveCryptoSwap2):
 
 
 @pytest.fixture(scope="module")
-def crypto_zap(alice, ZapTwoArbi):
+def crypto_zap(alice, ZapTwoArbi, crypto_swap):
     return ZapTwoArbi.deploy(
-        SWAP, BASE_SWAP, {"from": alice}
+        SWAP, crypto_swap, {"from": alice}
     )
 
 
