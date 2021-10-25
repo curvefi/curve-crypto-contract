@@ -2,7 +2,7 @@ import pytest
 import brownie
 
 
-INITIAL_AMOUNTS = [32000 * 10**18, 40000 * 10**18, 40000 * 10**6, 40000 * 10**6]
+INITIAL_AMOUNTS = [24000 * 10**18, 10000 * 10**18, 10000 * 10**6, 10000 * 10**6]
 
 
 @pytest.mark.parametrize("idx", range(4))

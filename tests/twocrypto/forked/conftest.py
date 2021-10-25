@@ -74,6 +74,15 @@ def pre_mining(alice, crypto_zap, coins, decimals, base_coins, base_decimals):
     for c, d in zip(base_coins, base_decimals):
         c._mint_for_testing(alice, 100_000 * 10**d)
         c.approve(crypto_zap, 2**256 - 1, {'from': alice})
+        c._mint_for_testing(charlie, 100_000 * 10**d)
+        c.approve(crypto_zap, 2**256 - 1, {'from': charlie})
 
-    coins[0]._mint_for_testing(alice, 100_000 * 10**decimals[0])
+    coins[0]._mint_for_testing(alice, 300_000 * 10**decimals[0])
     coins[0].approve(crypto_zap, 2**256 - 1, {'from': alice})
+
+    coins[0]._mint_for_testing(charlie, 300_000 * 10**decimals[0])
+    coins[0].approve(crypto_zap, 2**256 - 1, {'from': charlie})
+
+    crypto_zap.add_liquidity([
+        240000 * 10**18, 100000 * 10**18, 100000 * 10**6, 100000 * 10**6
+    ], 0, {'from': charlie})
