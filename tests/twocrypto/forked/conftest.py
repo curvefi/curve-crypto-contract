@@ -1,5 +1,6 @@
 import pytest
 from brownie_tokens import MintableForkToken
+# from brownie import interface
 
 
 BASE_COINS = [
@@ -69,8 +70,11 @@ def crypto_lp_token(CurveTokenV4):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def pre_mining(alice, crypto_zap, coins, decimals):
+def pre_mining(alice, crypto_zap, coins, decimals, base_coins, base_decimals):
     """Mint a bunch of test tokens"""
-    for coin, decimal in zip(coins, decimals):
-        coin._mint_for_testing(alice, 100_000 * 10 ** decimal)
-        coin.approve(crypto_zap, 2 ** 256 - 1, {"from": alice})
+    for c, d in zip(base_coins, base_decimals):
+        c._mint_for_testing(alice, 100_000 * 10**d)
+        c.approve(crypto_zap, 2**256 - 1, {'from': alice})
+
+    coins[0]._mint_for_testing(alice, 100_000 * 10**decimals[0])
+    coins[0].approve(crypto_zap, 2**256 - 1, {'from': alice})
