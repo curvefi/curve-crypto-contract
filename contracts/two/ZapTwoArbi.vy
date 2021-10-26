@@ -21,7 +21,7 @@ interface StableSwap:
     def calc_token_amount(amounts: uint256[N_STABLECOINS], is_deposit: bool) -> uint256: view
     def calc_withdraw_one_coin(token_amount: uint256, i: int128) -> uint256: view
     def add_liquidity(amounts: uint256[N_STABLECOINS], min_mint_amount: uint256): nonpayable
-    def remove_liquidity_one_coin(token_amount: uint256, i: int128, min_amount: uint256) -> uint256: nonpayable
+    def remove_liquidity_one_coin(token_amount: uint256, i: int128, min_amount: uint256): nonpayable
     def remove_liquidity(amount: uint256, min_amounts: uint256[N_STABLECOINS]): nonpayable
     def get_virtual_price() -> uint256: view
 
@@ -180,7 +180,8 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
 
     if outer_j == N_COINS - 1:
         # if `j` is in the base pool, withdraw the desired underlying asset and transfer to caller
-        amount = StableSwap(self.base_pool).remove_liquidity_one_coin(amount, convert(j - (N_COINS - 1), int128), _min_dy)
+        StableSwap(self.base_pool).remove_liquidity_one_coin(amount, convert(j - (N_COINS - 1), int128), _min_dy)
+        amount = ERC20(self.coins[N_COINS-1]).balanceOf(self)
     else:
         # withdraw `j` underlying from lending pool and transfer to caller
         assert amount >= _min_dy
@@ -234,7 +235,8 @@ def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: u
 
     value: uint256 = ERC20(self.coins[outer_i]).balanceOf(self)
     if outer_i == N_COINS - 1:
-        value = StableSwap(self.base_pool).remove_liquidity_one_coin(value, convert(i - (N_COINS - 1), int128), _min_amount)
+        StableSwap(self.base_pool).remove_liquidity_one_coin(value, convert(i - (N_COINS - 1), int128), _min_amount)
+        value = ERC20(self.underlying_coins[i]).balanceOf(self)
     else:
         assert value >= _min_amount
     response: Bytes[32] = raw_call(
