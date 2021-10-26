@@ -4,16 +4,15 @@ from brownie_tokens import MintableForkToken
 
 
 BASE_COINS = [
-    "",  # DAI
-    "",  # USDC
-    ""   # USDT
+    "0x6B175474E89094C44Da98b954EedeAC495271d0F",  # DAI
+    "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",  # USDC
+    "0xdAC17F958D2ee523a2206206994597C13D831ec7"   # USDT
 ]
 COINS = [
-    "",  # EUR
-    ""   # 3crv*
+    "0xC581b735A1688071A1746c968e0798D642EDE491",  # EUR
+    "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490"   # 3crv*
 ]
-SWAP = ""
-TOKEN = ""
+BASE_SWAP = ""
 
 
 @pytest.fixture(scope="session")
@@ -43,7 +42,7 @@ def base_coins():
 
 @pytest.fixture(scope="module")
 def decimals():
-    return [18, 18]
+    return [6, 18]
 
 
 @pytest.fixture(scope="module")
@@ -51,21 +50,36 @@ def base_decimals():
     return [18, 6, 6]
 
 
-@pytest.fixture(scope="module")
-def crypto_swap(CurveCryptoSwap2):
-    return CurveCryptoSwap2.at(SWAP)
+def _crypto_swap(compiled_swap, token, alice):
+    swap = compiled_swap.deploy(
+            alice,
+            alice,
+            90 * 2**2 * 10000,  # A
+            int(2.8e-4 * 1e18),  # gamma
+            int(8.5e-5 * 1e10),  # mid_fee
+            int(1.3e-3 * 1e10),  # out_fee
+            10**10,  # allowed_extra_profit
+            int(0.012 * 1e18),  # fee_gamma
+            int(0.55e-5 * 1e18),  # adjustment_step
+            0,  # admin_fee
+            600,  # ma_half_time
+            int(0.8 * 1e18),  # price
+            {'from': alice})
+    token.set_minter(swap, {"from": alice})
+
+    return swap
+
+
+@pytest.fixture(scope="module", autouse=True)
+def crypto_swap(compiled_swap, token, alice):
+    return _crypto_swap(compiled_swap, token, alice)
 
 
 @pytest.fixture(scope="module")
 def crypto_zap(alice, ZapTwoArbi, crypto_swap):
     return ZapTwoArbi.deploy(
-        SWAP, crypto_swap, {"from": alice}
+        crypto_swap, BASE_SWAP, {"from": alice}
     )
-
-
-@pytest.fixture(scope="module")
-def crypto_lp_token(CurveTokenV4):
-    return CurveTokenV4.at(TOKEN)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -84,5 +98,5 @@ def pre_mining(alice, crypto_zap, coins, decimals, base_coins, base_decimals):
     coins[0].approve(crypto_zap, 2**256 - 1, {'from': charlie})
 
     crypto_zap.add_liquidity([
-        240000 * 10**18, 100000 * 10**18, 100000 * 10**6, 100000 * 10**6
+        240000 * 10**6, 100000 * 10**18, 100000 * 10**6, 100000 * 10**6
     ], 0, {'from': charlie})
