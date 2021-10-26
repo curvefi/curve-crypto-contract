@@ -44,6 +44,11 @@ def base_coins():
 
 
 @pytest.fixture(scope="module")
+def underlying_coins(coins, base_coins):
+    return [coins[0]] + base_coins
+
+
+@pytest.fixture(scope="module")
 def decimals():
     return [6, 18]
 

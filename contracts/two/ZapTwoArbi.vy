@@ -22,7 +22,7 @@ interface StableSwap:
     def calc_withdraw_one_coin(token_amount: uint256, i: int128) -> uint256: view
     def add_liquidity(amounts: uint256[N_STABLECOINS], min_mint_amount: uint256): nonpayable
     def remove_liquidity_one_coin(token_amount: uint256, i: int128, min_amount: uint256) -> uint256: nonpayable
-    def remove_liquidity(amount: uint256, min_amounts: uint256[N_STABLECOINS]) -> uint256[N_STABLECOINS]: nonpayable
+    def remove_liquidity(amount: uint256, min_amounts: uint256[N_STABLECOINS]): nonpayable
     def get_virtual_price() -> uint256: view
 
 
