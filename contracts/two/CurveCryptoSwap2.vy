@@ -264,7 +264,7 @@ def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint
         x = [x_unsorted[1], x_unsorted[0]]
 
     assert x[0] > 10**9 - 1 and x[0] < 10**15 * 10**18 + 1  # dev: unsafe values x[0]
-    assert x[1] * 10**18 / x[0] > 10**14-1  # dev: unsafe values x[i]
+    assert x[1] * 10**18 / x[0] > 10**14-1  # dev: unsafe values x[i] (input)
 
     D: uint256 = N_COINS * self.geometric_mean(x, False)
     S: uint256 = x[0] + x[1]

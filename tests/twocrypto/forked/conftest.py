@@ -1,6 +1,9 @@
 import pytest
 from brownie_tokens import MintableForkToken
+from brownie import compile_source
 # from brownie import interface
+
+VYPER_VERSION = "0.3.0"  # Forced version, use None when brownie supports the new version
 
 
 BASE_COINS = [
@@ -50,6 +53,26 @@ def base_decimals():
     return [18, 6, 6]
 
 
+def _compiled_swap(token, coins, decimals, CurveCryptoSwap2):
+    path = CurveCryptoSwap2._sources.get_source_path('CurveCryptoSwap2')
+    with open(path, 'r') as f:
+        source = f.read()
+        source = source.replace("0x0000000000000000000000000000000000000001", token.address)
+
+        source = source.replace("0x0000000000000000000000000000000000000010", coins[0].address)
+        source = source.replace("0x0000000000000000000000000000000000000011", coins[1].address)
+
+        source = source.replace("1,#0", str(10 ** (18 - decimals[0])) + ',')
+        source = source.replace("1,#1", str(10 ** (18 - decimals[1])) + ',')
+
+    return compile_source(source, vyper_version=VYPER_VERSION).Vyper
+
+
+@pytest.fixture(scope="module", autouse=True)
+def compiled_swap(token, coins, decimals, CurveCryptoSwap2):
+    return _compiled_swap(token, coins, decimals, CurveCryptoSwap2)
+
+
 def _crypto_swap(compiled_swap, token, alice):
     swap = compiled_swap.deploy(
             alice,
@@ -83,7 +106,7 @@ def crypto_zap(alice, ZapTwoArbi, crypto_swap):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def pre_mining(alice, crypto_zap, coins, decimals, base_coins, base_decimals):
+def pre_mining(alice, crypto_zap, crypto_swap, coins, decimals, base_coins, base_decimals, charlie):
     """Mint a bunch of test tokens"""
     for c, d in zip(base_coins, base_decimals):
         c._mint_for_testing(alice, 100_000 * 10**d)
