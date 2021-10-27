@@ -7,7 +7,7 @@ interface CurveCryptoSwap:
     def token() -> address: view
     def coins(i: uint256) -> address: view
     def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256: view
-    def calc_token_amount(amounts: uint256[N_COINS], is_deposit: bool) -> uint256: view
+    def calc_token_amount(amounts: uint256[N_COINS]) -> uint256: view
     def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256: view
     def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256): nonpayable
     def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256): nonpayable
@@ -284,7 +284,7 @@ def calc_token_amount(_amounts: uint256[N_UL_COINS], _is_deposit: bool) -> uint2
     if _amounts[1] + _amounts[2] + _amounts[3] > 0:
         base_lp = StableSwap(self.base_pool).calc_token_amount(base_amounts, _is_deposit)
     amounts: uint256[N_COINS] = [_amounts[0], base_lp]
-    return CurveCryptoSwap(self.pool).calc_token_amount(amounts, _is_deposit)
+    return CurveCryptoSwap(self.pool).calc_token_amount(amounts)
 
 
 @view
