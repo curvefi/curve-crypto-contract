@@ -147,6 +147,8 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
 
 @external
 def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, _receiver: address = msg.sender) -> uint256:
+    assert i != j  # dev: coins must be different
+
     # transfer `i` from caller into the zap
     response: Bytes[32] = raw_call(
         self.underlying_coins[i],
@@ -181,7 +183,7 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
     if outer_j == N_COINS - 1:
         # if `j` is in the base pool, withdraw the desired underlying asset and transfer to caller
         StableSwap(self.base_pool).remove_liquidity_one_coin(amount, convert(j - (N_COINS - 1), int128), _min_dy)
-        amount = ERC20(self.coins[N_COINS-1]).balanceOf(self)
+        amount = ERC20(self.underlying_coins[j]).balanceOf(self)
     else:
         # withdraw `j` underlying from lending pool and transfer to caller
         assert amount >= _min_dy
