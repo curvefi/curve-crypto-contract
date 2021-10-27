@@ -18,7 +18,11 @@ def test_add_multiple_coins(alice, crypto_zap, token):
         INITIAL_AMOUNTS, 0, {"from": alice}
     )
 
-    assert token.balanceOf(alice) > 0
+    calc_amount = crypto_zap.calc_token_amount(INITIAL_AMOUNTS, True)
+    amount = token.balanceOf(alice)
+
+    assert amount > 0
+    assert abs(amount - calc_amount) / amount < 0.01
 
 
 def test_add_no_coins(alice, crypto_zap):
