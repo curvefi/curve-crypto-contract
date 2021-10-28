@@ -814,7 +814,7 @@ def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
 
 @external
 @nonreentrant('lock')
-def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):  # XXX return
+def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256) -> uint256:
     assert not self.is_killed  # dev: the pool is killed
 
     A_gamma: uint256[2] = self._A_gamma()
@@ -901,6 +901,8 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):  # XXX r
     assert d_token >= min_mint_amount, "Slippage"
 
     log AddLiquidity(msg.sender, amounts, d_token_fee, token_supply)
+
+    return d_token
 
 
 @external
@@ -1033,7 +1035,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
     log RemoveLiquidityOne(msg.sender, token_amount, i, dy)
 
-    return token_amount
+    return dy
 
 
 @external

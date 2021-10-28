@@ -9,10 +9,10 @@ interface CurveCryptoSwap:
     def get_dy(i: uint256, j: uint256, dx: uint256) -> uint256: view
     def calc_token_amount(amounts: uint256[N_COINS]) -> uint256: view
     def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256: view
-    def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256): nonpayable
-    def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256): nonpayable
+    def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256) -> uint256: nonpayable
+    def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256) -> uint256: nonpayable
     def remove_liquidity(amount: uint256, min_amounts: uint256[N_COINS]): nonpayable
-    def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256): nonpayable
+    def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256) -> uint256: nonpayable
     def price_oracle() -> uint256: view
 
 interface StableSwap:
@@ -139,10 +139,8 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
 
             deposit_amounts[i] = amount
 
-    CurveCryptoSwap(self.pool).add_liquidity(deposit_amounts, _min_mint_amount)
-    token: address = self.token
-    amount: uint256 = ERC20(token).balanceOf(self)
-    ERC20(token).transfer(_receiver, amount)
+    amount: uint256 = CurveCryptoSwap(self.pool).add_liquidity(deposit_amounts, _min_mint_amount)
+    ERC20(self.token).transfer(_receiver, amount)
 
 
 @external
@@ -175,10 +173,9 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
         dx = ERC20(self.coins[N_COINS-1]).balanceOf(self)
 
     # perform the exchange
+    amount: uint256 = dx
     if outer_i != outer_j:
-        CurveCryptoSwap(self.pool).exchange(outer_i, outer_j, dx, 0)
-    amount: uint256 = ERC20(self.coins[outer_j]).balanceOf(self)
-    # XXX check - maybe can do returns
+        amount = CurveCryptoSwap(self.pool).exchange(outer_i, outer_j, dx, 0)
 
     if outer_j == N_COINS - 1:
         # if `j` is in the base pool, withdraw the desired underlying asset and transfer to caller
@@ -233,9 +230,8 @@ def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _recei
 def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: uint256, _receiver: address = msg.sender):
     ERC20(self.token).transferFrom(msg.sender, self, _token_amount)
     outer_i: uint256 = min(i, N_COINS - 1)
-    CurveCryptoSwap(self.pool).remove_liquidity_one_coin(_token_amount, outer_i, 0)
+    value: uint256 = CurveCryptoSwap(self.pool).remove_liquidity_one_coin(_token_amount, outer_i, 0)
 
-    value: uint256 = ERC20(self.coins[outer_i]).balanceOf(self)
     if outer_i == N_COINS - 1:
         StableSwap(self.base_pool).remove_liquidity_one_coin(value, convert(i - (N_COINS - 1), int128), _min_amount)
         value = ERC20(self.underlying_coins[i]).balanceOf(self)
