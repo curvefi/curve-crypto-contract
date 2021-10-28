@@ -24,15 +24,16 @@ def test_exchange_underlying(alice, crypto_zap, lp_token_amount, underlying_coin
             crypto_zap.exchange_underlying(i, j, dx, 0, {'from': alice})
         return
 
-    min_dy = crypto_zap.get_dy_underlying(i, j, dx)
+    dy_calc = crypto_zap.get_dy_underlying(i, j, dx)
 
     with brownie.reverts():
-        crypto_zap.exchange_underlying(i, j, dx, int(1.1 * min_dy), {'from': alice})
+        crypto_zap.exchange_underlying(i, j, dx, int(1.1 * dy_calc), {'from': alice})
 
-    crypto_zap.exchange_underlying(i, j, dx, int(0.9 * min_dy), {'from': alice})
+    crypto_zap.exchange_underlying(i, j, dx, int(0.9 * dy_calc), {'from': alice})
 
     dy = underlying_coins[j].balanceOf(alice) - dy
     dx_taken -= underlying_coins[i].balanceOf(alice)
 
     assert dx == dx_taken
     assert dy > 0
+    assert abs(dy - dy_calc) / dy < 1e-2
