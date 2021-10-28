@@ -30,6 +30,8 @@ N_COINS: constant(int128) = 2
 N_STABLECOINS: constant(int128) = 3
 N_UL_COINS: constant(int128) = N_COINS + N_STABLECOINS - 1
 
+# All the following properties can be replaced with constants for gas efficiency
+
 coins: public(address[N_COINS])
 underlying_coins: public(address[N_UL_COINS])
 
