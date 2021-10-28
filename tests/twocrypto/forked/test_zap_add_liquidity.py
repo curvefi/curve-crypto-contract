@@ -9,16 +9,21 @@ INITIAL_AMOUNTS = [24000 * 10**6, 10000 * 10**18, 10000 * 10**6, 10000 * 10**6]
 def test_add_single_coins(alice, crypto_zap, idx, token):
     amounts = [0] * 4
     amounts[idx] = INITIAL_AMOUNTS[idx]
+
+    calc_amount = crypto_zap.calc_token_amount(amounts)
+    amount = token.balanceOf(alice)
     crypto_zap.add_liquidity(amounts, 0, {"from": alice})
-    assert token.balanceOf(alice) > 0
+    amount = token.balanceOf(alice) - amount
+
+    assert amount > 0
+    assert abs(amount - calc_amount) / amount < 0.01
 
 
 def test_add_multiple_coins(alice, crypto_zap, token):
+    calc_amount = crypto_zap.calc_token_amount(INITIAL_AMOUNTS)
     crypto_zap.add_liquidity(
         INITIAL_AMOUNTS, 0, {"from": alice}
     )
-
-    calc_amount = crypto_zap.calc_token_amount(INITIAL_AMOUNTS, True)
     amount = token.balanceOf(alice)
 
     assert amount > 0
