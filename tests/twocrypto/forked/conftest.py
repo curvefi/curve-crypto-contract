@@ -1,7 +1,6 @@
 import pytest
 from brownie_tokens import MintableForkToken
 from brownie import compile_source
-# from brownie import interface
 
 VYPER_VERSION = "0.3.0"  # Forced version, use None when brownie supports the new version
 
