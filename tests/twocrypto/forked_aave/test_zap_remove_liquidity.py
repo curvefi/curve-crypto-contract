@@ -23,7 +23,7 @@ def test_remove_all_coins(alice, crypto_zap, underlying_coins, lp_token_amount, 
 
 
 def test_remove_all_coins_min_amount(
-    alice, crypto_zap, underlying_coins, lp_token_amount, base_decimals
+    alice, crypto_zap, underlying_coins, lp_token_amount, decimals, base_decimals
 ):
     balances = [c.balanceOf(alice) for c in underlying_coins]
 
