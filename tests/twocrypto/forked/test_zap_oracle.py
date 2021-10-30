@@ -7,3 +7,4 @@ def test_oracle(crypto_zap):
     price = 1 / 0.8
 
     assert (crypto_zap.price_oracle() - vp * price) / (vp * price) < 1e-4
+    assert (crypto_zap.price_scale() - vp * price) / (vp * price) < 1e-4
