@@ -22,7 +22,7 @@ def main():
     accounts.load('babe')
 
     virtual_price = interface.StableSwap2Pool(SWAP).get_virtual_price()
-    p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether-eurt&vs_currencies=usd").json()
+    p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=stasis-eurs&vs_currencies=usd").json()
     INITIAL_PRICE = int(virtual_price / p['stasis-eurs']['usd'])
     txparams = {"from": accounts[0], 'required_confs': 5, 'gasPrice': '2 gwei', 'gas': 200 * 10**6}
     print('Euro price:', 1e18 / INITIAL_PRICE, '2crv')
