@@ -12,9 +12,9 @@ import json
 # Addresses are taken for Polygon
 COINS = [
     "0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f",  # EURT
-    "0xdAD97F7713Ae9437fa9249920eC8507e5FbB23d3"   # 3Crv
+    "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171"   # 3Crv
 ]
-SWAP = "0x92215849c439E1f8612b6646060B4E3E5ef822cC"
+SWAP = "0x445FE580eF8d70FF569aB36e80c647af338db351"
 FEE_RECEIVER = "0x0000000000000000000000000000000000000000"
 
 
@@ -24,7 +24,7 @@ def main():
     virtual_price = interface.StableSwap2Pool(SWAP).get_virtual_price()
     p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether-eurt&vs_currencies=usd").json()
     INITIAL_PRICE = int(virtual_price / p['tether-eurt']['usd'])
-    txparams = {"from": accounts[0], 'required_confs': 5}
+    txparams = {"from": accounts[0], 'required_confs': 20, 'gasPrice': '30 gwei'}
     print('Euro price:', 1e18 / INITIAL_PRICE, '3crv')
 
     token = CurveTokenV4.deploy("Curve EURT-3Crv", "crvEURTUSD", txparams)
