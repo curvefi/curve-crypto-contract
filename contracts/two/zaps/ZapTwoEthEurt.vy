@@ -63,17 +63,18 @@ def __init__():
         if len(response) != 0:
             assert convert(response, bool)
 
-    response: Bytes[32] = raw_call(
-        COINS[0],
-        concat(
-            method_id("approve(address,uint256)"),
-            convert(POOL, bytes32),
-            convert(MAX_UINT256, bytes32)
-        ),
-        max_outsize=32
-    )
-    if len(response) != 0:
-        assert convert(response, bool)
+    for coin in COINS:
+        response: Bytes[32] = raw_call(
+            coin,
+            concat(
+                method_id("approve(address,uint256)"),
+                convert(POOL, bytes32),
+                convert(MAX_UINT256, bytes32)
+            ),
+            max_outsize=32
+        )
+        if len(response) != 0:
+            assert convert(response, bool)
 
 
 @external
