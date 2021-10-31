@@ -109,7 +109,8 @@ def crypto_zap(alice, ZapTwoEthEurt, crypto_swap, token):
         source = f.read()
         source = source.replace("0x0000000000000000000000000000000000000001", token.address)
         source = source.replace("0x0000000000000000000000000000000000000000", crypto_swap.address)
-    return compile_source(source, vyper_version=VYPER_VERSION).Vyper
+    compiled = compile_source(source, vyper_version=VYPER_VERSION).Vyper
+    return compiled.deploy({'from': alice})
 
 
 @pytest.fixture(scope="module", autouse=True)
