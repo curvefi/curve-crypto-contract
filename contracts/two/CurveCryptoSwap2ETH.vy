@@ -869,7 +869,13 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, use_eth: 
 
     for i in range(N_COINS):
         if amounts[i] > 0:
-            assert ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
+            if use_eth and i == ETH_INDEX:
+                assert msg.value == amounts[i]  # dev: incorrect eth amount
+            else:
+                assert msg.value == 0  # dev: nonzero eth amount
+                assert ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
+                if i == ETH_INDEX:
+                    WETH(_coins[i]).withdraw(amounts[i])
             amountsp[i] = xp[i] - xp_old[i]
     assert amounts[0] > 0 or amounts[1] > 0  # dev: no coins to add
 
