@@ -558,7 +558,10 @@ def _claim_admin_fees():
     # Gulp here
     _coins: address[N_COINS] = coins
     for i in range(N_COINS):
-        self.balances[i] = ERC20(_coins[i]).balanceOf(self)
+        if i == ETH_INDEX:
+            self.balances[i] = self.balance
+        else:
+            self.balances[i] = ERC20(_coins[i]).balanceOf(self)
 
     vprice: uint256 = self.virtual_price
 
