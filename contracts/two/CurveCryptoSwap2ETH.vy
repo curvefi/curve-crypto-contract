@@ -955,7 +955,12 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS], use_eth: b
         assert d_balance >= min_amounts[i]
         self.balances[i] = balances[i] - d_balance
         balances[i] = d_balance  # now it's the amounts going out
-        assert ERC20(_coins[i]).transfer(msg.sender, d_balance)
+        if use_eth and i == ETH_INDEX:
+            raw_call(msg.sender, b"", value=d_balance)
+        else:
+            if i == ETH_INDEX:
+                WETH(_coins[i]).deposit(value=d_balance)
+            assert ERC20(_coins[i]).transfer(msg.sender, d_balance)
 
     D: uint256 = self.D
     self.D = D - D * amount / total_supply
@@ -1282,3 +1287,6 @@ def unkill_me():
 def set_admin_fee_receiver(_admin_fee_receiver: address):
     assert msg.sender == self.owner  # dev: only owner
     self.admin_fee_receiver = _admin_fee_receiver
+
+
+# XXX add LP token price
