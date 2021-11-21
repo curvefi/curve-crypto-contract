@@ -175,6 +175,11 @@ EXP_PRECISION: constant(uint256) = 10**10
 
 ETH_INDEX: constant(uint256) = 0  # Can put it to something big to turn the logic off
 
+# Constants to calculate LP token price lower bound more precisely
+DISCOUNT0: constant(uint256) = 670000000000000 # Change
+A0: constant(uint256) = 2**2 * 1000 * 10000
+GAMMA0: constant(uint256) = 2000000000000  # 2e-6
+
 
 @external
 def __init__(
@@ -1294,4 +1299,34 @@ def set_admin_fee_receiver(_admin_fee_receiver: address):
     self.admin_fee_receiver = _admin_fee_receiver
 
 
-# XXX add LP token price
+@internal
+@pure
+def sqrt_int(x: uint256) -> uint256:
+    """
+    Originating from: https://github.com/vyperlang/vyper/issues/1266
+    """
+
+    if x == 0:
+        return 0
+
+    z: uint256 = (x + 10**18) / 2
+    y: uint256 = x
+
+    for i in range(256):
+        if z == y:
+            return y
+        y = z
+        z = (x * 10**18 / z + z) / 2
+
+    raise "Did not converge"
+
+
+@external
+@view
+def lp_price(fast: bool = True) -> uint256:
+    """
+    Approximate LP token price
+    """
+    max_price: uint256 = 2 * self.virtual_price * self.sqrt_int(self.price_oracle) / 10**18
+
+    return max_price
