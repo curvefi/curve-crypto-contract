@@ -1,4 +1,5 @@
 import pytest
+import brownie
 from brownie import compile_source
 from brownie.test import given, strategy
 
@@ -69,7 +70,7 @@ def crypto_swap(compiled_swap, token, accounts):
 
 def _crypto_swap_with_deposit(crypto_swap, coins, accounts):
     user = accounts[1]
-    quantities = [10**6 * 10**36 // p for p in [10**18] + INITIAL_PRICES]  # $2M worth
+    quantities = [10**3 * 10**36 // p for p in [10**18] + INITIAL_PRICES]  # $2M worth
     coins[0].deposit({'from': user, 'value': quantities[0]})
     coins[0].approve(crypto_swap, 2**256 - 1, {'from': user})
     coins[1]._mint_for_testing(user, quantities[1])
@@ -145,5 +146,13 @@ def test_exchange_weth(swap, coins, accounts, amount, i):
     assert swap.balances(i) - b0 == amount
 
 
-def test_exchange_fail_eth():
-    pass
+def test_exchange_fail_eth(swap, coins, accounts):
+    user = accounts[1]
+    coins[0]._mint_for_testing(user, 10**15)
+    coins[1]._mint_for_testing(user, 10**18)
+    with brownie.reverts():
+        swap.exchange(0, 1, 10**15, 0, {'from': user, 'value': 10**15})
+    with brownie.reverts():
+        swap.exchange(1, 0, 10**18, 0, {'from': user, 'value': 10**18})
+    with brownie.reverts():
+        swap.exchange_underlying(1, 0, 10**18, 0, {'from': user, 'value': 10**18})
