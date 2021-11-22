@@ -3,7 +3,7 @@ from brownie import compile_source
 from brownie.test import given, strategy
 
 VYPER_VERSION = "0.3.0"  # Forced version, use None when brownie supports the new version
-INITIAL_PRICES = [int(0.001 * 10**18)]  # CRV/EUR
+INITIAL_PRICES = [int(0.001 * 10**18)]  # CRV/ETH
 
 
 # Fixtures
@@ -70,9 +70,10 @@ def crypto_swap(compiled_swap, token, accounts):
 def _crypto_swap_with_deposit(crypto_swap, coins, accounts):
     user = accounts[1]
     quantities = [10**6 * 10**36 // p for p in [10**18] + INITIAL_PRICES]  # $2M worth
-    for coin, q in zip(coins, quantities):
-        coin._mint_for_testing(user, q)
-        coin.approve(crypto_swap, 2**256 - 1, {'from': user})
+    coins[0].deposit({'from': user, 'value': quantities[0]})
+    coins[0].approve(crypto_swap, 2**256 - 1, {'from': user})
+    coins[1]._mint_for_testing(user, quantities[1])
+    coins[1].approve(crypto_swap, 2**256 - 1, {'from': user})
 
     # Very first deposit
     crypto_swap.add_liquidity(quantities, 0, {'from': user})
@@ -134,13 +135,13 @@ def test_exchange_eth_out(swap, amount, coins, accounts):
 def test_exchange_weth(swap, coins, accounts, amount, i):
     user = accounts[1]
 
-    old_balance = accounts[1 - i].balance()
+    old_balance = coins[1 - i].balanceOf(user)
     b0 = swap.balances(i)
     b1 = swap.balances(1 - i)
     coins[i]._mint_for_testing(user, amount)
     swap.exchange(i, 1 - i, amount, 0, {'from': user})
-    assert accounts[1 - i].balance() - old_balance > 0
-    assert accounts[1 - i].balance() - old_balance == b1 - swap.balances(1 - i)
+    assert coins[1 - i].balanceOf(user) - old_balance > 0
+    assert coins[1 - i].balanceOf(user) - old_balance == b1 - swap.balances(1 - i)
     assert swap.balances(i) - b0 == amount
 
 
