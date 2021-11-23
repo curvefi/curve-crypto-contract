@@ -232,3 +232,10 @@ def test_remove_liquidity_one_coin_eth(swap, token, coins, accounts, frac, i, us
         assert user.balance() > initial_eth_balance
         assert coins[i].balanceOf(user) == initial_coin_balances[i]
     assert coins[1 - i].balanceOf(user) == initial_coin_balances[1 - i]
+
+
+def test_lp_price(swap, token):
+    tvl = swap.balances(0) + swap.balances(1) * swap.price_scale() // 10**18
+    naive_price = tvl * 10**18 // token.totalSupply()
+
+    assert abs(swap.lp_price() / naive_price - 1) < 2e-3

@@ -1342,7 +1342,7 @@ def sqrt_int(x: uint256) -> uint256:
 
 @external
 @view
-def lp_price(fast: bool = True) -> uint256:
+def lp_price() -> uint256:
     """
     Approximate LP token price
     """
