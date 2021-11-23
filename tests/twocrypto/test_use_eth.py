@@ -212,5 +212,23 @@ def test_remove_liquidity_eth(swap, token, coins, accounts, frac, use_eth):
         assert coins[0].balanceOf(user) - initial_coin_balances[0] == to_remove[0]
 
 
-def test_remove_liquidity_one_coin_eth():
-    pass
+@given(frac=strategy('uint256', min_value=10**10, max_value=10**18),
+       i=strategy('uint8', min_value=0, max_value=1),
+       use_eth=strategy('bool'))
+def test_remove_liquidity_one_coin_eth(swap, token, coins, accounts, frac, i, use_eth):
+    user = accounts[1]
+    token_amount = token.balanceOf(user) * frac // 10**18
+    assert token_amount > 0
+
+    initial_coin_balances = [c.balanceOf(user) for c in coins]
+    initial_eth_balance = user.balance()
+
+    swap.remove_liquidity_one_coin(token_amount, i, 0, use_eth, {'from': user})
+
+    if i == 1 or not use_eth:
+        assert coins[i].balanceOf(user) > initial_coin_balances[i]
+        assert initial_eth_balance == user.balance()
+    else:
+        assert user.balance() > initial_eth_balance
+        assert coins[i].balanceOf(user) == initial_coin_balances[i]
+    assert coins[1 - i].balanceOf(user) == initial_coin_balances[1 - i]
