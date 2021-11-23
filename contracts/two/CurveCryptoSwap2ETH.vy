@@ -175,11 +175,6 @@ EXP_PRECISION: constant(uint256) = 10**10
 
 ETH_INDEX: constant(uint256) = 0  # Can put it to something big to turn the logic off
 
-# Constants to calculate LP token price lower bound more precisely
-DISCOUNT0: constant(uint256) = 670000000000000 # Change
-A0: constant(uint256) = 2**2 * 1000 * 10000
-GAMMA0: constant(uint256) = 2000000000000  # 2e-6
-
 
 @external
 def __init__(
