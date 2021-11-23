@@ -865,6 +865,7 @@ def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
 @nonreentrant('lock')
 def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, use_eth: bool = False) -> uint256:
     assert not self.is_killed  # dev: the pool is killed
+    assert amounts[0] > 0 or amounts[1] > 0  # dev: no coins to add
 
     A_gamma: uint256[2] = self._A_gamma()
 
@@ -889,17 +890,18 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, use_eth: 
     xp = [xp[0] * PRECISIONS[0], xp[1] * price_scale / PRECISION]
     xp_old = [xp_old[0] * PRECISIONS[0], xp_old[1] * price_scale / PRECISION]
 
+    if not use_eth:
+        assert msg.value == 0  # dev: nonzero eth amount
+
     for i in range(N_COINS):
+        if use_eth and i == ETH_INDEX:
+            assert msg.value == amounts[i]  # dev: incorrect eth amount
         if amounts[i] > 0:
-            if use_eth and i == ETH_INDEX:
-                assert msg.value == amounts[i]  # dev: incorrect eth amount
-            else:
-                assert msg.value == 0  # dev: nonzero eth amount
+            if (not use_eth) or (i != ETH_INDEX):
                 assert ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
                 if i == ETH_INDEX:
                     WETH(_coins[i]).withdraw(amounts[i])
             amountsp[i] = xp[i] - xp_old[i]
-    assert amounts[0] > 0 or amounts[1] > 0  # dev: no coins to add
 
     t: uint256 = self.future_A_gamma_time
     if t > 0:

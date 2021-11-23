@@ -156,3 +156,35 @@ def test_exchange_fail_eth(swap, coins, accounts):
         swap.exchange(1, 0, 10**18, 0, {'from': user, 'value': 10**18})
     with brownie.reverts():
         swap.exchange_underlying(1, 0, 10**18, 0, {'from': user, 'value': 10**18})
+
+
+@given(amounts=strategy('uint256[2]', min_value=10**10, max_value=10**19),
+       use_eth=strategy('bool'))
+def test_add_liquidity_eth(swap, coins, accounts, amounts, use_eth):
+    user = accounts[1]
+    amounts[1] = amounts[1] * 10**18 // INITIAL_PRICES[0]
+
+    for i in range(2):
+        coins[i]._mint_for_testing(user, amounts[i])
+
+
+    initial_coin_balances = [c.balanceOf(user) for c in coins]
+    initial_eth_balance = user.balance()
+
+    if use_eth:
+        with brownie.reverts('dev: incorrect eth amount'):
+            swap.add_liquidity(amounts, 0, True, {'from': user})
+        swap.add_liquidity(amounts, 0, True, {'from': user, 'value': amounts[0]})
+
+        assert coins[0].balanceOf(user) == initial_coin_balances[0]
+        assert initial_eth_balance - user.balance() == amounts[0]
+
+    else:
+        with brownie.reverts('dev: nonzero eth amount'):
+            swap.add_liquidity(amounts, 0, False, {'from': user, 'value': amounts[0]})
+        swap.add_liquidity(amounts, 0, False, {'from': user})
+
+        assert initial_coin_balances[0] - coins[0].balanceOf(user) == amounts[0]
+        assert initial_eth_balance == user.balance()
+
+    assert initial_coin_balances[1] - coins[1].balanceOf(user) == amounts[1]
