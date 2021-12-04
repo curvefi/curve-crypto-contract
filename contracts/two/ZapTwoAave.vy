@@ -1,4 +1,4 @@
-# @version 0.3.0
+# @version 0.3.1
 # EUR/a3crv pool where 3crv is _second_, not first
 # Hardcoded addresses are for Polygon
 

@@ -1,7 +1,7 @@
 import pytest
 from brownie import compile_source
 
-VYPER_VERSION = "0.3.0"  # Forced version, use None when brownie supports the new version
+VYPER_VERSION = "0.3.1"  # Forced version, use None when brownie supports the new version
 INITIAL_PRICES = [int(0.8 * 10**18)]  # 1/eur
 
 

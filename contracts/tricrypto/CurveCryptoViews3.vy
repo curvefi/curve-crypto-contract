@@ -1,4 +1,4 @@
-# @version 0.3.0
+# @version 0.3.1
 # (c) Curve.Fi, 2021
 
 # This contract contains view-only external methods which can be gas-inefficient
