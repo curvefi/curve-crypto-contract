@@ -3,7 +3,7 @@ import brownie
 from brownie import compile_source
 from brownie.test import given, strategy
 
-VYPER_VERSION = "0.3.0"  # Forced version, use None when brownie supports the new version
+VYPER_VERSION = "0.3.1"  # Forced version, use None when brownie supports the new version
 INITIAL_PRICES = [int(0.001 * 10**18)]  # CRV/ETH
 
 
@@ -167,7 +167,6 @@ def test_add_liquidity_eth(swap, coins, accounts, amounts, use_eth):
     for i in range(2):
         coins[i]._mint_for_testing(user, amounts[i])
 
-
     initial_coin_balances = [c.balanceOf(user) for c in coins]
     initial_eth_balance = user.balance()
 
@@ -212,7 +211,7 @@ def test_remove_liquidity_eth(swap, token, coins, accounts, frac, use_eth):
         assert coins[0].balanceOf(user) - initial_coin_balances[0] == to_remove[0]
 
 
-@given(frac=strategy('uint256', min_value=10**10, max_value=10**18),
+@given(frac=strategy('uint256', min_value=10**10, max_value=5 * 10**17),
        i=strategy('uint8', min_value=0, max_value=1),
        use_eth=strategy('bool'))
 def test_remove_liquidity_one_coin_eth(swap, token, coins, accounts, frac, i, use_eth):
