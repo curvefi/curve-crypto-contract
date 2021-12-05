@@ -2,7 +2,6 @@
 # (c) Curve.Fi, 2021
 # Pool for two crypto assets
 
-from vyper.interfaces import ERC20
 # Expected coins:
 # eth/whatever
 
@@ -12,6 +11,11 @@ interface CurveToken:
     def mint_relative(_to: address, frac: uint256) -> uint256: nonpayable
     def burnFrom(_to: address, _value: uint256) -> bool: nonpayable
 
+interface ERC20:
+    def transfer(_to: address, _value: uint256) -> bool: nonpayable
+    def transferFrom(_from: address, _to: address, _value: uint256) -> bool: nonpayable
+    def decimals() -> uint256: view
+    def balanceOf(_user: address) -> uint256: view
 
 interface WETH:
     def deposit(): payable
@@ -91,11 +95,8 @@ N_COINS: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
 A_MULTIPLIER: constant(uint256) = 10000
 
-# These addresses are replaced by the deployer
-token: constant(address) = 0x0000000000000000000000000000000000000001
-coins: constant(address[N_COINS]) = [
-    0x0000000000000000000000000000000000000010,
-    0x0000000000000000000000000000000000000011]
+token: immutable(address)
+coins: immutable(address[N_COINS])
 
 price_scale: public(uint256)   # Internal price scale
 price_oracle: public(uint256)  # Price target given by MA
@@ -166,10 +167,7 @@ MAX_A: constant(uint256) = N_COINS**N_COINS * A_MULTIPLIER * 100000
 # N_COINS = 3 -> 1  (10**18 -> 10**18)
 # N_COINS = 4 -> 10**8  (10**18 -> 10**10)
 # PRICE_PRECISION_MUL: constant(uint256) = 1
-PRECISIONS: constant(uint256[N_COINS]) = [
-    1,#0
-    1,#1
-]
+PRECISIONS: immutable(uint256[N_COINS])
 
 EXP_PRECISION: constant(uint256) = 10**10
 
@@ -189,7 +187,9 @@ def __init__(
     adjustment_step: uint256,
     admin_fee: uint256,
     ma_half_time: uint256,
-    initial_price: uint256
+    initial_price: uint256,
+    _token: address,
+    _coins: address[N_COINS]
 ):
     self.owner = owner
 
@@ -218,6 +218,11 @@ def __init__(
     self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
 
     self.admin_fee_receiver = admin_fee_receiver
+
+    token = _token
+    coins = _coins
+    PRECISIONS = [10 ** (18 - ERC20(_coins[0]).decimals()),
+                  10 ** (18 - ERC20(_coins[1]).decimals())]
 
 
 @payable
