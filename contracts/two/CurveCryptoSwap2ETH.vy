@@ -643,21 +643,21 @@ def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: 
 
     self.xcp_profit = xcp_profit
 
+    norm: uint256 = price_oracle * 10**18 / price_scale
+    if norm > 10**18:
+        norm -= 10**18
+    else:
+        norm = 10**18 - norm
+    adjustment_step: uint256 = max(self.adjustment_step, norm / 10)
+
     needs_adjustment: bool = self.not_adjusted
     # if not needs_adjustment and (virtual_price-10**18 > (xcp_profit-10**18)/2 + self.allowed_extra_profit):
     # (re-arrange for gas efficiency)
-    if not needs_adjustment and (virtual_price * 2 - 10**18 > xcp_profit + 2*self.allowed_extra_profit):
+    if not needs_adjustment and (virtual_price * 2 - 10**18 > xcp_profit + 2*self.allowed_extra_profit) and (norm > adjustment_step) and (old_virtual_price > 0):
         needs_adjustment = True
         self.not_adjusted = True
 
     if needs_adjustment:
-        norm: uint256 = price_oracle * 10**18 / price_scale
-        if norm > 10**18:
-            norm -= 10**18
-        else:
-            norm = 10**18 - norm
-        adjustment_step: uint256 = max(self.adjustment_step, norm / 10)
-
         if norm > adjustment_step and old_virtual_price > 0:
             p_new = (price_scale * (norm - adjustment_step) + adjustment_step * price_oracle) / norm
 
@@ -693,6 +693,11 @@ def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: 
     # Still need to update the profit counter and D
     self.D = D_unadjusted
     self.virtual_price = virtual_price
+
+    # norm appeared < adjustment_step after
+    if needs_adjustment:
+        self.not_adjusted = False
+        self._claim_admin_fees()
 
 
 @internal
