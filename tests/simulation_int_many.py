@@ -308,12 +308,13 @@ class Trader:
             (p_real * 10**18 // p_target - 10**18) ** 2
             for p_real, p_target in zip(self.price_oracle, self.curve.p)
         ) ** 0.5)
-        if norm <= self.adjustment_step:
+        adjustment_step = max(self.adjustment_step, norm // 10)
+        if norm <= adjustment_step:
             # Already close to the target price
             return norm
 
         p_new = [10**18]
-        p_new += [p_target + self.adjustment_step * (p_real - p_target) // norm
+        p_new += [p_target + adjustment_step * (p_real - p_target) // norm
                   for p_real, p_target in zip(self.price_oracle[1:], self.curve.p[1:])]
 
         old_p = self.curve.p[:]
