@@ -1,7 +1,5 @@
 import pytest
-from brownie import compile_source
 
-VYPER_VERSION = "0.3.1"  # Forced version, use None when brownie supports the new version
 INITIAL_PRICES = [int(0.8 * 10**18)]  # 1/eur
 
 
@@ -16,28 +14,9 @@ def token(CurveTokenV4, accounts):
     yield CurveTokenV4.deploy("Curve EUR-USD", "crvEURUSD", {"from": accounts[0]})
 
 
-def _compiled_swap(token, coins, CurveCryptoSwap2):
-    path = CurveCryptoSwap2._sources.get_source_path('CurveCryptoSwap2')
-    with open(path, 'r') as f:
-        source = f.read()
-        source = source.replace("0x0000000000000000000000000000000000000001", token.address)
-
-        source = source.replace("0x0000000000000000000000000000000000000010", coins[0].address)
-        source = source.replace("0x0000000000000000000000000000000000000011", coins[1].address)
-
-        source = source.replace("1,#0", str(10 ** (18 - coins[0].decimals())) + ',')
-        source = source.replace("1,#1", str(10 ** (18 - coins[1].decimals())) + ',')
-
-    return compile_source(source, vyper_version=VYPER_VERSION).Vyper
-
-
 @pytest.fixture(scope="module", autouse=True)
-def compiled_swap(token, coins, CurveCryptoSwap2):
-    return _compiled_swap(token, coins, CurveCryptoSwap2)
-
-
-def _crypto_swap(compiled_swap, token, accounts):
-    swap = compiled_swap.deploy(
+def crypto_swap(CurveCryptoSwap2, token, coins, accounts):
+    swap = CurveCryptoSwap2.deploy(
             accounts[0],
             accounts[0],
             90 * 2**2 * 10000,  # A
@@ -50,20 +29,17 @@ def _crypto_swap(compiled_swap, token, accounts):
             0,  # admin_fee
             600,  # ma_half_time
             INITIAL_PRICES[0],
+            token,
+            coins,
             {'from': accounts[0]})
     token.set_minter(swap, {"from": accounts[0]})
 
     return swap
 
 
-@pytest.fixture(scope="module", autouse=True)
-def crypto_swap(compiled_swap, token, accounts):
-    return _crypto_swap(compiled_swap, token, accounts)
-
-
 def _crypto_swap_with_deposit(crypto_swap, coins, accounts):
     user = accounts[1]
-    quantities = [10**6 * 10**36 // p for p in [10**18] + INITIAL_PRICES]  # $3M worth
+    quantities = [10**6 * 10**36 // p for p in [10**18] + INITIAL_PRICES]
     for coin, q in zip(coins, quantities):
         coin._mint_for_testing(user, q)
         coin.approve(crypto_swap, 2**256-1, {'from': user})

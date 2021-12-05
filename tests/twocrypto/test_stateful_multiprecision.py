@@ -1,6 +1,6 @@
 import pytest
 from .test_stateful import NumbaGoUp
-from .conftest import _compiled_swap, _crypto_swap, _crypto_swap_with_deposit
+from .conftest import _crypto_swap_with_deposit
 
 COINS = [
     ('USDC', 6),
@@ -25,13 +25,25 @@ def token_mp(CurveTokenV4, accounts):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def compiled_swap_mp(token_mp, coins_mp, CurveCryptoSwap2):
-    return _compiled_swap(token_mp, coins_mp, CurveCryptoSwap2)
-
-
-@pytest.fixture(scope="module", autouse=True)
-def crypto_swap_mp(compiled_swap_mp, token_mp, accounts):
-    return _crypto_swap(compiled_swap_mp, token_mp, accounts)
+def crypto_swap_mp(CurveCryptoSwap2, token_mp, coins_mp, accounts):
+    swap = CurveCryptoSwap2.deploy(
+            accounts[0],
+            accounts[0],
+            90 * 2**2 * 10000,  # A
+            int(2.8e-4 * 1e18),  # gamma
+            int(8.5e-5 * 1e10),  # mid_fee
+            int(1.3e-3 * 1e10),  # out_fee
+            10**10,  # allowed_extra_profit
+            int(0.012 * 1e18),  # fee_gamma
+            int(0.55e-5 * 1e18),  # adjustment_step
+            0,  # admin_fee
+            600,  # ma_half_time
+            INITIAL_PRICES[0],
+            token_mp,
+            coins_mp,
+            {'from': accounts[0]})
+    token_mp.set_minter(swap, {"from": accounts[0]})
+    return swap
 
 
 @pytest.fixture(scope="module")
