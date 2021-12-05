@@ -79,7 +79,7 @@ class StatefulGas(StatefulBase):
             self.virtual_price = 10**18
 
 
-# @pytest.mark.skip()
+@pytest.mark.skip()
 def test_gas(crypto_swap, token, chain, accounts, coins, state_machine):
     from hypothesis._settings import HealthCheck
 
