@@ -21,8 +21,8 @@ def crypto_swap(CurveCryptoSwap2, token, coins, accounts):
             accounts[0],
             90 * 2**2 * 10000,  # A
             int(2.8e-4 * 1e18),  # gamma
-            int(8.5e-5 * 1e10),  # mid_fee
-            int(1.3e-3 * 1e10),  # out_fee
+            int(5e-4 * 1e10),  # mid_fee
+            int(4e-3 * 1e10),  # out_fee
             10**10,  # allowed_extra_profit
             int(0.012 * 1e18),  # fee_gamma
             int(0.55e-5 * 1e18),  # adjustment_step
