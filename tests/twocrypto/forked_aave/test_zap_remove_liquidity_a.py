@@ -23,11 +23,16 @@ def test_remove_all_coins(alice, crypto_zap, underlying_coins, lp_token_amount, 
 
 
 def test_remove_all_coins_min_amount(
-    alice, crypto_zap, underlying_coins, lp_token_amount, decimals, base_decimals
+    alice, crypto_zap, underlying_coins, lp_token_amount, decimals, base_decimals, stable_swap
 ):
     balances = [c.balanceOf(alice) for c in underlying_coins]
 
-    amounts = [int(amt * 0.5) for amt in INITIAL_AMOUNTS]
+    stable_precisions = [1, 10**12, 10**12]
+    total = sum(stable_swap.balances(i) * stable_precisions[i] for i in range(3))
+    frac = [stable_swap.balances(i) * stable_precisions[i] / total for i in range(3)]
+    total = sum(INITIAL_AMOUNTS[i+1] * stable_precisions[i] for i in range(3))
+
+    amounts = [int(0.9 * INITIAL_AMOUNTS[0])] + [int(0.9 * frac[i] * total / stable_precisions[i]) for i in range(3)]
     crypto_zap.remove_liquidity(lp_token_amount, amounts, {"from": alice})
 
     assert underlying_coins[0].balanceOf(alice) >= balances[0] + 0.97 * INITIAL_AMOUNTS[0]

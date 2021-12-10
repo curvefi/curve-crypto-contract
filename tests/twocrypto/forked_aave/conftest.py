@@ -1,6 +1,6 @@
 import pytest
+from brownie import interface
 from brownie_tokens import MintableForkToken
-from brownie import compile_source
 
 VYPER_VERSION = "0.3.1"  # Forced version, use None when brownie supports the new version
 
@@ -57,28 +57,9 @@ def base_decimals():
     return [18, 6, 6]
 
 
-def _compiled_swap(token, coins, decimals, CurveCryptoSwap2):
-    path = CurveCryptoSwap2._sources.get_source_path('CurveCryptoSwap2')
-    with open(path, 'r') as f:
-        source = f.read()
-        source = source.replace("0x0000000000000000000000000000000000000001", token.address)
-
-        source = source.replace("0x0000000000000000000000000000000000000010", coins[0].address)
-        source = source.replace("0x0000000000000000000000000000000000000011", coins[1].address)
-
-        source = source.replace("1,#0", str(10 ** (18 - decimals[0])) + ',')
-        source = source.replace("1,#1", str(10 ** (18 - decimals[1])) + ',')
-
-    return compile_source(source, vyper_version=VYPER_VERSION).Vyper
-
-
 @pytest.fixture(scope="module", autouse=True)
-def compiled_swap(token, coins, decimals, CurveCryptoSwap2):
-    return _compiled_swap(token, coins, decimals, CurveCryptoSwap2)
-
-
-def _crypto_swap(compiled_swap, token, alice):
-    swap = compiled_swap.deploy(
+def crypto_swap(CurveCryptoSwap2, token, coins, alice):
+    swap = CurveCryptoSwap2.deploy(
             alice,
             alice,
             90 * 2**2 * 10000,  # A
@@ -91,6 +72,8 @@ def _crypto_swap(compiled_swap, token, alice):
             0,  # admin_fee
             600,  # ma_half_time
             int(0.8 * 1e18),  # price
+            token,
+            coins,
             {'from': alice})
     token.set_minter(swap, {"from": alice})
 
@@ -98,8 +81,8 @@ def _crypto_swap(compiled_swap, token, alice):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def crypto_swap(compiled_swap, token, alice):
-    return _crypto_swap(compiled_swap, token, alice)
+def stable_swap():
+    return interface.StableSwap3Pool(BASE_SWAP)
 
 
 @pytest.fixture(scope="module")
