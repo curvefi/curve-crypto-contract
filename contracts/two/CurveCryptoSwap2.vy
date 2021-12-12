@@ -95,7 +95,7 @@ token: immutable(address)
 coins: immutable(address[N_COINS])
 
 price_scale: public(uint256)   # Internal price scale
-price_oracle: public(uint256)  # Price target given by MA
+_price_oracle: uint256  # Price target given by MA
 
 last_prices: public(uint256)
 last_prices_timestamp: public(uint256)
@@ -202,7 +202,7 @@ def __init__(
     self.admin_fee = admin_fee
 
     self.price_scale = initial_price
-    self.price_oracle = initial_price
+    self._price_oracle = initial_price
     self.last_prices = initial_price
     self.last_prices_timestamp = block.timestamp
     self.ma_half_time = ma_half_time
@@ -579,8 +579,30 @@ def _claim_admin_fees():
 
 
 @internal
+@view
+def internal_price_oracle() -> uint256:
+    price_oracle: uint256 = self._price_oracle
+    last_prices_timestamp: uint256 = self.last_prices_timestamp
+
+    if last_prices_timestamp < block.timestamp:
+        ma_half_time: uint256 = self.ma_half_time
+        last_prices: uint256 = self.last_prices
+        alpha: uint256 = self.halfpow((block.timestamp - last_prices_timestamp) * 10**18 / ma_half_time)
+        return (last_prices * (10**18 - alpha) + price_oracle * alpha) / 10**18
+
+    else:
+        return price_oracle
+
+
+@external
+@view
+def price_oracle() -> uint256:
+    return self.internal_price_oracle()
+
+
+@internal
 def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: uint256):
-    price_oracle: uint256 = self.price_oracle
+    price_oracle: uint256 = self._price_oracle
     last_prices: uint256 = self.last_prices
     price_scale: uint256 = self.price_scale
     last_prices_timestamp: uint256 = self.last_prices_timestamp
@@ -591,7 +613,7 @@ def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: 
         ma_half_time: uint256 = self.ma_half_time
         alpha: uint256 = self.halfpow((block.timestamp - last_prices_timestamp) * 10**18 / ma_half_time)
         price_oracle = (last_prices * (10**18 - alpha) + price_oracle * alpha) / 10**18
-        self.price_oracle = price_oracle
+        self._price_oracle = price_oracle
         self.last_prices_timestamp = block.timestamp
 
     D_unadjusted: uint256 = new_D  # Withdrawal methods know new D already
@@ -1257,3 +1279,36 @@ def unkill_me():
 def set_admin_fee_receiver(_admin_fee_receiver: address):
     assert msg.sender == self.owner  # dev: only owner
     self.admin_fee_receiver = _admin_fee_receiver
+
+
+@internal
+@pure
+def sqrt_int(x: uint256) -> uint256:
+    """
+    Originating from: https://github.com/vyperlang/vyper/issues/1266
+    """
+
+    if x == 0:
+        return 0
+
+    z: uint256 = (x + 10**18) / 2
+    y: uint256 = x
+
+    for i in range(256):
+        if z == y:
+            return y
+        y = z
+        z = (x * 10**18 / z + z) / 2
+
+    raise "Did not converge"
+
+
+@external
+@view
+def lp_price() -> uint256:
+    """
+    Approximate LP token price
+    """
+    max_price: uint256 = 2 * self.virtual_price * self.sqrt_int(self.internal_price_oracle()) / 10**18
+
+    return max_price
