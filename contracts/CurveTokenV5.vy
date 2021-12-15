@@ -12,6 +12,10 @@ from vyper.interfaces import ERC20
 implements: ERC20
 
 
+interface ERC1271:
+    def isValidSignature(_hash: bytes32, _signature: Bytes[65]) -> bytes32: view
+
+
 event Approval:
     _owner: indexed(address)
     _spender: indexed(address)
@@ -29,6 +33,9 @@ event SetMinter:
 
 EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
 PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+
+# keccak256("isValidSignature(bytes32,bytes)")[:4] << 224
+ERC1271_MAGIC_VAL: constant(bytes32) = 0x1626ba7e00000000000000000000000000000000000000000000000000000000
 VERSION: constant(String[8]) = "v5.0.0"
 
 
@@ -130,6 +137,8 @@ def permit(
     """
     @notice Approves spender by owner's signature to expend owner's tokens.
         See https://eips.ethereum.org/EIPS/eip-2612.
+    @dev Supports smart contract wallets which implement ERC1271
+        https://eips.ethereum.org/EIPS/eip-1271
     @param _owner The address which is a source of funds and has signed the Permit.
     @param _spender The address which is allowed to spend the funds.
     @param _value The amount of tokens to be spent.
@@ -151,7 +160,11 @@ def permit(
         )
     )
 
-    assert ecrecover(digest, convert(_v, uint256), convert(_r, uint256), convert(_s, uint256)) == _owner
+    if _owner.is_contract:
+        sig: Bytes[65] = concat(_abi_encode(_r, _s), slice(convert(_v, bytes32), 31, 1))
+        assert ERC1271(_owner).isValidSignature(digest, sig) == ERC1271_MAGIC_VAL
+    else:
+        assert ecrecover(digest, convert(_v, uint256), convert(_r, uint256), convert(_s, uint256)) == _owner
 
     self.allowance[_owner][_spender] = _value
     self.nonces[_owner] = nonce + 1
