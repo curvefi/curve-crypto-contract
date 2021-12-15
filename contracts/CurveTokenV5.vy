@@ -22,9 +22,14 @@ event Transfer:
     _to: indexed(address)
     _value: uint256
 
+event SetMinter:
+    _old_minter: address
+    _new_minter: address
 
-name: public(String[64])
-symbol: public(String[32])
+
+NAME: immutable(String[64])
+SYMBOL: immutable(String[32])
+
 
 balanceOf: public(HashMap[address, uint256])
 allowance: public(HashMap[address, HashMap[address, uint256]])
@@ -35,25 +40,18 @@ minter: public(address)
 
 @external
 def __init__(_name: String[64], _symbol: String[32]):
-    self.name = _name
-    self.symbol = _symbol
+    NAME = _name
+    SYMBOL = _symbol
+
     self.minter = msg.sender
+    log SetMinter(ZERO_ADDRESS, msg.sender)
+
+    # fire a transfer event so block explorers identify the contract as an ERC20
     log Transfer(ZERO_ADDRESS, msg.sender, 0)
 
 
-@view
 @external
-def decimals() -> uint256:
-    """
-    @notice Get the number of decimals for this token
-    @dev Implemented as a view method to reduce gas costs
-    @return uint256 decimal places
-    """
-    return 18
-
-
-@external
-def transfer(_to : address, _value : uint256) -> bool:
+def transfer(_to: address, _value: uint256) -> bool:
     """
     @dev Transfer token for a specified address
     @param _to The address to transfer to.
@@ -69,7 +67,7 @@ def transfer(_to : address, _value : uint256) -> bool:
 
 
 @external
-def transferFrom(_from : address, _to : address, _value : uint256) -> bool:
+def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
     """
      @dev Transfer tokens from one address to another.
      @param _from address The address which you want to send tokens from
@@ -88,7 +86,7 @@ def transferFrom(_from : address, _to : address, _value : uint256) -> bool:
 
 
 @external
-def approve(_spender : address, _value : uint256) -> bool:
+def approve(_spender: address, _value: uint256) -> bool:
     """
     @notice Approve the passed address to transfer the specified amount of
             tokens on behalf of msg.sender
@@ -194,5 +192,41 @@ def burnFrom(_to: address, _value: uint256) -> bool:
 
 @external
 def set_minter(_minter: address):
+    """
+    @notice Set the address allowed to mint tokens
+    @dev Emits the `SetMinter` event
+    @param _minter The address to set as the minter
+    """
     assert msg.sender == self.minter
+
+    log SetMinter(msg.sender, _minter)
     self.minter = _minter
+
+
+@view
+@external
+def name() -> String[64]:
+    """
+    @notice Get the name for this token
+    """
+    return NAME
+
+
+@view
+@external
+def symbol() -> String[32]:
+    """
+    @notice Get the symbol for this token
+    """
+    return SYMBOL
+
+
+@view
+@external
+def decimals() -> uint8:
+    """
+    @notice Get the number of decimals for this token
+    @dev Implemented as a view method to reduce gas costs
+    @return uint8 decimal places
+    """
+    return 18
