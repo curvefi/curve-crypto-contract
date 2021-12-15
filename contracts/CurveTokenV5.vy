@@ -27,8 +27,15 @@ event SetMinter:
     _new_minter: address
 
 
+EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+VERSION: constant(String[8]) = "v5.0.0"
+
+
 NAME: immutable(String[64])
 SYMBOL: immutable(String[32])
+
+DOMAIN_SEPARATOR: immutable(bytes32)
 
 
 balanceOf: public(HashMap[address, uint256])
@@ -36,12 +43,17 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 totalSupply: public(uint256)
 
 minter: public(address)
+nonces: public(HashMap[address, uint256])
 
 
 @external
 def __init__(_name: String[64], _symbol: String[32]):
     NAME = _name
     SYMBOL = _symbol
+
+    DOMAIN_SEPARATOR = keccak256(
+        _abi_encode(EIP712_TYPEHASH, keccak256(_name), keccak256(VERSION), chain.id, self)
+    )
 
     self.minter = msg.sender
     log SetMinter(ZERO_ADDRESS, msg.sender)
@@ -102,6 +114,49 @@ def approve(_spender: address, _value: uint256) -> bool:
     self.allowance[msg.sender][_spender] = _value
 
     log Approval(msg.sender, _spender, _value)
+    return True
+
+
+@external
+def permit(
+    _owner: address,
+    _spender: address,
+    _value: uint256,
+    _deadline: uint256,
+    _v: uint8,
+    _r: bytes32,
+    _s: bytes32
+) -> bool:
+    """
+    @notice Approves spender by owner's signature to expend owner's tokens.
+        See https://eips.ethereum.org/EIPS/eip-2612.
+    @param _owner The address which is a source of funds and has signed the Permit.
+    @param _spender The address which is allowed to spend the funds.
+    @param _value The amount of tokens to be spent.
+    @param _deadline The timestamp after which the Permit is no longer valid.
+    @param _v The bytes[64] of the valid secp256k1 signature of permit by owner
+    @param _r The bytes[0:32] of the valid secp256k1 signature of permit by owner
+    @param _s The bytes[32:64] of the valid secp256k1 signature of permit by owner
+    @return True, if transaction completes successfully
+    """
+    assert _owner != ZERO_ADDRESS
+    assert block.timestamp <= _deadline
+
+    nonce: uint256 = self.nonces[_owner]
+    digest: bytes32 = keccak256(
+        concat(
+            b"\x19\x01",
+            DOMAIN_SEPARATOR,
+            keccak256(_abi_encode(PERMIT_TYPEHASH, _owner, _spender, _value, nonce, _deadline))
+        )
+    )
+
+    assert ecrecover(digest, convert(_v, uint256), convert(_r, uint256), convert(_s, uint256)) == _owner
+
+    self.allowance[_owner][_spender] = _value
+    self.nonces[_owner] = nonce + 1
+
+    log Approval(_owner, _spender, _value)
     return True
 
 
@@ -230,3 +285,21 @@ def decimals() -> uint8:
     @return uint8 decimal places
     """
     return 18
+
+
+@view
+@external
+def DOMAIN_SEPARATOR() -> bytes32:
+    """
+    @notice Get the domain separator for this contract
+    """
+    return DOMAIN_SEPARATOR
+
+
+@view
+@external
+def version() -> String[8]:
+    """
+    @notice Get the version of this token contract
+    """
+    return VERSION
