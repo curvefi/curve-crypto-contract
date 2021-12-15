@@ -1,4 +1,10 @@
+reports:
+  exclude_paths:
+    - contracts/testing/*.*
+  only_include_project: false
+
 networks:
-    development:
-        cmd_settings:
-            chain_id: 1337
+  development:
+    cmd_settings:
+      default_balance: 1000000
+      chain_id: 1337
