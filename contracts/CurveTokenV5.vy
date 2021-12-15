@@ -1,4 +1,4 @@
-# @version 0.3.0
+# @version 0.3.1
 """
 @title Curve LP Token
 @author Curve.Fi
@@ -7,32 +7,20 @@
 @dev Follows the ERC-20 token standard as defined at
      https://eips.ethereum.org/EIPS/eip-20
 """
-
 from vyper.interfaces import ERC20
 
 implements: ERC20
 
-interface Curve:
-    def owner() -> address: view
-
-
-event Transfer:
-    _from: indexed(address)
-    _to: indexed(address)
-    _value: uint256
 
 event Approval:
     _owner: indexed(address)
     _spender: indexed(address)
     _value: uint256
 
-event SetName:
-    old_name: String[64]
-    old_symbol: String[32]
-    name: String[64]
-    symbol: String[32]
-    owner: address
-    time: uint256
+event Transfer:
+    _from: indexed(address)
+    _to: indexed(address)
+    _value: uint256
 
 
 name: public(String[64])
@@ -208,14 +196,3 @@ def burnFrom(_to: address, _value: uint256) -> bool:
 def set_minter(_minter: address):
     assert msg.sender == self.minter
     self.minter = _minter
-
-
-@external
-def set_name(_name: String[64], _symbol: String[32]):
-    assert Curve(self.minter).owner() == msg.sender
-    old_name: String[64] = self.name
-    old_symbol: String[32] = self.symbol
-    self.name = _name
-    self.symbol = _symbol
-
-    log SetName(old_name, old_symbol, _name, _symbol, msg.sender, block.timestamp)
