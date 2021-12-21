@@ -1309,6 +1309,4 @@ def lp_price() -> uint256:
     """
     Approximate LP token price
     """
-    max_price: uint256 = 2 * self.virtual_price * self.sqrt_int(self.internal_price_oracle()) / 10**18
-
-    return max_price
+    return 2 * self.virtual_price * self.sqrt_int(self.internal_price_oracle()) / 10**18
