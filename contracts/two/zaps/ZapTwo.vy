@@ -15,6 +15,7 @@ interface CurveCryptoSwap:
     def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256) -> uint256: nonpayable
     def price_oracle() -> uint256: view
     def price_scale() -> uint256: view
+    def lp_price() -> uint256: view
 
 interface StableSwap:
     def coins(i: uint256) -> address: view
@@ -130,6 +131,15 @@ def price_scale() -> uint256:
     usd_tkn: uint256 = CurveCryptoSwap(POOL).price_scale()
     vprice: uint256 = StableSwap(BASE_POOL).get_virtual_price()
     return vprice * 10**18 / usd_tkn
+
+
+@external
+@view
+def lp_price() -> uint256:
+    p: uint256 = CurveCryptoSwap(POOL).lp_price()  # price in tkn
+    usd_tkn: uint256 = CurveCryptoSwap(POOL).price_oracle()
+    vprice: uint256 = StableSwap(BASE_POOL).get_virtual_price()
+    return p * vprice / usd_tkn
 
 
 @external
