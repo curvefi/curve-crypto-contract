@@ -147,3 +147,19 @@ def isValidSignature(_hash: bytes32, _sig: Bytes[65]) -> bytes32:
     # make sure this is hit when owner is a contract
     assert tx.subcalls[0]["function"] == "isValidSignature(bytes32,bytes)"
 
+def test_domain_separator_change(alice, token):
+    src = """
+owner: public(address)
+
+@external
+def __init__():
+    self.owner = msg.sender
+    """
+    mock_minter = brownie.compile_source(src, vyper_version="0.3.1").Vyper.deploy({"from": alice})
+    token.set_minter(mock_minter, {"from": alice})
+
+    domain_separator = token.DOMAIN_SEPARATOR()
+    token.set_name("New Name", "NN", {"from": alice})
+
+    # should update
+    assert token.DOMAIN_SEPARATOR() != domain_separator
