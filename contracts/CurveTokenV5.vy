@@ -51,9 +51,7 @@ VERSION: constant(String[8]) = "v5.0.0"
 
 name: public(String[64])
 symbol: public(String[32])
-
-DOMAIN_SEPARATOR: immutable(bytes32)
-
+DOMAIN_SEPARATOR: public(bytes32)
 
 balanceOf: public(HashMap[address, uint256])
 allowance: public(HashMap[address, HashMap[address, uint256]])
@@ -68,7 +66,8 @@ def __init__(_name: String[64], _symbol: String[32]):
     self.name = _name
     self.symbol = _symbol
 
-    DOMAIN_SEPARATOR = keccak256(
+    # set as storage variable in the event that `name` ever changes
+    self.DOMAIN_SEPARATOR = keccak256(
         _abi_encode(EIP712_TYPEHASH, keccak256(_name), keccak256(VERSION), chain.id, self)
     )
 
@@ -166,13 +165,14 @@ def permit(
     digest: bytes32 = keccak256(
         concat(
             b"\x19\x01",
-            DOMAIN_SEPARATOR,
+            self.DOMAIN_SEPARATOR,
             keccak256(_abi_encode(PERMIT_TYPEHASH, _owner, _spender, _value, nonce, _deadline))
         )
     )
 
     if _owner.is_contract:
         sig: Bytes[65] = concat(_abi_encode(_r, _s), slice(convert(_v, bytes32), 31, 1))
+        # reentrancy not a concern since this is a staticcall
         assert ERC1271(_owner).isValidSignature(digest, sig) == ERC1271_MAGIC_VAL
     else:
         assert ecrecover(digest, convert(_v, uint256), convert(_r, uint256), convert(_s, uint256)) == _owner
@@ -295,15 +295,6 @@ def decimals() -> uint8:
 
 @view
 @external
-def DOMAIN_SEPARATOR() -> bytes32:
-    """
-    @notice Get the domain separator for this contract
-    """
-    return DOMAIN_SEPARATOR
-
-
-@view
-@external
 def version() -> String[8]:
     """
     @notice Get the version of this token contract
@@ -313,10 +304,20 @@ def version() -> String[8]:
 
 @external
 def set_name(_name: String[64], _symbol: String[32]):
+    """
+    @notice Set the token name and symbol
+    @dev Only callable by the owner of the Minter contract
+    """
     assert Curve(self.minter).owner() == msg.sender
-    old_name: String[64] = self.name
-    old_symbol: String[32] = self.symbol
+
+    # avoid writing to memory, save a few gas
+    log SetName(self.name, self.symbol, _name, _symbol, msg.sender, block.timestamp)
+
     self.name = _name
     self.symbol = _symbol
 
-    log SetName(old_name, old_symbol, _name, _symbol, msg.sender, block.timestamp)
+    # update domain separator
+    self.DOMAIN_SEPARATOR = keccak256(
+        _abi_encode(EIP712_TYPEHASH, keccak256(_name), keccak256(VERSION), chain.id, self)
+    )
+
