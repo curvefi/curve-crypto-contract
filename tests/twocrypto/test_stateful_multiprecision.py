@@ -20,8 +20,8 @@ def coins_mp(ERC20Mock, accounts):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def token_mp(CurveTokenV4, accounts):
-    yield CurveTokenV4.deploy("Curve USD-EUR", "crvUSDEUR", {"from": accounts[0]})
+def token_mp(CurveTokenV5, accounts):
+    yield CurveTokenV5.deploy("Curve USD-EUR", "crvUSDEUR", {"from": accounts[0]})
 
 
 @pytest.fixture(scope="module", autouse=True)
