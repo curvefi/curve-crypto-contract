@@ -1,6 +1,5 @@
 import pytest
 from brownie_tokens import MintableForkToken
-from brownie import compile_source
 
 VYPER_VERSION = "0.3.1"  # Forced version, use None when brownie supports the new version
 
@@ -81,14 +80,8 @@ def crypto_swap(CurveCryptoSwap2, token, coins, alice):
 
 
 @pytest.fixture(scope="module")
-def crypto_zap(alice, ZapTwoEthEurt, crypto_swap, token):
-    path = ZapTwoEthEurt._sources.get_source_path('ZapTwoEthEurt')
-    with open(path, 'r') as f:
-        source = f.read()
-        source = source.replace("0x0000000000000000000000000000000000000001", token.address)
-        source = source.replace("0x0000000000000000000000000000000000000000", crypto_swap.address)
-    compiled = compile_source(source, vyper_version=VYPER_VERSION).Vyper
-    return compiled.deploy({'from': alice})
+def crypto_zap(alice, ZapTwo, crypto_swap):
+    return ZapTwo.deploy(crypto_swap, BASE_SWAP, {'from': alice})
 
 
 @pytest.fixture(scope="module", autouse=True)
