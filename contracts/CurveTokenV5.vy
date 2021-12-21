@@ -11,6 +11,8 @@ from vyper.interfaces import ERC20
 
 implements: ERC20
 
+interface Curve:
+    def owner() -> address: view
 
 interface ERC1271:
     def isValidSignature(_hash: bytes32, _signature: Bytes[65]) -> bytes32: view
@@ -26,6 +28,14 @@ event Transfer:
     _to: indexed(address)
     _value: uint256
 
+event SetName:
+    old_name: String[64]
+    old_symbol: String[32]
+    name: String[64]
+    symbol: String[32]
+    owner: address
+    time: uint256
+
 event SetMinter:
     _old_minter: address
     _new_minter: address
@@ -39,8 +49,8 @@ ERC1271_MAGIC_VAL: constant(bytes32) = 0x1626ba7e0000000000000000000000000000000
 VERSION: constant(String[8]) = "v5.0.0"
 
 
-NAME: immutable(String[64])
-SYMBOL: immutable(String[32])
+name: public(String[64])
+symbol: public(String[32])
 
 DOMAIN_SEPARATOR: immutable(bytes32)
 
@@ -55,8 +65,8 @@ nonces: public(HashMap[address, uint256])
 
 @external
 def __init__(_name: String[64], _symbol: String[32]):
-    NAME = _name
-    SYMBOL = _symbol
+    self.name = _name
+    self.symbol = _symbol
 
     DOMAIN_SEPARATOR = keccak256(
         _abi_encode(EIP712_TYPEHASH, keccak256(_name), keccak256(VERSION), chain.id, self)
@@ -274,24 +284,6 @@ def set_minter(_minter: address):
 
 @view
 @external
-def name() -> String[64]:
-    """
-    @notice Get the name for this token
-    """
-    return NAME
-
-
-@view
-@external
-def symbol() -> String[32]:
-    """
-    @notice Get the symbol for this token
-    """
-    return SYMBOL
-
-
-@view
-@external
 def decimals() -> uint8:
     """
     @notice Get the number of decimals for this token
@@ -317,3 +309,14 @@ def version() -> String[8]:
     @notice Get the version of this token contract
     """
     return VERSION
+
+
+@external
+def set_name(_name: String[64], _symbol: String[32]):
+    assert Curve(self.minter).owner() == msg.sender
+    old_name: String[64] = self.name
+    old_symbol: String[32] = self.symbol
+    self.name = _name
+    self.symbol = _symbol
+
+    log SetName(old_name, old_symbol, _name, _symbol, msg.sender, block.timestamp)
