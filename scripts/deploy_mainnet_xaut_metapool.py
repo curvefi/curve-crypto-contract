@@ -23,8 +23,8 @@ def main():
     virtual_price = interface.StableSwap3Pool(STABLESWAP).get_virtual_price()
     p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether-gold&vs_currencies=usd").json()
     INITIAL_PRICE = int(virtual_price / p['tether-gold']['usd'])
-    txparams = {"from": accounts[0]}
-    # txparams = {"from": accounts[0], 'required_confs': 5, 'priority_fee': '2 gwei'}
+    # txparams = {"from": accounts[0]}
+    txparams = {"from": accounts[0], 'required_confs': 5, 'priority_fee': '2 gwei'}
     print('Gold price:', 1e18 / INITIAL_PRICE, '3crv')
 
     token = CurveTokenV5.deploy("Curve XAUT-3Crv", "crvXAUTUSD", txparams)
