@@ -712,9 +712,9 @@ def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: 
         self._claim_admin_fees()
 
 
-@external
-@nonreentrant('lock')
-def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256) -> uint256:
+@internal
+def _exchange(sender: address, i: uint256, j: uint256, dx: uint256, min_dy: uint256,
+              receiver: address, callbacker: address, callback_sig: Bytes[4]) -> uint256:
     assert not self.is_killed  # dev: the pool is killed
     assert i != j  # dev: coin index out of range
     assert i < N_COINS  # dev: coin index out of range
@@ -727,7 +727,22 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256) -> uint256:
     dy: uint256 = 0
 
     _coins: address[N_COINS] = coins
-    assert ERC20(_coins[i]).transferFrom(msg.sender, self, dx)
+
+    if callback_sig == b"\x00\x00\x00\x00":
+        assert ERC20(_coins[i]).transferFrom(sender, self, dx)
+    else:
+        c: address = _coins[i]
+        b: uint256 = ERC20(c).balanceOf(self)
+        raw_call(callbacker,
+                 concat(
+                    callback_sig,
+                    convert(sender, bytes32),
+                    convert(receiver, bytes32),
+                    convert(c, bytes32),
+                    convert(dx, bytes32)
+                 )
+        )
+        assert ERC20(c).balanceOf(self) - b == dx  # dev: callback didn't give us coins
 
     y: uint256 = xp[j]
     x0: uint256 = xp[i]
@@ -771,7 +786,7 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256) -> uint256:
     y -= dy
 
     self.balances[j] = y
-    assert ERC20(_coins[j]).transfer(msg.sender, dy)
+    assert ERC20(_coins[j]).transfer(receiver, dy)
 
     y *= prec_j
     if j > 0:
@@ -789,9 +804,27 @@ def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256) -> uint256:
 
     self.tweak_price(A_gamma, xp, p, 0)
 
-    log TokenExchange(msg.sender, i, dx, j, dy)
+    log TokenExchange(sender, i, dx, j, dy)
 
     return dy
+
+
+@external
+@nonreentrant('lock')
+def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
+             receiver: address = msg.sender) -> uint256:
+    """
+    Exchange using WETH by default
+    """
+    return self._exchange(msg.sender, i, j, dx, min_dy, receiver, ZERO_ADDRESS, b'\x00\x00\x00\x00')
+
+
+@external
+@nonreentrant('lock')
+def exchange_extended(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
+                      sender: address, receiver: address, cb: Bytes[4]) -> uint256:
+    assert cb != b'\x00\x00\x00\x00'  # dev: No callback specified
+    return self._exchange(sender, i, j, dx, min_dy, receiver, msg.sender, cb)
 
 
 @external
@@ -844,8 +877,9 @@ def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
 
 @external
 @nonreentrant('lock')
-def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256) -> uint256:
+def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, receiver: address = msg.sender) -> uint256:
     assert not self.is_killed  # dev: the pool is killed
+    assert amounts[0] > 0 or amounts[1] > 0  # dev: no coins to add
 
     A_gamma: uint256[2] = self._A_gamma()
 
@@ -897,7 +931,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256) -> uint25
         d_token_fee = self._calc_token_fee(amountsp, xp) * d_token / 10**10 + 1
         d_token -= d_token_fee
         token_supply += d_token
-        CurveToken(token).mint(msg.sender, d_token)
+        CurveToken(token).mint(receiver, d_token)
 
         # Calculate price
         # p_i * (dx_i - dtoken / token_supply * xx_i) = sum{k!=i}(p_k * (dtoken / token_supply * xx_k - dx_k))
@@ -926,18 +960,18 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256) -> uint25
         self.D = D
         self.virtual_price = 10**18
         self.xcp_profit = 10**18
-        CurveToken(token).mint(msg.sender, d_token)
+        CurveToken(token).mint(receiver, d_token)
 
     assert d_token >= min_mint_amount, "Slippage"
 
-    log AddLiquidity(msg.sender, amounts, d_token_fee, token_supply)
+    log AddLiquidity(receiver, amounts, d_token_fee, token_supply)
 
     return d_token
 
 
 @external
 @nonreentrant('lock')
-def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
+def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS], receiver: address = msg.sender):
     """
     This withdrawal method is very safe, does no complex math
     """
@@ -952,7 +986,7 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
         assert d_balance >= min_amounts[i]
         self.balances[i] = balances[i] - d_balance
         balances[i] = d_balance  # now it's the amounts going out
-        assert ERC20(_coins[i]).transfer(msg.sender, d_balance)
+        assert ERC20(_coins[i]).transfer(receiver, d_balance)
 
     D: uint256 = self.D
     self.D = D - D * amount / total_supply
@@ -1039,7 +1073,7 @@ def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
 
 @external
 @nonreentrant('lock')
-def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256) -> uint256:
+def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256, receiver: address = msg.sender) -> uint256:
     assert not self.is_killed  # dev: the pool is killed
 
     A_gamma: uint256[2] = self._A_gamma()
@@ -1059,7 +1093,7 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
     CurveToken(token).burnFrom(msg.sender, token_amount)
 
     _coins: address[N_COINS] = coins
-    assert ERC20(_coins[i]).transfer(msg.sender, dy)
+    assert ERC20(_coins[i]).transfer(receiver, dy)
 
     self.tweak_price(A_gamma, xp, p, D)
 

@@ -728,7 +728,8 @@ def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: 
 
 
 @internal
-def _exchange(sender: address, mvalue: uint256, i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool) -> uint256:
+def _exchange(sender: address, mvalue: uint256, i: uint256, j: uint256, dx: uint256, min_dy: uint256,
+              use_eth: bool, receiver: address, callbacker: address, callback_sig: Bytes[4]) -> uint256:
     assert not self.is_killed  # dev: the pool is killed
     assert i != j  # dev: coin index out of range
     assert i < N_COINS  # dev: coin index out of range
@@ -745,7 +746,21 @@ def _exchange(sender: address, mvalue: uint256, i: uint256, j: uint256, dx: uint
         assert mvalue == dx  # dev: incorrect eth amount
     else:
         assert mvalue == 0  # dev: nonzero eth amount
-        assert ERC20(_coins[i]).transferFrom(sender, self, dx)
+        if callback_sig == b"\x00\x00\x00\x00":
+            assert ERC20(_coins[i]).transferFrom(sender, self, dx)
+        else:
+            c: address = _coins[i]
+            b: uint256 = ERC20(c).balanceOf(self)
+            raw_call(callbacker,
+                     concat(
+                        callback_sig,
+                        convert(sender, bytes32),
+                        convert(receiver, bytes32),
+                        convert(c, bytes32),
+                        convert(dx, bytes32)
+                     )
+            )
+            assert ERC20(c).balanceOf(self) - b == dx  # dev: callback didn't give us coins
         if i == ETH_INDEX:
             WETH(_coins[i]).withdraw(dx)
 
@@ -792,11 +807,11 @@ def _exchange(sender: address, mvalue: uint256, i: uint256, j: uint256, dx: uint
 
     self.balances[j] = y
     if use_eth and j == ETH_INDEX:
-        raw_call(sender, b"", value=dy)
+        raw_call(receiver, b"", value=dy)
     else:
         if j == ETH_INDEX:
             WETH(_coins[j]).deposit(value=dy)
-        assert ERC20(_coins[j]).transfer(sender, dy)
+        assert ERC20(_coins[j]).transfer(receiver, dy)
 
     y *= prec_j
     if j > 0:
@@ -822,21 +837,32 @@ def _exchange(sender: address, mvalue: uint256, i: uint256, j: uint256, dx: uint
 @payable
 @external
 @nonreentrant('lock')
-def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256, use_eth: bool = False) -> uint256:
+def exchange(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
+             use_eth: bool = False, receiver: address = msg.sender) -> uint256:
     """
     Exchange using WETH by default
     """
-    return self._exchange(msg.sender, msg.value, i, j, dx, min_dy, use_eth)
+    return self._exchange(msg.sender, msg.value, i, j, dx, min_dy, use_eth, receiver, ZERO_ADDRESS, b'\x00\x00\x00\x00')
 
 
 @payable
 @external
 @nonreentrant('lock')
-def exchange_underlying(i: uint256, j: uint256, dx: uint256, min_dy: uint256) -> uint256:
+def exchange_underlying(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
+                        receiver: address = msg.sender) -> uint256:
     """
     Exchange using ETH
     """
-    return self._exchange(msg.sender, msg.value, i, j, dx, min_dy, True)
+    return self._exchange(msg.sender, msg.value, i, j, dx, min_dy, True, receiver, ZERO_ADDRESS, b'\x00\x00\x00\x00')
+
+
+@payable
+@external
+@nonreentrant('lock')
+def exchange_extended(i: uint256, j: uint256, dx: uint256, min_dy: uint256,
+                      use_eth: bool, sender: address, receiver: address, cb: Bytes[4]) -> uint256:
+    assert cb != b'\x00\x00\x00\x00'  # dev: No callback specified
+    return self._exchange(sender, msg.value, i, j, dx, min_dy, use_eth, receiver, msg.sender, cb)
 
 
 @external
@@ -890,7 +916,8 @@ def _calc_token_fee(amounts: uint256[N_COINS], xp: uint256[N_COINS]) -> uint256:
 @payable
 @external
 @nonreentrant('lock')
-def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, use_eth: bool = False) -> uint256:
+def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256,
+                  use_eth: bool = False, receiver: address = msg.sender) -> uint256:
     assert not self.is_killed  # dev: the pool is killed
     assert amounts[0] > 0 or amounts[1] > 0  # dev: no coins to add
 
@@ -924,10 +951,11 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, use_eth: 
         if use_eth and i == ETH_INDEX:
             assert msg.value == amounts[i]  # dev: incorrect eth amount
         if amounts[i] > 0:
+            coin: address = _coins[i]
             if (not use_eth) or (i != ETH_INDEX):
-                assert ERC20(_coins[i]).transferFrom(msg.sender, self, amounts[i])
+                assert ERC20(coin).transferFrom(msg.sender, self, amounts[i])
                 if i == ETH_INDEX:
-                    WETH(_coins[i]).withdraw(amounts[i])
+                    WETH(coin).withdraw(amounts[i])
             amountsp[i] = xp[i] - xp_old[i]
 
     t: uint256 = self.future_A_gamma_time
@@ -951,7 +979,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, use_eth: 
         d_token_fee = self._calc_token_fee(amountsp, xp) * d_token / 10**10 + 1
         d_token -= d_token_fee
         token_supply += d_token
-        CurveToken(token).mint(msg.sender, d_token)
+        CurveToken(token).mint(receiver, d_token)
 
         # Calculate price
         # p_i * (dx_i - dtoken / token_supply * xx_i) = sum{k!=i}(p_k * (dtoken / token_supply * xx_k - dx_k))
@@ -980,18 +1008,19 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, use_eth: 
         self.D = D
         self.virtual_price = 10**18
         self.xcp_profit = 10**18
-        CurveToken(token).mint(msg.sender, d_token)
+        CurveToken(token).mint(receiver, d_token)
 
     assert d_token >= min_mint_amount, "Slippage"
 
-    log AddLiquidity(msg.sender, amounts, d_token_fee, token_supply)
+    log AddLiquidity(receiver, amounts, d_token_fee, token_supply)
 
     return d_token
 
 
 @external
 @nonreentrant('lock')
-def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS], use_eth: bool = False):
+def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS],
+                     use_eth: bool = False, receiver: address = msg.sender):
     """
     This withdrawal method is very safe, does no complex math
     """
@@ -1007,11 +1036,12 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS], use_eth: b
         self.balances[i] = balances[i] - d_balance
         balances[i] = d_balance  # now it's the amounts going out
         if use_eth and i == ETH_INDEX:
-            raw_call(msg.sender, b"", value=d_balance)
+            raw_call(receiver, b"", value=d_balance)
         else:
+            coin: address = _coins[i]
             if i == ETH_INDEX:
                 WETH(_coins[i]).deposit(value=d_balance)
-            assert ERC20(_coins[i]).transfer(msg.sender, d_balance)
+            assert ERC20(_coins[i]).transfer(receiver, d_balance)
 
     D: uint256 = self.D
     self.D = D - D * amount / total_supply
@@ -1098,7 +1128,8 @@ def calc_withdraw_one_coin(token_amount: uint256, i: uint256) -> uint256:
 
 @external
 @nonreentrant('lock')
-def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256, use_eth: bool = False) -> uint256:
+def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256,
+                              use_eth: bool = False, receiver: address = msg.sender) -> uint256:
     assert not self.is_killed  # dev: the pool is killed
 
     A_gamma: uint256[2] = self._A_gamma()
@@ -1119,11 +1150,12 @@ def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uin
 
     _coins: address[N_COINS] = coins
     if use_eth and i == ETH_INDEX:
-        raw_call(msg.sender, b"", value=dy)
+        raw_call(receiver, b"", value=dy)
     else:
+        coin: address = _coins[i]
         if i == ETH_INDEX:
-            WETH(_coins[i]).deposit(value=dy)
-        assert ERC20(_coins[i]).transfer(msg.sender, dy)
+            WETH(coin).deposit(value=dy)
+        assert ERC20(coin).transfer(receiver, dy)
 
     self.tweak_price(A_gamma, xp, p, D)
 
