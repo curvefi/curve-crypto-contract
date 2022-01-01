@@ -728,22 +728,6 @@ def _exchange(sender: address, i: uint256, j: uint256, dx: uint256, min_dy: uint
 
     _coins: address[N_COINS] = coins
 
-    if callback_sig == b"\x00\x00\x00\x00":
-        assert ERC20(_coins[i]).transferFrom(sender, self, dx)
-    else:
-        c: address = _coins[i]
-        b: uint256 = ERC20(c).balanceOf(self)
-        raw_call(callbacker,
-                 concat(
-                    callback_sig,
-                    convert(sender, bytes32),
-                    convert(receiver, bytes32),
-                    convert(c, bytes32),
-                    convert(dx, bytes32)
-                 )
-        )
-        assert ERC20(c).balanceOf(self) - b == dx  # dev: callback didn't give us coins
-
     y: uint256 = xp[j]
     x0: uint256 = xp[i]
     xp[i] = x0 + dx
@@ -786,6 +770,25 @@ def _exchange(sender: address, i: uint256, j: uint256, dx: uint256, min_dy: uint
     y -= dy
 
     self.balances[j] = y
+
+    # Transfer input and output at the same time
+    if callback_sig == b"\x00\x00\x00\x00":
+        assert ERC20(_coins[i]).transferFrom(sender, self, dx)
+    else:
+        c: address = _coins[i]
+        b: uint256 = ERC20(c).balanceOf(self)
+        raw_call(callbacker,
+                 concat(
+                    callback_sig,
+                    convert(sender, bytes32),
+                    convert(receiver, bytes32),
+                    convert(c, bytes32),
+                    convert(dx, bytes32),
+                    convert(dy, bytes32)
+                 )
+        )
+        assert ERC20(c).balanceOf(self) - b == dx  # dev: callback didn't give us coins
+
     assert ERC20(_coins[j]).transfer(receiver, dy)
 
     y *= prec_j

@@ -742,27 +742,6 @@ def _exchange(sender: address, mvalue: uint256, i: uint256, j: uint256, dx: uint
     dy: uint256 = 0
 
     _coins: address[N_COINS] = coins
-    if use_eth and i == ETH_INDEX:
-        assert mvalue == dx  # dev: incorrect eth amount
-    else:
-        assert mvalue == 0  # dev: nonzero eth amount
-        if callback_sig == b"\x00\x00\x00\x00":
-            assert ERC20(_coins[i]).transferFrom(sender, self, dx)
-        else:
-            c: address = _coins[i]
-            b: uint256 = ERC20(c).balanceOf(self)
-            raw_call(callbacker,
-                     concat(
-                        callback_sig,
-                        convert(sender, bytes32),
-                        convert(receiver, bytes32),
-                        convert(c, bytes32),
-                        convert(dx, bytes32)
-                     )
-            )
-            assert ERC20(c).balanceOf(self) - b == dx  # dev: callback didn't give us coins
-        if i == ETH_INDEX:
-            WETH(_coins[i]).withdraw(dx)
 
     y: uint256 = xp[j]
     x0: uint256 = xp[i]
@@ -806,6 +785,31 @@ def _exchange(sender: address, mvalue: uint256, i: uint256, j: uint256, dx: uint
     y -= dy
 
     self.balances[j] = y
+
+    # Do transfers in and out together
+    if use_eth and i == ETH_INDEX:
+        assert mvalue == dx  # dev: incorrect eth amount
+    else:
+        assert mvalue == 0  # dev: nonzero eth amount
+        if callback_sig == b"\x00\x00\x00\x00":
+            assert ERC20(_coins[i]).transferFrom(sender, self, dx)
+        else:
+            c: address = _coins[i]
+            b: uint256 = ERC20(c).balanceOf(self)
+            raw_call(callbacker,
+                     concat(
+                        callback_sig,
+                        convert(sender, bytes32),
+                        convert(receiver, bytes32),
+                        convert(c, bytes32),
+                        convert(dx, bytes32),
+                        convert(dy, bytes32)
+                     )
+            )
+            assert ERC20(c).balanceOf(self) - b == dx  # dev: callback didn't give us coins
+        if i == ETH_INDEX:
+            WETH(_coins[i]).withdraw(dx)
+
     if use_eth and j == ETH_INDEX:
         raw_call(receiver, b"", value=dy)
     else:
