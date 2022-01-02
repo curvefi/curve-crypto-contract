@@ -25,7 +25,7 @@ def main():
     txparams = {"from": accounts[0]}
     if network.show_active() == 'mainnet':
         txparams.update({'required_confs': 5, 'priority_fee': '2 gwei'})
-    print('CVX price:', INITIAL_PRICE / 1e18, 'ETH')
+    print('T price:', INITIAL_PRICE / 1e18, 'ETH')
 
     token = CurveTokenV5.deploy("Curve T-ETH", "crvTETH", txparams)
 
