@@ -21,7 +21,7 @@ def main():
     p_nu = p_nu['nucypher']['eth'] * 1e18
     p_keep = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=keep-network&vs_currencies=eth").json()
     p_keep = p_keep['keep-network']['eth'] * 1e18
-    INITIAL_PRICE = int((p_nu * p_keep) ** 0.5)  # Geometric mean
+    INITIAL_PRICE = int((p_nu/3.26 * p_keep/4.78) ** 0.5)  # Geometric mean
     txparams = {"from": accounts[0]}
     if network.show_active() == 'mainnet':
         txparams.update({'required_confs': 5, 'priority_fee': '2 gwei'})
