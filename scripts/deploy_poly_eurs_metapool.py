@@ -23,7 +23,7 @@ def main():
     virtual_price = interface.StableSwap2Pool(SWAP).get_virtual_price()
     p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=stasis-eurs&vs_currencies=usd").json()
     INITIAL_PRICE = int(virtual_price / p['stasis-eurs']['usd'])
-    if network.show_active() == 'polygon':
+    if network.show_active() == 'polygon-main':
         txparams = {"from": accounts[-1], 'required_confs': 20, 'gasPrice': '30 gwei'}
     else:
         txparams = {"from": accounts[-1]}
