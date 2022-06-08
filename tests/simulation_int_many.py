@@ -17,7 +17,7 @@ def geometric_mean(x):
         diff = abs(D - D_prev)
         if diff <= 1 or diff * 10**18 < D:
             return D
-    print(x)
+    # print(x)
     raise ValueError("Did not converge")
 
 
@@ -106,8 +106,8 @@ def newton_y(A, gamma, x, D, i):
         # y -= f / f_prime;  y = (y * fprime - f) / fprime
         y = (yfprime + 10**18 * D - 10**18 * S) // fprime + mul1 // fprime * (10**18 - K0) // K0
 
-        if j > 100:  # Just logging when doesn't converge
-            print(j, y, D, x)
+        # if j > 100:  # Just logging when doesn't converge
+        #     print(j, y, D, x)
         if y < 0 or fprime < 0:
             y = y_prev // 2
         if abs(y - y_prev) <= max(convergence_limit, y // 10**14):

@@ -162,18 +162,19 @@ class TestCurve(unittest.TestCase):
         try:
             out_amount = curve.y(in_amount, i, j)
             D1 = curve.D()
-        except ValueError:
+        except Exception:
             return  # Convergence checked separately - we deliberately try unsafe numbers
         is_safe = all(f >= MIN_XD and f <= MAX_XD for f in [xx * 10**18 // D1 for xx in curve.x])
         curve.x[i] = in_amount
+        Dd = curve.D()
         curve.x[j] = out_amount
         try:
             D2 = curve.D()
-        except ValueError:
+        except Exception:
             return  # Convergence checked separately - we deliberately try unsafe numbers
         is_safe &= all(f >= MIN_XD and f <= MAX_XD for f in [xx * 10**18 // D2 for xx in curve.x])
         if is_safe:
-            assert 2 * (D1 - D2) / (D1 + D2) < MIN_FEE  # Only loss is prevented - gain is ok
+            assert 2 * (D1 - D2) / (D1 + D2) < max(MIN_FEE * abs(Dd - D2) / D2, 10 / D2)  # Only loss is prevented - gain is ok
 
     @given(
            A=st.integers(MIN_A, MAX_A),
