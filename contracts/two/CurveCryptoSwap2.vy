@@ -419,7 +419,9 @@ def halfpow(power: uint256) -> uint256:
     if intpow > 59:
         return 0
     otherpow: uint256 = unsafe_sub(power, unsafe_mul(intpow, 10**18))  # < 10**18
-    result: uint256 = unsafe_div(10**18, pow_mod256(2, intpow))
+    # result: uint256 = unsafe_div(10**18, pow_mod256(2, intpow))
+    result: uint256 = pow_mod256(2, intpow)
+    result = unsafe_div(10**18, result)
     if otherpow == 0:
         return result
 
@@ -561,13 +563,13 @@ def _claim_admin_fees():
     vprice: uint256 = self.virtual_price
 
     if xcp_profit > xcp_profit_a:
-        fees: uint256 = (xcp_profit - xcp_profit_a) * self.admin_fee / (2 * 10**10)
+        fees: uint256 = unsafe_div((xcp_profit - xcp_profit_a) * self.admin_fee, 2 * 10**10)
         if fees > 0:
             receiver: address = self.admin_fee_receiver
             if receiver != ZERO_ADDRESS:
                 frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
                 claimed: uint256 = CurveToken(token).mint_relative(receiver, frac)
-                xcp_profit -= fees*2
+                xcp_profit -= unsafe_mul(fees, 2)
                 self.xcp_profit = xcp_profit
                 log ClaimAdminFee(receiver, claimed)
 
@@ -592,8 +594,8 @@ def internal_price_oracle() -> uint256:
     if last_prices_timestamp < block.timestamp:
         ma_half_time: uint256 = self.ma_half_time
         last_prices: uint256 = self.last_prices
-        alpha: uint256 = self.halfpow((block.timestamp - last_prices_timestamp) * 10**18 / ma_half_time)
-        return (last_prices * (10**18 - alpha) + price_oracle * alpha) / 10**18
+        alpha: uint256 = self.halfpow(unsafe_div(unsafe_mul(block.timestamp - last_prices_timestamp, 10**18), ma_half_time))
+        return unsafe_div(last_prices * (10**18 - alpha) + price_oracle * alpha, 10**18)
 
     else:
         return price_oracle
@@ -616,8 +618,8 @@ def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: 
     if last_prices_timestamp < block.timestamp:
         # MA update required
         ma_half_time: uint256 = self.ma_half_time
-        alpha: uint256 = self.halfpow((block.timestamp - last_prices_timestamp) * 10**18 / ma_half_time)
-        price_oracle = (last_prices * (10**18 - alpha) + price_oracle * alpha) / 10**18
+        alpha: uint256 = self.halfpow(unsafe_div(unsafe_mul(block.timestamp - last_prices_timestamp, 10**18), ma_half_time))
+        price_oracle = unsafe_div(last_prices * (10**18 - alpha) + price_oracle * alpha, 10**18)
         self._price_oracle = price_oracle
         self.last_prices_timestamp = block.timestamp
 
@@ -632,7 +634,7 @@ def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: 
     else:
         # calculate real prices
         __xp: uint256[N_COINS] = _xp
-        dx_price: uint256 = __xp[0] / 10**6
+        dx_price: uint256 = unsafe_div(__xp[0], 10**6)
         __xp[0] += dx_price
         last_prices = price_scale * dx_price / (_xp[1] - self.newton_y(A_gamma[0], A_gamma[1], __xp, D_unadjusted, 1))
 
@@ -643,7 +645,7 @@ def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: 
     old_virtual_price: uint256 = self.virtual_price
 
     # Update profit numbers without price adjustment first
-    xp: uint256[N_COINS] = [D_unadjusted / N_COINS, D_unadjusted * PRECISION / (N_COINS * price_scale)]
+    xp: uint256[N_COINS] = [unsafe_div(D_unadjusted, N_COINS), D_unadjusted * PRECISION / (N_COINS * price_scale)]
     xcp_profit: uint256 = 10**18
     virtual_price: uint256 = 10**18
 
@@ -662,28 +664,28 @@ def tweak_price(A_gamma: uint256[2],_xp: uint256[N_COINS], p_i: uint256, new_D: 
 
     norm: uint256 = price_oracle * 10**18 / price_scale
     if norm > 10**18:
-        norm -= 10**18
+        norm = unsafe_sub(norm, 10**18)
     else:
-        norm = 10**18 - norm
-    adjustment_step: uint256 = max(self.adjustment_step, norm / 10)
+        norm = unsafe_sub(10**18, norm)
+    adjustment_step: uint256 = max(self.adjustment_step, unsafe_div(norm, 10))
 
     needs_adjustment: bool = self.not_adjusted
     # if not needs_adjustment and (virtual_price-10**18 > (xcp_profit-10**18)/2 + self.allowed_extra_profit):
     # (re-arrange for gas efficiency)
-    if not needs_adjustment and (virtual_price * 2 - 10**18 > xcp_profit + 2*self.allowed_extra_profit) and (norm > adjustment_step) and (old_virtual_price > 0):
+    if not needs_adjustment and (virtual_price * 2 - 10**18 > xcp_profit + unsafe_mul(self.allowed_extra_profit, 2)) and (norm > adjustment_step) and (old_virtual_price > 0):
         needs_adjustment = True
         self.not_adjusted = True
 
     if needs_adjustment:
         if norm > adjustment_step and old_virtual_price > 0:
-            p_new = (price_scale * (norm - adjustment_step) + adjustment_step * price_oracle) / norm
+            p_new = unsafe_div(price_scale * (norm - adjustment_step) + adjustment_step * price_oracle, norm)
 
             # Calculate balances*prices
             xp = [_xp[0], _xp[1] * p_new / price_scale]
 
             # Calculate "extended constant product" invariant xCP and virtual price
             D: uint256 = self.newton_D(A_gamma[0], A_gamma[1], xp)
-            xp = [D / N_COINS, D * PRECISION / (N_COINS * p_new)]
+            xp = [unsafe_div(D, N_COINS), D * PRECISION / (N_COINS * p_new)]
             # We reuse old_virtual_price here but it's not old anymore
             old_virtual_price = 10**18 * self.geometric_mean(xp, True) / total_supply
 
