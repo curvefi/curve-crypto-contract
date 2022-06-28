@@ -1,4 +1,4 @@
-# @version 0.3.1
+# @version 0.3.3
 # */3crv pool where 3crv is _second_, not first
 
 from vyper.interfaces import ERC20
@@ -28,7 +28,7 @@ interface StableSwap:
     def get_virtual_price() -> uint256: view
 
 
-N_COINS: constant(int128) = 2
+N_COINS: constant(uint256) = 2
 N_STABLECOINS: constant(int128) = 3
 N_UL_COINS: constant(int128) = N_COINS + N_STABLECOINS - 1
 
