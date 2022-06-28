@@ -238,11 +238,11 @@ def geometric_mean(unsorted_x: uint256[N_COINS], sort: bool) -> uint256:
         #     tmp = tmp * _x / D
         # D = D * ((N_COINS - 1) * 10**18 + tmp) / (N_COINS * 10**18)
         # line below makes it for 2 coins
-        D = (D + x[0] * x[1] / D) / N_COINS
+        D = unsafe_div(D + x[0] * x[1] / D, N_COINS)
         if D > D_prev:
-            diff = D - D_prev
+            diff = unsafe_sub(D, D_prev)
         else:
-            diff = D_prev - D
+            diff = unsafe_sub(D_prev, D)
         if diff <= 1 or diff * 10**18 < D:
             return D
     raise "Did not converge"
@@ -272,48 +272,51 @@ def newton_D(ANN: uint256, gamma: uint256, x_unsorted: uint256[N_COINS]) -> uint
 
     D: uint256 = N_COINS * self.geometric_mean(x, False)
     S: uint256 = x[0] + x[1]
+    __g1k0: uint256 = gamma + 10**18
 
     for i in range(255):
         D_prev: uint256 = D
+        assert D > 0
+        # Unsafe ivision by D is now safe
 
         # K0: uint256 = 10**18
         # for _x in x:
         #     K0 = K0 * _x * N_COINS / D
         # collapsed for 2 coins
-        K0: uint256 = (10**18 * N_COINS**2) * x[0] / D * x[1] / D
+        K0: uint256 = unsafe_div(unsafe_div((10**18 * N_COINS**2) * x[0], D) * x[1], D)
 
-        _g1k0: uint256 = gamma + 10**18
+        _g1k0: uint256 = __g1k0
         if _g1k0 > K0:
-            _g1k0 = _g1k0 - K0 + 1
+            _g1k0 = unsafe_sub(_g1k0, K0) + 1  # > 0
         else:
-            _g1k0 = K0 - _g1k0 + 1
+            _g1k0 = unsafe_sub(K0, _g1k0) + 1  # > 0
 
         # D / (A * N**N) * _g1k0**2 / gamma**2
-        mul1: uint256 = 10**18 * D / gamma * _g1k0 / gamma * _g1k0 * A_MULTIPLIER / ANN
+        mul1: uint256 = unsafe_div(unsafe_div(unsafe_div(10**18 * D, gamma) * _g1k0, gamma) * _g1k0 * A_MULTIPLIER, ANN)
 
         # 2*N*K0 / _g1k0
-        mul2: uint256 = (2 * 10**18) * N_COINS * K0 / _g1k0
+        mul2: uint256 = unsafe_div(((2 * 10**18) * N_COINS) * K0, _g1k0)
 
-        neg_fprime: uint256 = (S + S * mul2 / 10**18) + mul1 * N_COINS / K0 - mul2 * D / 10**18
+        neg_fprime: uint256 = (S + unsafe_div(S * mul2, 10**18)) + mul1 * N_COINS / K0 - unsafe_div(mul2 * D, 10**18)
 
         # D -= f / fprime
         D_plus: uint256 = D * (neg_fprime + S) / neg_fprime
         D_minus: uint256 = D*D / neg_fprime
         if 10**18 > K0:
-            D_minus += D * (mul1 / neg_fprime) / 10**18 * (10**18 - K0) / K0
+            D_minus += unsafe_div(D * (mul1 / neg_fprime), 10**18) * unsafe_sub(10**18, K0) / K0
         else:
-            D_minus -= D * (mul1 / neg_fprime) / 10**18 * (K0 - 10**18) / K0
+            D_minus -= unsafe_div(D * (mul1 / neg_fprime), 10**18) * unsafe_sub(K0, 10**18) / K0
 
         if D_plus > D_minus:
-            D = D_plus - D_minus
+            D = unsafe_sub(D_plus, D_minus)
         else:
-            D = (D_minus - D_plus) / 2
+            D = unsafe_div(unsafe_sub(D_minus, D_plus), 2)
 
         diff: uint256 = 0
         if D > D_prev:
-            diff = D - D_prev
+            diff = unsafe_sub(D, D_prev)
         else:
-            diff = D_prev - D
+            diff = unsafe_sub(D_prev, D)
         if diff * 10**14 < max(10**16, D):  # Could reduce precision for gas efficiency here
             # Test that we are safe with the next newton_y
             for _x in x:
@@ -351,31 +354,33 @@ def newton_y(ANN: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: u
 
     convergence_limit: uint256 = max(max(x_j / 10**14, D / 10**14), 100)
 
+    __g1k0: uint256 = gamma + 10**18
+
     for j in range(255):
         y_prev: uint256 = y
 
-        K0: uint256 = K0_i * y * N_COINS / D
+        K0: uint256 = unsafe_div(K0_i * y * N_COINS, D)
         S: uint256 = x_j + y
 
-        _g1k0: uint256 = gamma + 10**18
+        _g1k0: uint256 = __g1k0
         if _g1k0 > K0:
-            _g1k0 = _g1k0 - K0 + 1
+            _g1k0 = unsafe_sub(_g1k0, K0) + 1
         else:
-            _g1k0 = K0 - _g1k0 + 1
+            _g1k0 = unsafe_sub(K0, _g1k0) + 1
 
         # D / (A * N**N) * _g1k0**2 / gamma**2
-        mul1: uint256 = 10**18 * D / gamma * _g1k0 / gamma * _g1k0 * A_MULTIPLIER / ANN
+        mul1: uint256 = unsafe_div(unsafe_div(unsafe_div(10**18 * D, gamma) * _g1k0, gamma) * _g1k0 * A_MULTIPLIER, ANN)
 
         # 2*K0 / _g1k0
-        mul2: uint256 = 10**18 + (2 * 10**18) * K0 / _g1k0
+        mul2: uint256 = unsafe_div(10**18 + (2 * 10**18) * K0, _g1k0)
 
         yfprime: uint256 = 10**18 * y + S * mul2 + mul1
         _dyfprime: uint256 = D * mul2
         if yfprime < _dyfprime:
-            y = y_prev / 2
+            y = unsafe_div(y_prev, 2)
             continue
         else:
-            yfprime -= _dyfprime
+            yfprime = unsafe_sub(yfprime, _dyfprime)
         fprime: uint256 = yfprime / y
 
         # y -= f / f_prime;  y = (y * fprime - f) / fprime
@@ -385,17 +390,17 @@ def newton_y(ANN: uint256, gamma: uint256, x: uint256[N_COINS], D: uint256, i: u
         y_minus += 10**18 * S / fprime
 
         if y_plus < y_minus:
-            y = y_prev / 2
+            y = unsafe_div(y_prev, 2)
         else:
-            y = y_plus - y_minus
+            y = unsafe_sub(y_plus, y_minus)
 
         diff: uint256 = 0
         if y > y_prev:
-            diff = y - y_prev
+            diff = unsafe_sub(y, y_prev)
         else:
-            diff = y_prev - y
-        if diff < max(convergence_limit, y / 10**14):
-            frac: uint256 = y * 10**18 / D
+            diff = unsafe_sub(y_prev, y)
+        if diff < max(convergence_limit, unsafe_div(y, 10**14)):
+            frac: uint256 = unsafe_div(y * 10**18, D)
             assert (frac > 10**16 - 1) and (frac < 10**20 + 1)  # dev: unsafe value for y
             return y
 
@@ -410,34 +415,34 @@ def halfpow(power: uint256) -> uint256:
 
     Inspired by: https://github.com/balancer-labs/balancer-core/blob/master/contracts/BNum.sol#L128
     """
-    intpow: uint256 = power / 10**18
-    otherpow: uint256 = power - intpow * 10**18
+    intpow: uint256 = unsafe_div(power, 10**18)
     if intpow > 59:
         return 0
-    result: uint256 = 10**18 / (2**intpow)
+    otherpow: uint256 = unsafe_sub(power, unsafe_mul(intpow, 10**18))  # < 10**18
+    result: uint256 = unsafe_div(10**18, pow_mod256(2, intpow))
     if otherpow == 0:
         return result
 
     term: uint256 = 10**18
-    x: uint256 = 5 * 10**17
     S: uint256 = 10**18
     neg: bool = False
 
     for i in range(1, 256):
-        K: uint256 = i * 10**18
-        c: uint256 = K - 10**18
-        if otherpow > c:
-            c = otherpow - c
+        K: uint256 = unsafe_mul(i, 10**18)  # <= 255 * 10**18; >= 10**18
+        c: uint256 = unsafe_sub(K, 10**18)  # <= 254 * 10**18; < K
+        if otherpow > c:  # c < otherpow < 10**18 <= K -> c < K
+            c = unsafe_sub(otherpow, c)
             neg = not neg
         else:
-            c -= otherpow
-        term = term * (c * x / 10**18) / K
+            c = unsafe_sub(c, otherpow)  # c < K
+        # c <= 254 * 10**18, < K -> (c/2) / K < 1 -> term * c/2 / K <= 10**18
+        term = unsafe_div(unsafe_mul(term, unsafe_div(c, 2)), K)
         if neg:
             S -= term
         else:
             S += term
         if term < EXP_PRECISION:
-            return result * S / 10**18
+            return unsafe_div(result * S, 10**18)
 
     raise "Did not converge"
 ### end of Math functions
@@ -460,7 +465,7 @@ def coins(i: uint256) -> address:
 @view
 def xp() -> uint256[N_COINS]:
     return [self.balances[0] * PRECISIONS[0],
-            self.balances[1] * PRECISIONS[1] * self.price_scale / PRECISION]
+            unsafe_div(self.balances[1] * PRECISIONS[1] * self.price_scale, PRECISION)]
 
 
 @view
@@ -516,10 +521,10 @@ def _fee(xp: uint256[N_COINS]) -> uint256:
     """
     fee_gamma: uint256 = self.fee_gamma
     f: uint256 = xp[0] + xp[1]  # sum
-    f = fee_gamma * 10**18 / (
-        fee_gamma + 10**18 - (10**18 * N_COINS**N_COINS) * xp[0] / f * xp[1] / f
+    f = unsafe_mul(fee_gamma, 10**18) / (
+        unsafe_add(fee_gamma, 10**18) - unsafe_div((10**18 * N_COINS**N_COINS) * xp[0] / f * xp[1], f)
     )
-    return (self.mid_fee * f + self.out_fee * (10**18 - f)) / 10**18
+    return unsafe_div(self.mid_fee * f + self.out_fee * (10**18 - f), 10**18)
 
 
 @external
@@ -531,7 +536,7 @@ def fee() -> uint256:
 @internal
 @view
 def get_xcp(D: uint256) -> uint256:
-    x: uint256[N_COINS] = [D / N_COINS, D * PRECISION / (self.price_scale * N_COINS)]
+    x: uint256[N_COINS] = [unsafe_div(D, N_COINS), D * PRECISION / (self.price_scale * N_COINS)]
     return self.geometric_mean(x, True)
 
 
