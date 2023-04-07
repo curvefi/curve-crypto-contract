@@ -153,7 +153,6 @@ kill_deadline: public(uint256)
 transfer_ownership_deadline: public(uint256)
 admin_actions_deadline: public(uint256)
 
-reward_receiver: public(address)
 admin_fee_receiver: public(address)
 
 KILL_DEADLINE_DT: constant(uint256) = 2 * 30 * 86400
@@ -185,10 +184,6 @@ PRECISIONS: constant(uint256[N_COINS]) = [
 ]
 
 INF_COINS: constant(uint256) = 15
-
-# Avalanche extras. Not needed on Ethereum! XXX
-AVA_REWARDS: constant(address) = 0x01D83Fe6A10D2f2B7AF17034343746188272cAc9
-WAVAX: constant(address) = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7
 
 
 @external
@@ -419,25 +414,6 @@ def _claim_admin_fees():
     if xcp_profit > xcp_profit_a:
         self.xcp_profit_a = xcp_profit
 
-    # push wAVAX rewards into the reward receiver
-    receiver: address = self.reward_receiver
-    if receiver != empty(address):
-        response: Bytes[32] = raw_call(
-            AVA_REWARDS,
-            concat(
-                method_id("claimRewards(address[],uint256,address)"),
-                convert(32 * 3, bytes32),
-                convert(max_value(uint256), bytes32),
-                convert(self, bytes32),
-                convert(2, bytes32),
-                convert(coins[1], bytes32),
-                convert(coins[2], bytes32),
-            ),
-            max_outsize=32
-        )
-        # can do if amount > 0, but here we try to save space rather than anything else
-        # assert might be needed for some tokens - removed one to save bytespace
-        ERC20(WAVAX).transfer(receiver, convert(response, uint256))
 
 
 @internal
@@ -1167,12 +1143,6 @@ def kill_me():
 def unkill_me():
     assert msg.sender == self.owner  # dev: only owner
     self.is_killed = False
-
-
-@external
-def set_reward_receiver(_reward_receiver: address):
-    assert msg.sender == self.owner  # dev: only owner
-    self.reward_receiver = _reward_receiver
 
 
 @external
