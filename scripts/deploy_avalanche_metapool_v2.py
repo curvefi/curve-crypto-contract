@@ -4,9 +4,9 @@ from brownie import (
     CurveCryptoMath3,
     CurveTokenV4,
     CurveCryptoViews3,
-    CurveCryptoSwapAvalanche,
+    CurveCryptoSwapAvalancheV2,
     ERC20Mock,
-    ZapAaveAvalanche,
+    ZapAvalanche,
     compile_source,
 )
 from brownie import interface
@@ -14,24 +14,23 @@ import json
 
 # Addresses are taken for Avalanche
 COINS = [
-    "0x1337BedC9D22ecbe766dF105c9623922A27963EC",  # av3Crv
-    "0x686bef2417b6dc32c50a3cbfbcc3bb60e1e9a15d",  # avWBTC
-    "0x53f7c5869a859f0aec3d334ee8b4cf01e3492f21"   # avWETH
+    "0x0974D9d3bc463Fa17497aAFc3a87535553298FbE",  # 2CRV
+    "0x152b9d0FdC40C096757F570A51E494bd4b943E50",  # BTC.b
+    "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7"   # wAVAX
 ]
-SWAP = "0x7f90122BF0700F9E7e1F688fe926940E8839F353"
+SWAP = "0x0974D9d3bc463Fa17497aAFc3a87535553298FbE"
 FEE_RECEIVER = "0x0000000000000000000000000000000000000000"
-AVA_RECEIVER = "0x0000000000000000000000000000000000000000"
 
 
 def main():
-    accounts.load('babe')
+    accounts.load('dev')
 
-    p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd").json()
-    INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin', 'ethereum']]
+    p = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin-avalanche-bridged-btc-b,avalanche-2&vs_currencies=usd").json()
+    INITIAL_PRICES = [int(p[cur]['usd'] * 1e18) for cur in ['bitcoin-avalanche-bridged-btc-b', 'avalanche-2']]
     txparams = {"from": accounts[0], 'required_confs': 5}
 
     crypto_math = CurveCryptoMath3.deploy(txparams)
-    token = CurveTokenV4.deploy("Curve USD-BTC-ETH", "crvUSDBTCETH", txparams)
+    token = CurveTokenV4.deploy("Curve USD-BTC-AVAX", "crvUSDBTCAVAX", txparams)
 
     if COINS:
         coins = [interface.ERC20(addr) for addr in COINS]
@@ -39,7 +38,7 @@ def main():
         INITIAL_PRICES = [p * 10**18 // vprice for p in INITIAL_PRICES]
     else:
         coins = [
-            ERC20Mock.deploy(name, name, 18, txparams) for name in ["USD", "BTC", "ETH"]
+            ERC20Mock.deploy(name, name, 18, txparams) for name in ["USD", "BTC", "AVAX"]
         ]
 
     source = CurveCryptoViews3._build["source"]
@@ -48,10 +47,10 @@ def main():
     source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
     with open("CryptoViews.vy", "w") as f:
         f.write(source)
-    deployer = compile_source(source, vyper_version="0.2.15").Vyper
+    deployer = compile_source(source, vyper_version="0.3.7").Vyper
     crypto_views = deployer.deploy(crypto_math, txparams)
 
-    source = CurveCryptoSwapAvalanche._build["source"]
+    source = CurveCryptoSwapAvalancheV2._build["source"]
     source = source.replace("0x0000000000000000000000000000000000000000", crypto_math.address)
     source = source.replace("0x0000000000000000000000000000000000000001", token.address)
     source = source.replace("0x0000000000000000000000000000000000000002", crypto_views.address)
@@ -63,7 +62,7 @@ def main():
     source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
     with open("CryptoSwap.vy", "w") as f:
         f.write(source)
-    deployer = compile_source(source, vyper_version="0.2.15").Vyper
+    deployer = compile_source(source, vyper_version="0.3.7").Vyper
 
     swap = deployer.deploy(
         accounts[0],
@@ -81,9 +80,8 @@ def main():
         txparams,
     )
     token.set_minter(swap, txparams)
-    swap.set_reward_receiver(AVA_RECEIVER, txparams)
 
-    zap = ZapAaveAvalanche.deploy(swap.address, SWAP, txparams)
+    zap = ZapAvalanche.deploy(swap.address, SWAP, txparams)
 
     print("Math address:", crypto_math.address)
     print("Views address:", crypto_views.address)
