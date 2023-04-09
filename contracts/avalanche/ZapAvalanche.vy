@@ -42,7 +42,7 @@ def __init__(_pool: address, _base_pool: address):
     self.token = CurveCryptoSwap(_pool).token()
 
     for i in range(N_STABLECOINS):
-        coin: address = StableSwap(_base_pool).underlying_coins(i)
+        coin: address = StableSwap(_base_pool).coins(i)
         self.underlying_coins[i] = coin
         # approve transfer of underlying coin to base pool
         response: Bytes[32] = raw_call(
@@ -72,23 +72,6 @@ def __init__(_pool: address, _base_pool: address):
         )
         if len(response) != 0:
             assert convert(response, bool)
-
-        if i != 0:
-            # coins >= 1 are aTokens, we must get the underlying asset address
-            # and approve transfer into the aave lending pool
-            coin = aToken(coin).UNDERLYING_ASSET_ADDRESS()
-            self.underlying_coins[i+(N_STABLECOINS-1)] = coin
-            response = raw_call(
-                coin,
-                concat(
-                    method_id("approve(address,uint256)"),
-                    convert(AAVE_LENDING_POOL, bytes32),
-                    convert(MAX_UINT256, bytes32)
-                ),
-                max_outsize=32
-            )
-            if len(response) != 0:
-                assert convert(response, bool)
 
 
 @external
