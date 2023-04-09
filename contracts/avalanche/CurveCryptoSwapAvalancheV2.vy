@@ -547,6 +547,7 @@ def tweak_price(A_gamma: uint256[2],
 
         if norm > adjustment_step ** 2 and old_virtual_price > 0:
             norm = Math(math).sqrt_int(norm / 10**18)  # Need to convert to 1e18 units!
+            adjustment_step = max(adjustment_step, norm / 10)
 
             for k in range(N_COINS-1):
                 p_new[k] = (price_scale[k] * (norm - adjustment_step) + adjustment_step * price_oracle[k]) / norm
