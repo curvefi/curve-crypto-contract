@@ -159,18 +159,7 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
         base_deposit_amounts[i] = dx
         dx = StableSwap(self.base_pool).add_liquidity(base_deposit_amounts, 0, True)
     else:
-        # if `i` is an aToken, deposit to the aave lending pool
         base_i = i - (N_STABLECOINS - 1)
-        raw_call(
-            AAVE_LENDING_POOL,
-            concat(
-                method_id("deposit(address,uint256,address,uint16)"),
-                convert(self.underlying_coins[i], bytes32),
-                convert(dx, bytes32),
-                convert(self, bytes32),
-                convert(self.aave_referral, bytes32),
-            )
-        )
 
     # perform the exchange
     if max(base_i, base_j) > 0:
@@ -194,7 +183,7 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
     else:
         # withdraw `j` underlying from lending pool and transfer to caller
         assert amount >= _min_dy
-        LendingPool(AAVE_LENDING_POOL).withdraw(self.underlying_coins[j], amount, _receiver)
+        ERC20(self.underlying_coins[j]).transfer(_receiver, amount)
 
 
 @external
