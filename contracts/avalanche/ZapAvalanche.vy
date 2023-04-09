@@ -14,28 +14,19 @@ interface CurveCryptoSwap:
     def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256): nonpayable
 
 interface StableSwap:
-    def underlying_coins(i: uint256) -> address: view
+    def coins(i: uint256) -> address: view
     def get_dy(i: int128, j: int128, dx: uint256) -> uint256: view
-    def calc_token_amount(amounts: uint256[N_COINS], is_deposit: bool) -> uint256: view
+    def calc_token_amount(amounts: uint256[N_STABLECOINS], is_deposit: bool) -> uint256: view
     def calc_withdraw_one_coin(token_amount: uint256, i: int128) -> uint256: view
-    def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256, use_underlying: bool) -> uint256: nonpayable
+    def add_liquidity(amounts: uint256[N_STABLECOINS], min_mint_amount: uint256, use_underlying: bool) -> uint256: nonpayable
     def remove_liquidity_one_coin(token_amount: uint256, i: int128, min_amount: uint256, use_underlying: bool) -> uint256: nonpayable
-    def remove_liquidity(amount: uint256, min_amounts: uint256[N_COINS], use_underlying: bool) -> uint256[N_COINS]: nonpayable
-
-
-interface LendingPool:
-    def withdraw(underlying_asset: address, amount: uint256, receiver: address): nonpayable
-
-interface aToken:
-    def UNDERLYING_ASSET_ADDRESS() -> address: view
+    def remove_liquidity(amount: uint256, min_amounts: uint256[N_STABLECOINS], use_underlying: bool) -> uint256[N_STABLECOINS]: nonpayable
 
 
 N_COINS: constant(uint256) = 3
-N_STABLECOINS: constant(uint256) = 3
+N_STABLECOINS: constant(uint256) = 2
 N_UL_COINS: constant(uint256) = N_COINS + N_STABLECOINS - 1
-AAVE_LENDING_POOL: constant(address) = 0x4F01AeD16D97E3aB5ab2B501154DC9bb0F1A5A2C
 
-aave_referral: uint256
 coins: public(address[N_COINS])
 underlying_coins: public(address[N_UL_COINS])
 
