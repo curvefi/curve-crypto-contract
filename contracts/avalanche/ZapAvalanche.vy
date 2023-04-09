@@ -104,8 +104,7 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
     if is_base_deposit:
         deposit_amounts[0] = StableSwap(self.base_pool).add_liquidity(base_deposit_amounts, 0, True)
 
-    # transfer remaining underlying coins and deposit into aave
-    aave_referral: bytes32 = convert(self.aave_referral, bytes32)
+    # transfer remaining underlying coins and deposit
     for i in range(N_STABLECOINS, N_UL_COINS):
         amount: uint256 = _amounts[i]
         if amount != 0:
@@ -124,17 +123,6 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
             if len(_response) != 0:
                 assert convert(_response, bool)
 
-            # deposit to aave lending pool
-            raw_call(
-                AAVE_LENDING_POOL,
-                concat(
-                    method_id("deposit(address,uint256,address,uint16)"),
-                    convert(coin, bytes32),
-                    convert(amount, bytes32),
-                    convert(self, bytes32),
-                    aave_referral,
-                )
-            )
             deposit_amounts[i-(N_STABLECOINS-1)] = amount
 
     CurveCryptoSwap(self.pool).add_liquidity(deposit_amounts, _min_mint_amount)
