@@ -14,7 +14,7 @@ interface CurveCryptoSwap:
     def remove_liquidity_one_coin(token_amount: uint256, i: uint256, min_amount: uint256): nonpayable
 
 interface StableSwap:
-    def underlying_coins(i: uint256) -> address: view
+    def coins(i: uint256) -> address: view
     def get_dy(i: int128, j: int128, dx: uint256) -> uint256: view
     def calc_token_amount(amounts: uint256[N_COINS], is_deposit: bool) -> uint256: view
     def calc_withdraw_one_coin(token_amount: uint256, i: int128) -> uint256: view
@@ -23,19 +23,10 @@ interface StableSwap:
     def remove_liquidity(amount: uint256, min_amounts: uint256[N_COINS], use_underlying: bool) -> uint256[N_COINS]: nonpayable
 
 
-interface LendingPool:
-    def withdraw(underlying_asset: address, amount: uint256, receiver: address): nonpayable
-
-interface aToken:
-    def UNDERLYING_ASSET_ADDRESS() -> address: view
-
-
 N_COINS: constant(int128) = 3
-N_STABLECOINS: constant(int128) = 3
+N_STABLECOINS: constant(int128) = 2
 N_UL_COINS: constant(int128) = N_COINS + N_STABLECOINS - 1
-AAVE_LENDING_POOL: constant(address) = 0x4F01AeD16D97E3aB5ab2B501154DC9bb0F1A5A2C
 
-aave_referral: uint256
 coins: public(address[N_COINS])
 underlying_coins: public(address[N_UL_COINS])
 
@@ -51,7 +42,7 @@ def __init__(_pool: address, _base_pool: address):
     self.token = CurveCryptoSwap(_pool).token()
 
     for i in range(N_STABLECOINS):
-        coin: address = StableSwap(_base_pool).underlying_coins(i)
+        coin: address = StableSwap(_base_pool).coins(i)
         self.underlying_coins[i] = coin
         # approve transfer of underlying coin to base pool
         response: Bytes[32] = raw_call(
@@ -81,23 +72,6 @@ def __init__(_pool: address, _base_pool: address):
         )
         if len(response) != 0:
             assert convert(response, bool)
-
-        if i != 0:
-            # coins >= 1 are aTokens, we must get the underlying asset address
-            # and approve transfer into the aave lending pool
-            coin = aToken(coin).UNDERLYING_ASSET_ADDRESS()
-            self.underlying_coins[i+(N_STABLECOINS-1)] = coin
-            response = raw_call(
-                coin,
-                concat(
-                    method_id("approve(address,uint256)"),
-                    convert(AAVE_LENDING_POOL, bytes32),
-                    convert(MAX_UINT256, bytes32)
-                ),
-                max_outsize=32
-            )
-            if len(response) != 0:
-                assert convert(response, bool)
 
 
 @external
