@@ -251,7 +251,7 @@ def __init__(
 @payable
 @external
 def __default__():
-    pass
+    assert len(msg.data) == 0
 
 
 @internal
