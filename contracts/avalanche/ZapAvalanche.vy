@@ -193,14 +193,14 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
 def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _receiver: address = msg.sender):
     # transfer LP token from caller and remove liquidity
     ERC20(self.token).transferFrom(msg.sender, self, _amount)
-    min_amounts: uint256[N_COINS] = [0, _min_amounts[3], _min_amounts[4]]
+    min_amounts: uint256[N_COINS] = [0, _min_amounts[2], _min_amounts[3]]
     CurveCryptoSwap(self.pool).remove_liquidity(_amount, min_amounts)
 
     # withdraw from base pool and transfer underlying assets to receiver
     value: uint256 = ERC20(self.coins[0]).balanceOf(self)
-    base_min_amounts: uint256[N_STABLECOINS] = [_min_amounts[0], _min_amounts[1], _min_amounts[2]]
+    base_min_amounts: uint256[N_STABLECOINS] = [_min_amounts[0], _min_amounts[1]]
     received: uint256[N_STABLECOINS] = StableSwap(self.base_pool).remove_liquidity(value, base_min_amounts, True)
-    for i in range(N_STABLECOINS):
+    for i in range(N_UL_COINS):
         response: Bytes[32] = raw_call(
             self.underlying_coins[i],
             concat(
@@ -212,11 +212,6 @@ def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _recei
         )
         if len(response) != 0:
             assert convert(response, bool)
-
-    # withdraw from aave lending pool and transfer to receiver
-    for i in range(N_STABLECOINS, N_UL_COINS):
-        value = ERC20(self.coins[i-(N_STABLECOINS-1)]).balanceOf(self)
-        LendingPool(AAVE_LENDING_POOL).withdraw(self.underlying_coins[i], value, _receiver)
 
 
 @external
