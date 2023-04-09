@@ -1,4 +1,4 @@
-# @version 0.2.15
+# @version 0.3.7
 
 from vyper.interfaces import ERC20
 
@@ -30,9 +30,9 @@ interface aToken:
     def UNDERLYING_ASSET_ADDRESS() -> address: view
 
 
-N_COINS: constant(int128) = 3
-N_STABLECOINS: constant(int128) = 3
-N_UL_COINS: constant(int128) = N_COINS + N_STABLECOINS - 1
+N_COINS: constant(uint256) = 3
+N_STABLECOINS: constant(uint256) = 3
+N_UL_COINS: constant(uint256) = N_COINS + N_STABLECOINS - 1
 AAVE_LENDING_POOL: constant(address) = 0x4F01AeD16D97E3aB5ab2B501154DC9bb0F1A5A2C
 
 aave_referral: uint256
