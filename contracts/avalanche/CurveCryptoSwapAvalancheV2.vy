@@ -388,6 +388,7 @@ def get_xcp(D: uint256) -> uint256:
     return Math(math).geometric_mean(x)
 
 
+@nonreentrant('lock')
 @external
 @view
 def get_virtual_price() -> uint256:
