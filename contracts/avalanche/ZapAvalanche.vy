@@ -74,7 +74,7 @@ def __init__(_pool: address, _base_pool: address):
             assert convert(response, bool)
         
         if i != 0:
-            self.underlying_coins[i + (N_STABLECOINS - 1)]
+            self.underlying_coins[i + (N_STABLECOINS - 1)] = coin
 
 
 @external
