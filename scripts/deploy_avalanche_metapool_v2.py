@@ -19,7 +19,7 @@ COINS = [
     "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7"   # wAVAX
 ]
 SWAP = "0x0974D9d3bc463Fa17497aAFc3a87535553298FbE"
-FEE_RECEIVER = "0x0000000000000000000000000000000000000000"
+FEE_RECEIVER = "0x06534b0BF7Ff378F162d4F348390BDA53b15fA35"
 
 
 def main():
@@ -47,7 +47,7 @@ def main():
     source = source.replace("1,#2", str(10 ** (18 - coins[2].decimals())) + ',')
     with open("CryptoViews.vy", "w") as f:
         f.write(source)
-    deployer = compile_source(source, vyper_version="0.3.7").Vyper
+    deployer = compile_source(source, vyper_version="0.3.1").Vyper
     crypto_views = deployer.deploy(crypto_math, txparams)
 
     source = CurveCryptoSwapAvalancheV2._build["source"]
@@ -65,7 +65,7 @@ def main():
     deployer = compile_source(source, vyper_version="0.3.7").Vyper
 
     swap = deployer.deploy(
-        accounts[0],
+        "0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # avax admin
         FEE_RECEIVER,
         int(6.32 * 3 ** 3 * 10000),  # A
         int(1.18e-5 * 1e18),  # gamma
