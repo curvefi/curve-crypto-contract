@@ -238,7 +238,7 @@ def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: u
             assert convert(response, bool)
     else:
         assert value >= _min_amount
-        LendingPool(AAVE_LENDING_POOL).withdraw(self.underlying_coins[i], value, _receiver)
+        ERC20(self.underlying_coins[i]).transfer(_receiver, value)
 
 
 @view
