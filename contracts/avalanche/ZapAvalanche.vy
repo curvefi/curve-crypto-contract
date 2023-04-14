@@ -50,7 +50,7 @@ def __init__(_pool: address, _base_pool: address):
             concat(
                 method_id("approve(address,uint256)"),
                 convert(_base_pool, bytes32),
-                convert(MAX_UINT256, bytes32)
+                convert(max_value(uint256), bytes32)
             ),
             max_outsize=32
         )
@@ -66,7 +66,7 @@ def __init__(_pool: address, _base_pool: address):
             concat(
                 method_id("approve(address,uint256)"),
                 convert(_pool, bytes32),
-                convert(MAX_UINT256, bytes32)
+                convert(max_value(uint256), bytes32)
             ),
             max_outsize=32
         )

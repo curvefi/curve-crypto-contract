@@ -413,7 +413,7 @@ def _claim_admin_fees():
         fees: uint256 = (xcp_profit - xcp_profit_a) * self.admin_fee / (2 * 10**10)
         if fees > 0:
             receiver: address = self.admin_fee_receiver
-            if receiver != ZERO_ADDRESS:
+            if receiver != empty(address):
                 frac: uint256 = vprice * 10**18 / (vprice - fees) - 10**18
                 claimed: uint256 = CurveToken(token).mint_relative(receiver, frac)
                 xcp_profit -= fees*2
