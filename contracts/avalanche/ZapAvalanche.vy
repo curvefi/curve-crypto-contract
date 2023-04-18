@@ -219,12 +219,8 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
             ERC20(self.underlying_coins[j]).transfer(_receiver, amount)
 
 
-@payable
 @external
 def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _receiver: address = msg.sender, use_eth: bool = False):
-    if not use_eth:
-        assert msg.value == 0
-    
     # transfer LP token from caller and remove liquidity
     ERC20(self.token).transferFrom(msg.sender, self, _amount)
     min_amounts: uint256[N_COINS] = [0, _min_amounts[2], _min_amounts[3]]
@@ -254,12 +250,8 @@ def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _recei
                 assert convert(response, bool)
     
 
-@payable
 @external
 def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: uint256, _receiver: address = msg.sender, use_eth: bool = False):
-    if not use_eth:
-        assert msg.value == 0
-
     ERC20(self.token).transferFrom(msg.sender, self, _token_amount)
     base_i: uint256 = 0
     if i >= N_STABLECOINS:
