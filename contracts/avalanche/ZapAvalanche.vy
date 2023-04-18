@@ -78,6 +78,12 @@ def __init__(_pool: address, _base_pool: address):
 
 
 @external
+@payable
+def __default__():
+    assert len(msg.data) == 0
+
+
+@external
 def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _receiver: address = msg.sender, use_eth: bool = False):
     base_deposit_amounts: uint256[N_STABLECOINS] = empty(uint256[N_STABLECOINS])
     deposit_amounts: uint256[N_COINS] = empty(uint256[N_COINS])
