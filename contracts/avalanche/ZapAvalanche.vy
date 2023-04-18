@@ -18,9 +18,9 @@ interface StableSwap:
     def get_dy(i: int128, j: int128, dx: uint256) -> uint256: view
     def calc_token_amount(amounts: uint256[N_STABLECOINS], is_deposit: bool) -> uint256: view
     def calc_withdraw_one_coin(token_amount: uint256, i: int128) -> uint256: view
-    def add_liquidity(amounts: uint256[N_STABLECOINS], min_mint_amount: uint256, use_underlying: bool) -> uint256: nonpayable
-    def remove_liquidity_one_coin(token_amount: uint256, i: int128, min_amount: uint256, use_underlying: bool) -> uint256: nonpayable
-    def remove_liquidity(amount: uint256, min_amounts: uint256[N_STABLECOINS], use_underlying: bool) -> uint256[N_STABLECOINS]: nonpayable
+    def add_liquidity(amounts: uint256[N_STABLECOINS], min_mint_amount: uint256) -> uint256: nonpayable
+    def remove_liquidity_one_coin(token_amount: uint256, i: int128, min_amount: uint256) -> uint256: nonpayable
+    def remove_liquidity(amount: uint256, min_amounts: uint256[N_STABLECOINS]) -> uint256[N_STABLECOINS]: nonpayable
 
 
 N_COINS: constant(uint256) = 3
@@ -111,7 +111,7 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
             is_base_deposit = True
 
     if is_base_deposit:
-        deposit_amounts[0] = StableSwap(self.base_pool).add_liquidity(base_deposit_amounts, 0, True)
+        deposit_amounts[0] = StableSwap(self.base_pool).add_liquidity(base_deposit_amounts, 0)
 
     # transfer remaining underlying coins and deposit
     for i in range(N_STABLECOINS, N_UL_COINS):
@@ -166,7 +166,7 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
         # if `i` is in the base pool, deposit to get LP tokens
         base_deposit_amounts: uint256[N_STABLECOINS] = empty(uint256[N_STABLECOINS])
         base_deposit_amounts[i] = dx
-        dx = StableSwap(self.base_pool).add_liquidity(base_deposit_amounts, 0, True)
+        dx = StableSwap(self.base_pool).add_liquidity(base_deposit_amounts, 0)
     else:
         base_i = i - (N_STABLECOINS - 1)
 
@@ -177,7 +177,7 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
 
     if base_j == 0:
         # if `j` is in the base pool, withdraw the desired underlying asset and transfer to caller
-        amount = StableSwap(self.base_pool).remove_liquidity_one_coin(amount, convert(j, int128), _min_dy, True)
+        amount = StableSwap(self.base_pool).remove_liquidity_one_coin(amount, convert(j, int128), _min_dy)
         response = raw_call(
             self.underlying_coins[j],
             concat(
@@ -205,7 +205,7 @@ def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _recei
     # withdraw from base pool and transfer underlying assets to receiver
     value: uint256 = ERC20(self.coins[0]).balanceOf(self)
     base_min_amounts: uint256[N_STABLECOINS] = [_min_amounts[0], _min_amounts[1]]
-    received: uint256[N_STABLECOINS] = StableSwap(self.base_pool).remove_liquidity(value, base_min_amounts, True)
+    received: uint256[N_STABLECOINS] = StableSwap(self.base_pool).remove_liquidity(value, base_min_amounts)
     for i in range(N_UL_COINS):
         response: Bytes[32] = raw_call(
             self.underlying_coins[i],
@@ -230,7 +230,7 @@ def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: u
 
     value: uint256 = ERC20(self.coins[base_i]).balanceOf(self)
     if base_i == 0:
-        value = StableSwap(self.base_pool).remove_liquidity_one_coin(value, convert(i, int128), _min_amount, True)
+        value = StableSwap(self.base_pool).remove_liquidity_one_coin(value, convert(i, int128), _min_amount)
         response: Bytes[32] = raw_call(
             self.underlying_coins[i],
             concat(
