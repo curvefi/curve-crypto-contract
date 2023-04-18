@@ -22,6 +22,10 @@ interface StableSwap:
     def remove_liquidity_one_coin(token_amount: uint256, i: int128, min_amount: uint256) -> uint256: nonpayable
     def remove_liquidity(amount: uint256, min_amounts: uint256[N_STABLECOINS]) -> uint256[N_STABLECOINS]: nonpayable
 
+interface WETH:
+    def deposit(): payable
+    def withdraw(_amount: uint256): nonpayable
+
 
 N_COINS: constant(uint256) = 3
 N_STABLECOINS: constant(uint256) = 2
@@ -83,8 +87,12 @@ def __default__():
     assert len(msg.data) == 0
 
 
+@payable
 @external
 def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _receiver: address = msg.sender, use_eth: bool = False):
+    if not use_eth:
+        assert msg.value == 0
+    
     base_deposit_amounts: uint256[N_STABLECOINS] = empty(uint256[N_STABLECOINS])
     deposit_amounts: uint256[N_COINS] = empty(uint256[N_COINS])
     is_base_deposit: bool = False
@@ -118,19 +126,23 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
         amount: uint256 = _amounts[i]
         if amount != 0:
             coin: address = self.underlying_coins[i]
-            # transfer underlying coin from msg.sender to self
-            _response: Bytes[32] = raw_call(
-                coin,
-                concat(
-                    method_id("transferFrom(address,address,uint256)"),
-                    convert(msg.sender, bytes32),
-                    convert(self, bytes32),
-                    convert(amount, bytes32)
-                ),
-                max_outsize=32
-            )
-            if len(_response) != 0:
-                assert convert(_response, bool)
+            if i == N_UL_COINS - 1 and use_eth:
+                assert msg.value == amount
+                WETH(coin).deposit(value=msg.value)
+            else:
+                # transfer underlying coin from msg.sender to self
+                _response: Bytes[32] = raw_call(
+                    coin,
+                    concat(
+                        method_id("transferFrom(address,address,uint256)"),
+                        convert(msg.sender, bytes32),
+                        convert(self, bytes32),
+                        convert(amount, bytes32)
+                    ),
+                    max_outsize=32
+                )
+                if len(_response) != 0:
+                    assert convert(_response, bool)
 
             deposit_amounts[i-(N_STABLECOINS-1)] = amount
 
