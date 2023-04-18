@@ -152,21 +152,29 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
     ERC20(token).transfer(_receiver, amount)
 
 
+@payable
 @external
 def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, _receiver: address = msg.sender, use_eth: bool = False):
-    # transfer `i` from caller into the zap
-    response: Bytes[32] = raw_call(
-        self.underlying_coins[i],
-        concat(
-            method_id("transferFrom(address,address,uint256)"),
-            convert(msg.sender, bytes32),
-            convert(self, bytes32),
-            convert(_dx, bytes32)
-        ),
-        max_outsize=32
-    )
-    if len(response) != 0:
-        assert convert(response, bool)
+    if not use_eth:
+        assert msg.value == 0 
+
+    if i == N_UL_COINS - 1 and use_eth:
+        assert msg.value == _dx
+        WETH(self.underlying_coins[i]).deposit(value=_dx)
+    else:
+        # transfer `i` from caller into the zap
+        response: Bytes[32] = raw_call(
+            self.underlying_coins[i],
+            concat(
+                method_id("transferFrom(address,address,uint256)"),
+                convert(msg.sender, bytes32),
+                convert(self, bytes32),
+                convert(_dx, bytes32)
+            ),
+            max_outsize=32
+        )
+        if len(response) != 0:
+            assert convert(response, bool)
 
     dx: uint256 = _dx
     base_i: uint256 = 0
@@ -190,7 +198,7 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
     if base_j == 0:
         # if `j` is in the base pool, withdraw the desired underlying asset and transfer to caller
         amount = StableSwap(self.base_pool).remove_liquidity_one_coin(amount, convert(j, int128), _min_dy)
-        response = raw_call(
+        response: Bytes[32] = raw_call(
             self.underlying_coins[j],
             concat(
                 method_id("transfer(address,uint256)"),
@@ -204,7 +212,11 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
     else:
         # withdraw `j` underlying from lending pool and transfer to caller
         assert amount >= _min_dy
-        ERC20(self.underlying_coins[j]).transfer(_receiver, amount)
+        if j == N_UL_COINS - 1 and use_eth:
+            WETH(self.underlying_coins[j]).withdraw(amount)
+            raw_call(_receiver, b"", value=amount)
+        else:
+            ERC20(self.underlying_coins[j]).transfer(_receiver, amount)
 
 
 @external
