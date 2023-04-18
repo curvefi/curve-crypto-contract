@@ -219,8 +219,12 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
             ERC20(self.underlying_coins[j]).transfer(_receiver, amount)
 
 
+@payable
 @external
 def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _receiver: address = msg.sender, use_eth: bool = False):
+    if not use_eth:
+        assert msg.value == 0
+    
     # transfer LP token from caller and remove liquidity
     ERC20(self.token).transferFrom(msg.sender, self, _amount)
     min_amounts: uint256[N_COINS] = [0, _min_amounts[2], _min_amounts[3]]
@@ -229,20 +233,26 @@ def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _recei
     # withdraw from base pool and transfer underlying assets to receiver
     value: uint256 = ERC20(self.coins[0]).balanceOf(self)
     base_min_amounts: uint256[N_STABLECOINS] = [_min_amounts[0], _min_amounts[1]]
-    received: uint256[N_STABLECOINS] = StableSwap(self.base_pool).remove_liquidity(value, base_min_amounts)
+    StableSwap(self.base_pool).remove_liquidity(value, base_min_amounts)
     for i in range(N_UL_COINS):
-        response: Bytes[32] = raw_call(
-            self.underlying_coins[i],
-            concat(
-                method_id("transfer(address,uint256)"),
-                convert(_receiver, bytes32),
-                convert(received[i], bytes32)
-            ),
-            max_outsize=32
-        )
-        if len(response) != 0:
-            assert convert(response, bool)
-
+        coin: address = self.underlying_coins[i]
+        if i == N_UL_COINS - 1 and use_eth:
+            amt: uint256 = ERC20(coin).balanceOf(self)
+            WETH(coin).withdraw(amt)
+            raw_call(_receiver, b"", value=amt)
+        else:
+            response: Bytes[32] = raw_call(
+                coin,
+                concat(
+                    method_id("transfer(address,uint256)"),
+                    convert(_receiver, bytes32),
+                    convert(ERC20(coin).balanceOf(self), bytes32)
+                ),
+                max_outsize=32
+            )
+            if len(response) != 0:
+                assert convert(response, bool)
+    
 
 @external
 def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: uint256, _receiver: address = msg.sender, use_eth: bool = False):
