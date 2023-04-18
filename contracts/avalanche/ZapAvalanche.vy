@@ -78,7 +78,7 @@ def __init__(_pool: address, _base_pool: address):
 
 
 @external
-def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _receiver: address = msg.sender):
+def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _receiver: address = msg.sender, use_eth: bool = False):
     base_deposit_amounts: uint256[N_STABLECOINS] = empty(uint256[N_STABLECOINS])
     deposit_amounts: uint256[N_COINS] = empty(uint256[N_COINS])
     is_base_deposit: bool = False
@@ -135,7 +135,7 @@ def add_liquidity(_amounts: uint256[N_UL_COINS], _min_mint_amount: uint256, _rec
 
 
 @external
-def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, _receiver: address = msg.sender):
+def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, _receiver: address = msg.sender, use_eth: bool = False):
     # transfer `i` from caller into the zap
     response: Bytes[32] = raw_call(
         self.underlying_coins[i],
@@ -190,7 +190,7 @@ def exchange_underlying(i: uint256, j: uint256, _dx: uint256, _min_dy: uint256, 
 
 
 @external
-def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _receiver: address = msg.sender):
+def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _receiver: address = msg.sender, use_eth: bool = False):
     # transfer LP token from caller and remove liquidity
     ERC20(self.token).transferFrom(msg.sender, self, _amount)
     min_amounts: uint256[N_COINS] = [0, _min_amounts[2], _min_amounts[3]]
@@ -215,7 +215,7 @@ def remove_liquidity(_amount: uint256, _min_amounts: uint256[N_UL_COINS], _recei
 
 
 @external
-def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: uint256, _receiver: address = msg.sender):
+def remove_liquidity_one_coin(_token_amount: uint256, i: uint256, _min_amount: uint256, _receiver: address = msg.sender, use_eth: bool = False):
     ERC20(self.token).transferFrom(msg.sender, self, _token_amount)
     base_i: uint256 = 0
     if i >= N_STABLECOINS:
